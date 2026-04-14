@@ -1,0 +1,71 @@
+name: Public Sampling Task
+description: 为公开页面人工采样补一组小区 / 楼栋 / 楼层样本
+title: "[sampling] "
+labels:
+  - sampling
+  - staging
+body:
+  - type: markdown
+    attributes:
+      value: |
+        只填写公开可见页面信息，不要提交登录态、受限页或未授权数据。
+  - type: input
+    id: district
+    attributes:
+      label: 行政区
+      placeholder: 例如 浦东新区
+    validations:
+      required: true
+  - type: input
+    id: community
+    attributes:
+      label: 小区
+      placeholder: 例如 张江汤臣豪园三期
+    validations:
+      required: true
+  - type: input
+    id: building
+    attributes:
+      label: 楼栋
+      placeholder: 例如 7号楼 / A座
+  - type: input
+    id: floor
+    attributes:
+      label: 楼层
+      placeholder: 例如 14层
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 任务类型
+      options:
+        - community
+        - building
+        - floor
+    validations:
+      required: true
+  - type: textarea
+    id: target_fields
+    attributes:
+      label: 目标字段
+      description: 列出这次至少要补齐的字段
+      placeholder: |
+        sale: 总价 / 面积 / 户型 / 楼层
+        rent: 月租 / 面积 / 户型 / 楼层
+        map: 楼栋文本 / 单元文本 / 发布时间
+    validations:
+      required: true
+  - type: textarea
+    id: source_urls
+    attributes:
+      label: 公开页面 URL
+      description: 每行一个，只填公开可见页面
+      placeholder: |
+        https://example.com/public-sale-001
+        https://example.com/public-rent-001
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注
+      description: 记录需要人工判断的别名、楼栋文本、楼层歧义等

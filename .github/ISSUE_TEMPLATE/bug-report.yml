@@ -1,0 +1,40 @@
+name: Bug Report
+description: 记录页面、导入链路或地图联动问题
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: input
+    id: area
+    attributes:
+      label: 影响范围
+      placeholder: 例如 地图联动 / browser capture / staged metrics
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开首页
+        2. 切到楼栋
+        3. 点击某个机会榜条目
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图 / 相关接口
+      description: 可以贴 console、接口返回或截图路径

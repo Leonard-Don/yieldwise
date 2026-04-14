@@ -227,6 +227,26 @@ python3 jobs/import_reference_dictionary.py \
   --output-dir tmp/reference-runs/shanghai-citywide-reference-2026-04-12
 ```
 
+## GitHub 协作与持续更新
+
+仓库现在已经带了最小的 GitHub 协作骨架：
+
+- `.github/workflows/validate.yml`
+  - 每次 `push / pull_request` 会跑：
+    - `python3 -m compileall api jobs scripts`
+    - `node --check app.js`
+- `.github/ISSUE_TEMPLATE/public-sampling-task.yml`
+  - 用来派发公开页人工采样任务
+- `.github/ISSUE_TEMPLATE/bug-report.yml`
+  - 用来记录页面、导入链和地图联动问题
+
+如果你要继续加公开页样本，建议先看：
+
+- `CONTRIBUTING.md`
+- `docs/public-sampling-backlog.md`
+
+这样后面不管是自己补样本，还是把采样任务分给别人，口径都会更统一。
+
 这条链跑完后，`/api/map/communities` 会直接返回全市真实小区点位；当前仓库已经自带一版全市小区主档与 staged 锚点 snapshot。
 
 如果你不想手动拆这几步，现在也可以直接一键物化整套 staged public snapshot：
