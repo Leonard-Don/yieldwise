@@ -1,0 +1,4 @@
+district_id,community_id,community_name,aliases,source_confidence
+pudong,zhangjiang-park,张江汤臣豪园,张江汤臣豪园|张江豪园,0.94
+pudong,biyun-residence,碧云尊邸,碧云尊邸|碧云国际社区,0.92
+minhang,qibao-yunting,七宝云庭,七宝云庭|七宝云邸,0.93

@@ -1,0 +1,5 @@
+district_id,community_id,community_name,aliases,source_confidence
+pudong,zhangjiang-tangchen-3,张江汤臣豪园三期,"张江汤臣豪园三期|张江汤臣豪园",0.93
+pudong,dongfang-huijingyuan,东方汇景苑,"东方汇景苑",0.92
+pudong,caifu-haijing-huayuan,财富海景花园,"财富海景花园",0.92
+jingan,jiali-mingzhucheng,嘉利明珠城,"嘉利明珠城",0.9

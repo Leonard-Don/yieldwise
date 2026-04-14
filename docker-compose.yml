@@ -1,0 +1,23 @@
+services:
+  atlas-postgis:
+    image: postgis/postgis:16-3.4
+    container_name: atlas-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shanghai_yield_atlas
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas_local_dev
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - atlas-postgis-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas -d shanghai_yield_atlas"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  atlas-postgis-data:

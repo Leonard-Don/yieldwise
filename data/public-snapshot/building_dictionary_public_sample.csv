@@ -1,0 +1,5 @@
+community_id,building_id,building_name,total_floors,unit_count,aliases,source_ref
+zhangjiang-tangchen-3,zhangjiang-tangchen-3-b5,5号楼,11,2,"5号楼|5幢","张江汤臣豪园5号楼"
+dongfang-huijingyuan,dongfang-huijingyuan-b1,1号楼,39,2,"1号楼|1幢","东方路1881弄"
+caifu-haijing-huayuan,caifu-haijing-huayuan-b1,1号楼,38,2,"1号楼|1幢","浦明路258弄"
+jiali-mingzhucheng,jiali-mingzhucheng-b1,1号楼,38,2,"1号楼|1幢","平型关路377弄"

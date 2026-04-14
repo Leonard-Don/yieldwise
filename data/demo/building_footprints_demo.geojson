@@ -1,0 +1,90 @@
+{
+  "type": "FeatureCollection",
+  "name": "demo-building-footprints",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-demo-001",
+        "community_id": "zhangjiang-park",
+        "community_name": "张江汤臣豪园",
+        "building_id": "zhangjiang-park-b1",
+        "building_name": "2号楼"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.595305, 31.35768], [121.612305, 31.352719], [121.620484, 31.364883], [121.604747, 31.370742], [121.595305, 31.35768]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-demo-002",
+        "community_id": "zhangjiang-park",
+        "community_name": "张江汤臣豪园",
+        "building_id": "zhangjiang-park-b2",
+        "building_name": "5号楼"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.612863, 31.336124], [121.631737, 31.330677], [121.640821, 31.344046], [121.623347, 31.350477], [121.612863, 31.336124]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-demo-003",
+        "community_id": "zhangjiang-park",
+        "community_name": "张江汤臣豪园",
+        "building_id": "zhangjiang-park-b3",
+        "building_name": "7号楼"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.632274, 31.357405], [121.650516, 31.352127], [121.659305, 31.365094], [121.642411, 31.371335], [121.632274, 31.357405]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-demo-004",
+        "community_id": "qibao-yunting",
+        "community_name": "七宝云庭",
+        "building_id": "qibao-yunting-b1",
+        "building_name": "3幢"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.299853, 31.20259], [121.314968, 31.198127], [121.322253, 31.209095], [121.308253, 31.214373], [121.299853, 31.20259]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-demo-005",
+        "community_id": "qibao-yunting",
+        "community_name": "七宝云庭",
+        "building_id": "qibao-yunting-b2",
+        "building_name": "9幢"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.317411, 31.181045], [121.334411, 31.176085], [121.342589, 31.188248], [121.326853, 31.194108], [121.317411, 31.181045]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-demo-006",
+        "community_id": "qibao-yunting",
+        "community_name": "七宝云庭",
+        "building_id": "qibao-yunting-b3",
+        "building_name": "11幢"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.336358, 31.202199], [121.353358, 31.197238], [121.361537, 31.209402], [121.3458, 31.215262], [121.336358, 31.202199]]]
+      }
+    }
+  ]
+}

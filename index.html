@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shanghai Yield Atlas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Spatial Arbitrage Workbench</p>
+          <h1>Shanghai Yield Atlas</h1>
+        </div>
+        <div class="topbar-meta">
+          <div>
+            <span class="meta-label">研究范围</span>
+            <strong>上海试点 / 楼栋级示意</strong>
+          </div>
+          <div>
+            <span class="meta-label">坐标链路</span>
+            <strong>GCJ-02 → WGS-84</strong>
+          </div>
+          <div>
+            <span class="meta-label">模式</span>
+            <strong>租售比 + 机会评分</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <section class="panel filter-panel">
+            <div class="panel-heading">
+              <p class="eyebrow">Control</p>
+              <h2>筛选条件</h2>
+            </div>
+
+            <label class="field">
+              <span>行政区</span>
+              <select id="districtFilter"></select>
+            </label>
+
+            <label class="field">
+              <div class="field-header">
+                <span>最低年化回报率</span>
+                <strong id="minYieldValue">0.0%</strong>
+              </div>
+              <input id="minYieldFilter" type="range" min="0" max="5" step="0.1" value="0" />
+            </label>
+
+            <label class="field">
+              <div class="field-header">
+                <span>最高总价预算</span>
+                <strong id="maxBudgetValue">10000 万</strong>
+              </div>
+              <input id="maxBudgetFilter" type="range" min="300" max="10000" step="50" value="10000" />
+            </label>
+
+            <label class="field">
+              <div class="field-header">
+                <span>最小样本量</span>
+                <strong id="minSamplesValue">1 套</strong>
+              </div>
+              <input id="minSamplesFilter" type="range" min="1" max="60" step="1" value="1" />
+            </label>
+
+            <div class="field segmented">
+              <span>展示粒度</span>
+              <div class="segment-group" id="granularityGroup">
+                <button class="segment is-active" data-granularity="community">小区</button>
+                <button class="segment" data-granularity="building">楼栋</button>
+                <button class="segment" data-granularity="floor">楼层</button>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button id="exportKmlButton" class="action primary">导出 KML 草稿</button>
+              <button id="exportGeoJsonButton" class="action">导出 GeoJSON</button>
+            </div>
+          </section>
+
+          <section class="panel metric-strip">
+            <div class="panel-heading">
+              <p class="eyebrow">Pulse</p>
+              <h2>全局观测</h2>
+            </div>
+            <div class="metric-grid" id="summaryGrid"></div>
+          </section>
+        </aside>
+
+        <section class="main-column">
+          <section class="panel map-panel">
+            <div class="panel-heading split">
+              <div>
+                <p class="eyebrow">Map Surface</p>
+                <h2>上海租售比热力示意图</h2>
+              </div>
+              <div class="legend">
+                <span id="mapModeBadge" class="map-mode-badge">SVG Fallback</span>
+                <span><i class="legend-chip low"></i>低收益</span>
+                <span><i class="legend-chip mid"></i>均衡</span>
+                <span><i class="legend-chip high"></i>高收益</span>
+              </div>
+            </div>
+
+            <div class="map-frame">
+              <div id="amapContainer" class="amap-container is-hidden" aria-label="Amap live map"></div>
+              <div id="mapFallback" class="map-fallback">
+                <svg id="districtMap" viewBox="0 0 760 520" aria-label="Shanghai district heatmap">
+                  <defs>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <g id="mapGrid"></g>
+                  <g id="districtLayer"></g>
+                  <g id="markerLayer"></g>
+                </svg>
+              </div>
+              <div id="mapReferenceOverlay" class="map-reference-overlay is-hidden" aria-hidden="true">
+                <img src="./assets/shanghai-districts-reference.svg" alt="" />
+                <span>上海行政区参考图 · Wikimedia Commons CC BY-SA 4.0</span>
+              </div>
+
+              <div class="floating-note" id="mapNote">
+                <strong>说明</strong>
+                <p>地图为交互原型示意，当前重点展示区级热度、小区打点与楼栋下钻关系。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel matrix-panel">
+            <div class="panel-heading split">
+              <div>
+                <p class="eyebrow">Building x Floor</p>
+                <h2 id="matrixTitle">楼栋 × 楼层回报率表</h2>
+              </div>
+              <p class="helper-text">点击地图上的小区点或机会榜条目切楼栋，右侧会继续下钻到逐层机会带。</p>
+            </div>
+            <div id="matrixTable" class="matrix-table"></div>
+          </section>
+        </section>
+
+        <aside class="inspector">
+          <section class="panel detail-panel">
+            <div class="panel-heading">
+              <p class="eyebrow">Inspector</p>
+              <h2>选中对象</h2>
+            </div>
+            <div id="detailCard" class="detail-card"></div>
+          </section>
+
+          <section class="panel evidence-panel">
+            <div class="panel-heading">
+              <p class="eyebrow">Evidence</p>
+              <h2>楼层样本明细</h2>
+            </div>
+            <div id="floorEvidence" class="evidence-list"></div>
+          </section>
+
+          <section class="panel ranking-panel">
+            <div class="panel-heading split">
+              <div>
+                <p class="eyebrow">Opportunity</p>
+                <h2>套利机会榜</h2>
+              </div>
+              <span id="rankingCount" class="badge"></span>
+            </div>
+            <div id="rankingList" class="ranking-list"></div>
+          </section>
+
+          <section class="panel ranking-panel">
+            <div class="panel-heading split">
+              <div>
+                <p class="eyebrow">Persistence</p>
+                <h2>持续套利楼层榜</h2>
+              </div>
+              <div class="panel-heading-actions">
+                <span id="floorWatchlistCount" class="badge"></span>
+                <div class="action-row compact">
+                  <button id="exportFloorWatchlistKmlButton" class="action compact primary">导出楼层 KML</button>
+                  <button id="exportFloorWatchlistGeoJsonButton" class="action compact">导出楼层 GeoJSON</button>
+                </div>
+              </div>
+            </div>
+            <div id="floorWatchlist" class="ranking-list"></div>
+          </section>
+
+          <section class="panel ranking-panel">
+            <div class="panel-heading split">
+              <div>
+                <p class="eyebrow">Geo Ops</p>
+                <h2>几何补采优先级榜</h2>
+              </div>
+              <div class="panel-heading-actions">
+                <span id="geoTaskWatchlistCount" class="badge"></span>
+                <div class="action-row compact">
+                  <button id="exportGeoTaskWatchlistGeoJsonButton" class="action compact primary">导出补采 GeoJSON</button>
+                  <button id="exportGeoTaskWatchlistCsvButton" class="action compact">导出补采 CSV</button>
+                </div>
+              </div>
+            </div>
+            <div id="geoTaskWatchlist" class="ranking-list"></div>
+          </section>
+
+          <section class="panel ranking-panel">
+            <div class="panel-heading split">
+              <div>
+                <p class="eyebrow">Sampling</p>
+                <h2>公开页面采样任务包</h2>
+              </div>
+              <div class="panel-heading-actions">
+                <span id="browserSamplingPackCount" class="badge"></span>
+                <div class="action-row compact">
+                  <button id="exportBrowserSamplingPackCsvButton" class="action compact primary">导出采样 CSV</button>
+                </div>
+              </div>
+            </div>
+            <div id="browserSamplingPack" class="ranking-list"></div>
+          </section>
+        </aside>
+      </main>
+
+      <section class="research-grid">
+        <section class="panel strategy-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Stack</p>
+            <h2>地图与数据策略</h2>
+          </div>
+          <div id="strategyPanel" class="strategy-list"></div>
+          <div id="dataSourceList" class="source-list"></div>
+        </section>
+
+        <section class="panel operations-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Ops</p>
+            <h2>数据接入与地址标准化</h2>
+          </div>
+          <div id="opsSummary" class="ops-summary"></div>
+          <div id="referenceRunList" class="import-run-list"></div>
+          <div id="importRunList" class="import-run-list"></div>
+          <div id="metricsRunList" class="import-run-list"></div>
+          <div id="geoAssetRunList" class="import-run-list"></div>
+          <div id="geoAssetRunDetail" class="import-run-detail"></div>
+          <div id="importRunDetail" class="import-run-detail"></div>
+          <div id="sourceHealthList" class="source-list"></div>
+          <div id="browserSamplingWorkbench" class="import-run-detail"></div>
+          <div id="addressQueueList" class="queue-list"></div>
+          <div id="anchorWatchlist" class="queue-list"></div>
+        </section>
+
+        <section class="panel pipeline-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Architecture</p>
+            <h2>采集与清洗链路</h2>
+          </div>
+          <div id="pipeline" class="pipeline"></div>
+        </section>
+
+        <section class="panel schema-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Storage</p>
+            <h2>核心表设计</h2>
+          </div>
+          <div id="schemaList" class="schema-list"></div>
+        </section>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,3 @@
+source_listing_id,business_type,url,community_name,address_text,raw_text,published_at,building_text,unit_text,floor_text,total_floors,area_sqm,bedrooms,living_rooms,bathrooms,orientation,decoration,price_total_wan,unit_price_yuan,monthly_rent,capture_notes
+PB-CAPTURE-001,sale,https://example.com/public-sale-page,七宝云庭,上海市闵行区七宝云庭3幢2单元,"七宝云庭 3幢 2单元 8/12层 75.6平 2室1厅1卫 南 精装 总价628万 单价83069元/平",2026-04-14T10:30:00+08:00,,,,,,,,,,,,,
+PB-CAPTURE-002,rent,https://example.com/public-rent-page,七宝云庭,上海市闵行区七宝云庭3幢2单元,"七宝云庭 3幢 2单元 8/12层 75.1平 2室1厅1卫 南 精装 月租14900元",2026-04-14T10:42:00+08:00,,,,,,,,,,,,,

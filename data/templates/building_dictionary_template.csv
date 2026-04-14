@@ -1,0 +1,4 @@
+community_id,building_id,building_name,total_floors,unit_count,aliases,source_ref
+zhangjiang-park,zhangjiang-park-b2,2栋,24,2,2栋|2号楼|二栋,standBuilding:ZJ-2
+biyun-residence,biyun-residence-b3,3栋,18,2,3栋|3号楼|三栋,standBuilding:BY-3
+qibao-yunting,qibao-yunting-b9,9栋,16,2,9栋|9号楼|九栋,standBuilding:QB-9

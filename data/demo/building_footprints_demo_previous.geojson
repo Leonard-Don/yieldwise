@@ -1,0 +1,74 @@
+{
+  "type": "FeatureCollection",
+  "name": "demo-building-footprints-baseline",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-baseline-001",
+        "community_id": "zhangjiang-park",
+        "community_name": "张江汤臣豪园",
+        "building_id": "zhangjiang-park-b1",
+        "building_name": "2号楼"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.594102, 31.358336], [121.611211, 31.353116], [121.619204, 31.365011], [121.603095, 31.370966], [121.594102, 31.358336]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-baseline-002",
+        "community_id": "zhangjiang-park",
+        "community_name": "张江汤臣豪园",
+        "building_id": "zhangjiang-park-b2",
+        "building_name": "5号楼"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.611028, 31.335492], [121.629227, 31.330214], [121.637851, 31.342955], [121.621174, 31.348986], [121.611028, 31.335492]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-baseline-003",
+        "community_id": "qibao-yunting",
+        "community_name": "七宝云庭",
+        "building_id": "qibao-yunting-b1",
+        "building_name": "3幢"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.298626, 31.202024], [121.313315, 31.19765], [121.320468, 31.208402], [121.30688, 31.21339], [121.298626, 31.202024]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-baseline-004",
+        "community_id": "qibao-yunting",
+        "community_name": "七宝云庭",
+        "building_id": "qibao-yunting-b2",
+        "building_name": "9幢"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.316005, 31.180471], [121.332654, 31.175603], [121.340712, 31.187487], [121.325304, 31.193357], [121.316005, 31.180471]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "source_ref": "geo-baseline-unresolved-001",
+        "community_name": "张江汤臣豪园",
+        "building_name": "南塔楼"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[121.646918, 31.337182], [121.655381, 31.334826], [121.659992, 31.341514], [121.65195, 31.344377], [121.646918, 31.337182]]]
+      }
+    }
+  ]
+}

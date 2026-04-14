@@ -1,0 +1,5 @@
+source,source_listing_id,url,community_name,address_text,building_text,unit_text,floor_text,total_floors,area_sqm,bedrooms,living_rooms,bathrooms,orientation,decoration,monthly_rent,published_at
+beike-open-platform,RENT-001,https://example.com/rent-001,张江汤臣豪园,上海市浦东新区张江汤臣豪园5号楼2单元,5号楼,2单元,17/24,24,95.8,2,2,1,南,精装,22800,2026-04-10T12:00:00+08:00
+beike-open-platform,RENT-002,https://example.com/rent-002,张江汤臣豪园,上海市浦东新区张江汤臣豪园5号楼1单元,5号楼,1单元,8/24,24,88.6,2,1,1,南,简装,20900,2026-04-09T20:10:00+08:00
+authorized-manual,RENT-003,https://example.com/rent-003,七宝云庭,上海市闵行区七宝云庭9幢1单元,9幢,1单元,16/18,18,79.1,2,1,1,南北,精装,15300,2026-04-08T15:30:00+08:00
+authorized-manual,RENT-004,https://example.com/rent-004,碧云天第,上海市浦东新区碧云天第东区B座3单元,,3单元,中楼层,20,108.5,3,2,2,南,精装,19800,2026-04-07T18:45:00+08:00
