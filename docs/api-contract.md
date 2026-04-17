@@ -256,6 +256,7 @@
 - `latestGeoRunAt`
 - `metricsRunCount`
 - `latestMetricsRunAt`
+- `latestStagedMetricsRunAt`
 - `databaseConnected`
 - `databaseReadable`
 - `databaseSeeded`
@@ -269,6 +270,23 @@
 - `latestImportPersistAt`
 - `latestGeoPersistAt`
 - `latestMetricsRefreshAt`
+- `latestDatabaseMetricsRefreshAt`
+- `metricsRefreshHistory[]`
+
+`metricsRefreshHistory[]` 每条事件当前至少包含：
+
+- `createdAt`
+- `batchName`
+- `snapshotDate`
+- `status / statusLabel`
+- `mode / modeLabel`
+- `triggerSource / triggerLabel`
+- `postgresStatus`
+- `summary.communityMetricCount`
+- `summary.buildingFloorMetricCount`
+- `summary.communityCoverageCount`
+- `summary.buildingCoverageCount`
+- `error`
 
 ### `GET /api/import-runs`
 
@@ -321,6 +339,39 @@
 - `communityCoverageCount`
 - `buildingCoverageCount`
 - `manifestPath`
+
+### `POST /api/jobs/refresh-metrics`
+
+立即触发一轮 staged metrics 快照计算，并在完成后刷新工作台读到的 metrics run 列表。
+
+默认行为：
+
+- 若未传 `snapshot_date`，后端会使用服务端当天日期
+- 若未传 `batch_name`，后端会生成 `staged-metrics-YYYY-MM-DD`
+- 若前端处于数据库主读且当前已连通 PostgreSQL，可额外传 `write_postgres=true`
+
+请求体示例：
+
+```json
+{
+  "snapshot_date": "2026-04-17",
+  "batch_name": "staged-metrics-2026-04-17",
+  "write_postgres": false,
+  "apply_schema": false
+}
+```
+
+响应至少包含：
+
+- `metricsRun`
+- `postgres`
+- `steps`
+- `summary.communityMetricCount`
+- `summary.buildingFloorMetricCount`
+- `requested.snapshotDate`
+- `requested.batchName`
+- `requested.writePostgres`
+- `requested.triggerSource`
 
 ### `GET /api/browser-sampling-pack`
 
@@ -907,7 +958,7 @@
 - `svg_points`
 - `svg_center`
 
-其中 `svg_points / svg_center` 主要给当前 SVG 回退地图使用，后续接入真实 AOI / 楼栋资产后仍可保留为前端调试字段。
+其中 `svg_points / svg_center` 目前主要保留给前端调试、导出和几何兜底计算使用，不再承担旧的 SVG 地图渲染职责。
 
 行为约定：
 
@@ -1136,5 +1187,4 @@
 
 1. 把 `samplePairs` 替换成真实出售 / 出租配对样本。
 2. 为 `GET /api/buildings/{building_id}/floors/{floor_no}` 增加真实单元号与原始快照链接。
-3. 增加 `POST /api/jobs/refresh-metrics` 触发快照计算。
-4. 增加鉴权与抓取任务状态接口。
+3. 增加鉴权与抓取任务状态接口。

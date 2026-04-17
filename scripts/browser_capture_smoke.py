@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +21,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT_DIR / "output" / "playwright"
 IMPORT_RUNS_DIR = ROOT_DIR / "tmp" / "import-runs"
 METRICS_RUNS_DIR = ROOT_DIR / "tmp" / "metrics-runs"
+PWCLI_MAX_SESSION_LENGTH = 17
+PWCLI_COMMAND_TIMEOUT_SECONDS = 60.0
 
 
 def snapshot_stage_candidates(session: str, target_name: str) -> list[Path]:
@@ -54,9 +58,18 @@ def shell_env() -> dict[str, str]:
     return env
 
 
-def run_pwcli(session: str, *args: str) -> str:
+def cli_session_name(session: str) -> str:
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "-", session).strip("-") or "default"
+    if len(sanitized) <= PWCLI_MAX_SESSION_LENGTH:
+        return sanitized
+    digest = hashlib.sha1(sanitized.encode("utf-8")).hexdigest()[:6]
+    prefix = sanitized[: PWCLI_MAX_SESSION_LENGTH - len(digest) - 1].rstrip("-") or "pw"
+    return f"{prefix}-{digest}"
+
+
+def run_pwcli(session: str, *args: str, timeout_seconds: float | None = PWCLI_COMMAND_TIMEOUT_SECONDS) -> str:
     env = shell_env()
-    command = [env["PWCLI"], f"-s={session}", *args]
+    command = [env["PWCLI"], f"-s={cli_session_name(session)}", *args]
     completed = subprocess.run(
         command,
         cwd=ROOT_DIR,
@@ -64,8 +77,42 @@ def run_pwcli(session: str, *args: str) -> str:
         check=True,
         capture_output=True,
         text=True,
+        timeout=timeout_seconds,
     )
     return completed.stdout
+
+
+def command_error_text(error: subprocess.CalledProcessError) -> str:
+    return f"{error.stdout or ''}\n{error.stderr or ''}".strip()
+
+
+def is_session_not_open_error(error: subprocess.CalledProcessError) -> bool:
+    return "is not open" in command_error_text(error)
+
+
+def close_session_quietly(session: str) -> None:
+    try:
+        run_pwcli(session, "close", timeout_seconds=5)
+    except subprocess.TimeoutExpired:
+        pass
+    except Exception:
+        pass
+
+
+def cleanup_session_artifacts(session: str) -> None:
+    close_session_quietly(session)
+    cli_session = cli_session_name(session)
+    temp_root = Path(tempfile.gettempdir())
+    patterns = [
+        f"pw-*/cli/*-{cli_session}.sock",
+        f"pw-*/cli/*-{cli_session}-*.sock",
+    ]
+    for pattern in patterns:
+        for socket_path in temp_root.glob(pattern):
+            try:
+                socket_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def extract_playwright_result(output: str):
@@ -85,6 +132,11 @@ def newest_run_name(directory: Path, prefix: str) -> str | None:
         return None
     candidates.sort(key=lambda item: item.stat().st_mtime, reverse=True)
     return candidates[0].name
+
+
+def metrics_capture_prefix(snapshot_date: str | None = None) -> str:
+    date_value = snapshot_date or datetime.now().date().isoformat()
+    return f"staged-metrics-{date_value}-capture-"
 
 
 def snapshot_path(label: str, suffix: str) -> Path:
@@ -192,6 +244,69 @@ def run_id_matches(reported: str | None, actual: str | None) -> bool:
     if not reported or not actual:
         return True
     return reported == actual or reported.startswith(f"{actual}-")
+
+
+def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: int = 3) -> dict:
+    open_args = [url, "--headed"] if headed else [url]
+    actual_session = cli_session_name(session)
+    last_error: subprocess.CalledProcessError | None = None
+    for attempt in range(max_attempts):
+        cleanup_session_artifacts(session)
+        try:
+            run_pwcli(session, "open", *open_args)
+            return {
+                "requestedSession": session,
+                "actualSession": actual_session,
+                "attempt": attempt + 1,
+                "openedNewSession": True,
+                "reusedExistingSession": False,
+                "headed": headed,
+            }
+        except subprocess.CalledProcessError as error:
+            last_error = error
+            error_text = command_error_text(error)
+            if "EADDRINUSE" in error_text and attempt + 1 < max_attempts:
+                socket_match = re.search(r"address already in use (/.+?\.sock)", error_text)
+                if socket_match:
+                    socket_path = Path(socket_match.group(1))
+                    try:
+                        socket_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                time.sleep(0.5)
+                continue
+            raise
+    assert last_error is not None
+    raise last_error
+
+
+def ensure_browser_session(
+    session: str,
+    url: str,
+    *,
+    headed: bool,
+    navigate: bool,
+    fresh_session: bool = False,
+) -> tuple[bool, dict]:
+    actual_session = cli_session_name(session)
+    if not fresh_session:
+        try:
+            if navigate:
+                run_pwcli(session, "goto", url)
+            else:
+                run_pwcli(session, "tab-list")
+            return False, {
+                "requestedSession": session,
+                "actualSession": actual_session,
+                "attempt": 1,
+                "openedNewSession": False,
+                "reusedExistingSession": True,
+                "headed": headed,
+            }
+        except subprocess.CalledProcessError as error:
+            if not is_session_not_open_error(error):
+                raise
+    return True, open_browser_session(session, url, headed=headed)
 
 
 def browser_sampling_pack_url(atlas_url: str) -> str:
@@ -307,25 +422,32 @@ def main() -> int:
     parser.add_argument("--url", default="http://127.0.0.1:8013/", help="Atlas URL")
     parser.add_argument("--session", default="atlas-smoke", help="Playwright browser session name")
     parser.add_argument("--label", default=f"atlas-browser-capture-smoke-{datetime.now().strftime('%Y%m%d%H%M%S')}")
+    parser.add_argument("--headed", action="store_true", help="Run with a visible browser window. Default is headless.")
+    parser.add_argument("--fresh-session", action="store_true", help="Force a new browser session instead of reusing an existing one.")
     parser.add_argument("--navigate", action="store_true", help="Navigate the current browser session to --url before running.")
     parser.add_argument("--sale-price-wan", type=int, default=323)
     parser.add_argument("--rent-price-yuan", type=int, default=12200)
     parser.add_argument("--published-at", default="2026-04-14 14:50:00")
+    parser.add_argument("--keep-session-open", action="store_true", help="Keep the Playwright browser session open after the smoke test.")
     args = parser.parse_args()
 
     import_before = newest_run_name(IMPORT_RUNS_DIR, "public-browser-sampling-ui-")
-    metrics_before = newest_run_name(METRICS_RUNS_DIR, "staged-metrics-2026-04-14-capture-")
+    metrics_before = newest_run_name(METRICS_RUNS_DIR, metrics_capture_prefix())
+    opened_session = False
+    session_meta = None
+
+    initial_force_navigate = args.navigate or args.session != "default"
+    opened_session, session_meta = ensure_browser_session(
+        args.session,
+        args.url,
+        headed=args.headed,
+        navigate=initial_force_navigate,
+        fresh_session=args.fresh_session,
+    )
 
     def open_and_wait(force_navigate: bool) -> tuple[Path, str, dict]:
         if force_navigate:
-            try:
-                run_pwcli(args.session, "goto", args.url)
-            except subprocess.CalledProcessError as error:
-                combined = f"{error.stdout}\n{error.stderr}"
-                if "is not open" not in combined:
-                    raise
-                run_pwcli(args.session, "open")
-                run_pwcli(args.session, "goto", args.url)
+            run_pwcli(args.session, "goto", args.url)
             try:
                 rerun_atlas_init(args.session)
             except Exception:
@@ -365,102 +487,110 @@ def main() -> int:
                     pass
                 return wait_for_capture_panel(args.session, args.label, attempts=10)
 
-    initial_force_navigate = args.navigate or args.session != "default"
     try:
-        pre_snapshot, pre_text, pre_state = open_and_wait(initial_force_navigate)
-    except RuntimeError:
-        pre_snapshot, pre_text, pre_state = open_and_wait(True)
+        try:
+            pre_snapshot, pre_text, pre_state = open_and_wait(initial_force_navigate)
+        except RuntimeError:
+            pre_snapshot, pre_text, pre_state = open_and_wait(True)
 
-    timestamp_slug = datetime.now().strftime("%Y%m%d%H%M%S")
-    sale_id = f"browser-smoke-sale-{timestamp_slug}"
-    rent_id = f"browser-smoke-rent-{timestamp_slug}"
-    sale_url = f"https://example.com/sale/{sale_id}"
-    rent_url = f"https://example.com/rent/{rent_id}"
-    task = {
-        "communityName": pre_state.get("communityName", "").strip(),
-        "buildingName": pre_state.get("buildingName", "").strip(),
-        "floorNo": str(pre_state.get("floorNo", "")).strip(),
-        "districtName": pre_state.get("districtName", "").strip(),
-        "taskId": pre_state.get("taskId"),
-        "taskLabel": pre_state.get("taskLabel", "").strip(),
-    }
-    floor_label = f"{task['floorNo']}层" if task["floorNo"] else "中层"
-    building_label = task["buildingName"] or "待补楼栋"
-    sale_raw = f"上海 {task['districtName']} {task['communityName']} {building_label} {floor_label}/16层 89平米 2室2厅 南向 精装 挂牌总价{args.sale_price_wan}万"
-    rent_raw = f"上海 {task['districtName']} {task['communityName']} {building_label} {floor_label}/16层 89平米 2室2厅 南向 精装 月租{args.rent_price_yuan}元"
+        timestamp_slug = datetime.now().strftime("%Y%m%d%H%M%S")
+        sale_id = f"browser-smoke-sale-{timestamp_slug}"
+        rent_id = f"browser-smoke-rent-{timestamp_slug}"
+        sale_url = f"https://example.com/sale/{sale_id}"
+        rent_url = f"https://example.com/rent/{rent_id}"
+        task = {
+            "communityName": pre_state.get("communityName", "").strip(),
+            "buildingName": pre_state.get("buildingName", "").strip(),
+            "floorNo": str(pre_state.get("floorNo", "")).strip(),
+            "districtName": pre_state.get("districtName", "").strip(),
+            "taskId": pre_state.get("taskId"),
+            "taskLabel": pre_state.get("taskLabel", "").strip(),
+        }
+        floor_label = f"{task['floorNo']}层" if task["floorNo"] else "中层"
+        building_label = task["buildingName"] or "待补楼栋"
+        sale_raw = f"上海 {task['districtName']} {task['communityName']} {building_label} {floor_label}/16层 89平米 2室2厅 南向 精装 挂牌总价{args.sale_price_wan}万"
+        rent_raw = f"上海 {task['districtName']} {task['communityName']} {building_label} {floor_label}/16层 89平米 2室2厅 南向 精装 月租{args.rent_price_yuan}元"
 
-    fill_capture_form(
-        args.session,
-        {
-            "sale-sourceListingId": sale_id,
-            "sale-url": sale_url,
-            "sale-publishedAt": args.published_at,
-            "sale-rawText": sale_raw,
-            "rent-sourceListingId": rent_id,
-            "rent-url": rent_url,
-            "rent-publishedAt": args.published_at,
-            "rent-rawText": rent_raw,
-        },
-    )
+        fill_capture_form(
+            args.session,
+            {
+                "sale-sourceListingId": sale_id,
+                "sale-url": sale_url,
+                "sale-publishedAt": args.published_at,
+                "sale-rawText": sale_raw,
+                "rent-sourceListingId": rent_id,
+                "rent-url": rent_url,
+                "rent-publishedAt": args.published_at,
+                "rent-rawText": rent_raw,
+            },
+        )
 
-    filled_snapshot = take_snapshot(args.session, args.label, "filled")
-    click_submit(args.session)
+        filled_snapshot = take_snapshot(args.session, args.label, "filled")
+        click_submit(args.session)
 
-    time.sleep(2)
-    success_2s = take_snapshot(args.session, args.label, "after-2s")
-    success_state_2s = browser_capture_dom_state(args.session)
-    time.sleep(4)
-    success_6s = take_snapshot(args.session, args.label, "after-6s")
-    success_text = snapshot_text(success_6s)
-    success_state = browser_capture_dom_state(args.session)
-    console_errors = run_pwcli(args.session, "console", "error")
+        time.sleep(2)
+        success_2s = take_snapshot(args.session, args.label, "after-2s")
+        success_state_2s = browser_capture_dom_state(args.session)
+        time.sleep(4)
+        success_6s = take_snapshot(args.session, args.label, "after-6s")
+        success_text = snapshot_text(success_6s)
+        success_state = browser_capture_dom_state(args.session)
+        console_errors = run_pwcli(args.session, "console", "error")
 
-    import_after = newest_run_name(IMPORT_RUNS_DIR, "public-browser-sampling-ui-")
-    metrics_after = newest_run_name(METRICS_RUNS_DIR, "staged-metrics-2026-04-14-capture-")
-    latest_result = success_state.get("result") if success_state else None
-    current_task_run = success_state.get("currentTaskRecentRun") if success_state else None
-    button_state = success_state.get("submitButton") if success_state else {}
+        import_after = newest_run_name(IMPORT_RUNS_DIR, "public-browser-sampling-ui-")
+        metrics_after = newest_run_name(METRICS_RUNS_DIR, metrics_capture_prefix())
+        latest_result = success_state.get("result") if success_state else None
+        current_task_run = success_state.get("currentTaskRecentRun") if success_state else None
+        button_state = success_state.get("submitButton") if success_state else {}
+        attention_count = int(latest_result.get("attentionCount") or 0) if latest_result else None
 
-    result = {
-        "url": args.url,
-        "session": args.session,
-        "task": task,
-        "importRunBefore": import_before,
-        "importRunAfter": import_after,
-        "metricsRunBefore": metrics_before,
-        "metricsRunAfter": metrics_after,
-        "domResult": latest_result,
-        "currentTaskRecentRun": current_task_run,
-        "recentSamplingCount": None if not success_text else None,
-        "buttonRecovered": bool(button_state) and not button_state.get("disabled") and "生成采样批次并刷新" in button_state.get("text", ""),
-        "consoleErrors": console_errors.strip(),
-        "artifacts": {
-            "pre": str(pre_snapshot),
-            "filled": str(filled_snapshot),
-            "after2s": str(success_2s),
-            "after6s": str(success_6s),
-        },
-        "after2sState": success_state_2s,
-        "after6sState": success_state,
-    }
+        result = {
+            "url": args.url,
+            "session": args.session,
+            "sessionMeta": session_meta,
+            "task": task,
+            "importRunBefore": import_before,
+            "importRunAfter": import_after,
+            "metricsRunBefore": metrics_before,
+            "metricsRunAfter": metrics_after,
+            "domResult": latest_result,
+            "attentionCount": attention_count,
+            "currentTaskRecentRun": current_task_run,
+            "recentSamplingCount": None if not success_text else None,
+            "buttonRecovered": bool(button_state) and not button_state.get("disabled") and "生成采样批次并刷新" in button_state.get("text", ""),
+            "consoleErrors": console_errors.strip(),
+            "artifacts": {
+                "pre": str(pre_snapshot),
+                "filled": str(filled_snapshot),
+                "after2s": str(success_2s),
+                "after6s": str(success_6s),
+            },
+            "after2sState": success_state_2s,
+            "after6sState": success_state,
+        }
 
-    if import_after == import_before:
-        raise RuntimeError("公开页采样提交后，没有生成新的 import run。")
-    if metrics_after == metrics_before:
-        raise RuntimeError("公开页采样提交后，没有生成新的 staged metrics run。")
-    if not result["buttonRecovered"]:
-        raise RuntimeError("提交后按钮没有从“导入中...”恢复。")
-    if latest_result and not run_id_matches(latest_result.get("importRunId"), import_after):
-        raise RuntimeError(f"页面结果里的 import run 与落盘结果不一致：{latest_result.get('importRunId')} != {import_after}")
-    if latest_result and not run_id_matches(latest_result.get("metricsRunId"), metrics_after):
-        raise RuntimeError(f"页面结果里的 metrics run 与落盘结果不一致：{latest_result.get('metricsRunId')} != {metrics_after}")
-    if current_task_run and current_task_run.get("captureRunId") and latest_result and latest_result.get("captureRunId") and current_task_run.get("captureRunId") != latest_result.get("captureRunId"):
-        raise RuntimeError("当前任务最近采样的 capture run 与结果卡不一致。")
-    if "Total messages: 0" not in result["consoleErrors"] and "Returning 0 messages" not in result["consoleErrors"]:
-        raise RuntimeError("提交后浏览器 console 仍然存在 error。")
+        if import_after == import_before:
+            raise RuntimeError("公开页采样提交后，没有生成新的 import run。")
+        if metrics_after == metrics_before:
+            raise RuntimeError("公开页采样提交后，没有生成新的 staged metrics run。")
+        if not result["buttonRecovered"]:
+            raise RuntimeError("提交后按钮没有从“导入中...”恢复。")
+        if attention_count:
+            raise RuntimeError(f"提交后不应出现 attention，当前为 {attention_count} 条：{latest_result.get('text') if latest_result else ''}")
+        if latest_result and not run_id_matches(latest_result.get("importRunId"), import_after):
+            raise RuntimeError(f"页面结果里的 import run 与落盘结果不一致：{latest_result.get('importRunId')} != {import_after}")
+        if latest_result and not run_id_matches(latest_result.get("metricsRunId"), metrics_after):
+            raise RuntimeError(f"页面结果里的 metrics run 与落盘结果不一致：{latest_result.get('metricsRunId')} != {metrics_after}")
+        if current_task_run and current_task_run.get("captureRunId") and latest_result and latest_result.get("captureRunId") and current_task_run.get("captureRunId") != latest_result.get("captureRunId"):
+            raise RuntimeError("当前任务最近采样的 capture run 与结果卡不一致。")
+        if "Total messages: 0" not in result["consoleErrors"] and "Returning 0 messages" not in result["consoleErrors"]:
+            raise RuntimeError("提交后浏览器 console 仍然存在 error。")
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    finally:
+        if opened_session and not args.keep_session_open:
+            close_session_quietly(args.session)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,8 @@ import re
 import subprocess
 import sys
 from copy import deepcopy
-from datetime import datetime
+from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -158,6 +159,10 @@ def browser_capture_runs_root() -> Path:
     return ROOT_DIR / "tmp" / "browser-capture-runs"
 
 
+def metrics_refresh_history_path() -> Path:
+    return ROOT_DIR / "tmp" / "metrics-refresh-history.json"
+
+
 def slugify_identifier(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower())
     return slug.strip("-") or "browser-capture"
@@ -178,9 +183,253 @@ def read_json_file(path: Path | None) -> Any:
         return None
 
 
+def clear_runtime_caches() -> None:
+    _list_reference_runs_cached.cache_clear()
+    _reference_run_detail_full_cached.cache_clear()
+    _list_import_runs_cached.cache_clear()
+    _import_run_detail_full_cached.cache_clear()
+    _import_floor_history_for_cached.cache_clear()
+    _list_metrics_runs_cached.cache_clear()
+    _metrics_run_detail_cached.cache_clear()
+    _list_browser_capture_runs_cached.cache_clear()
+    _browser_capture_run_detail_cached.cache_clear()
+    _browser_capture_task_history_index_cached.cache_clear()
+    _list_geo_asset_runs_cached.cache_clear()
+    _geo_asset_run_detail_full_cached.cache_clear()
+    _geo_asset_run_comparison_cached.cache_clear()
+    _geo_asset_run_detail_cached.cache_clear()
+    _reference_catalog_indices_cached.cache_clear()
+    _runtime_data_state_cached.cache_clear()
+    _operations_payload_cached.cache_clear()
+    _bootstrap_operations_payload_cached.cache_clear()
+    _system_strategy_payload_cached.cache_clear()
+    _current_community_dataset_cached.cache_clear()
+
+
+def metrics_refresh_status_label(status: str | None) -> str:
+    return {
+        "completed": "已完成",
+        "partial": "部分完成",
+        "error": "失败",
+    }.get(str(status or "").strip().lower(), "状态待补")
+
+
+def metrics_refresh_mode_label(mode: str | None) -> str:
+    return {
+        "staged": "仅 staged",
+        "staged+postgres": "staged + PostgreSQL",
+        "postgres-only": "仅 PostgreSQL",
+    }.get(str(mode or "").strip().lower(), "模式待补")
+
+
+def metrics_refresh_trigger_label(trigger_source: str | None) -> str:
+    return {
+        "atlas-ui": "工作台手动",
+        "browser-sampling": "公开页采样",
+        "bootstrap": "本地 Bootstrap",
+    }.get(str(trigger_source or "").strip().lower(), "系统触发")
+
+
+def build_metrics_refresh_history_entry(
+    *,
+    batch_name: str,
+    snapshot_date: str,
+    write_postgres: bool,
+    trigger_source: str,
+    status: str,
+    postgres_status: str,
+    created_at: str | None = None,
+    metrics_run: dict[str, Any] | None = None,
+    postgres_summary: dict[str, Any] | None = None,
+    summary: dict[str, Any] | None = None,
+    error: str | None = None,
+    mode: str | None = None,
+    event_id: str | None = None,
+) -> dict[str, Any]:
+    resolved_created_at = created_at or datetime.now().astimezone().isoformat(timespec="seconds")
+    resolved_mode = str(mode or ("staged+postgres" if write_postgres else "staged")).strip().lower()
+    resolved_status = str(status or "completed").strip().lower()
+    resolved_postgres_status = str(postgres_status or ("completed" if write_postgres else "skipped")).strip().lower()
+    normalized_summary = summary if isinstance(summary, dict) else {}
+    normalized_postgres_summary = postgres_summary if isinstance(postgres_summary, dict) else None
+    entry = {
+        "eventId": str(event_id or f"metrics-refresh-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"),
+        "createdAt": resolved_created_at,
+        "snapshotDate": snapshot_date,
+        "batchName": batch_name,
+        "metricsRunId": metrics_run.get("runId") if isinstance(metrics_run, dict) else None,
+        "metricsRunCreatedAt": metrics_run.get("createdAt") if isinstance(metrics_run, dict) else None,
+        "status": resolved_status,
+        "statusLabel": metrics_refresh_status_label(resolved_status),
+        "mode": resolved_mode,
+        "modeLabel": metrics_refresh_mode_label(resolved_mode),
+        "writePostgres": bool(write_postgres),
+        "postgresStatus": resolved_postgres_status,
+        "triggerSource": str(trigger_source or "atlas-ui").strip().lower() or "atlas-ui",
+        "triggerLabel": metrics_refresh_trigger_label(trigger_source),
+        "summary": {
+            "communityMetricCount": int(normalized_summary.get("communityMetricCount") or 0),
+            "buildingFloorMetricCount": int(normalized_summary.get("buildingFloorMetricCount") or 0),
+            "communityCoverageCount": int(normalized_summary.get("communityCoverageCount") or 0),
+            "buildingCoverageCount": int(normalized_summary.get("buildingCoverageCount") or 0),
+        },
+        "postgresSummary": normalized_postgres_summary,
+    }
+    if error:
+        entry["error"] = str(error)
+    return entry
+
+
+def append_metrics_refresh_history(entry: dict[str, Any], *, limit: int = 12) -> None:
+    existing_rows = read_json_file(metrics_refresh_history_path())
+    history_rows = [row for row in existing_rows if isinstance(row, dict)] if isinstance(existing_rows, list) else []
+    write_json_file(metrics_refresh_history_path(), [deepcopy(entry), *history_rows][: max(limit, 1)])
+
+
+def list_metrics_refresh_history(limit: int | None = None) -> list[dict[str, Any]]:
+    rows = read_json_file(metrics_refresh_history_path())
+    if not isinstance(rows, list):
+        return []
+    items = [row for row in rows if isinstance(row, dict)]
+    normalized_items = [
+        build_metrics_refresh_history_entry(
+            batch_name=str(item.get("batchName") or "未命名批次").strip() or "未命名批次",
+            snapshot_date=str(item.get("snapshotDate") or "").strip() or "待补",
+            write_postgres=bool(item.get("writePostgres")),
+            trigger_source=str(item.get("triggerSource") or "atlas-ui"),
+            status=str(item.get("status") or "completed"),
+            postgres_status=str(item.get("postgresStatus") or ("completed" if item.get("writePostgres") else "skipped")),
+            created_at=str(item.get("createdAt") or "").strip() or None,
+            metrics_run={
+                "runId": item.get("metricsRunId"),
+                "createdAt": item.get("metricsRunCreatedAt"),
+            },
+            postgres_summary=item.get("postgresSummary") if isinstance(item.get("postgresSummary"), dict) else None,
+            summary=item.get("summary") if isinstance(item.get("summary"), dict) else None,
+            error=str(item.get("error") or "").strip() or None,
+            mode=str(item.get("mode") or "").strip() or None,
+            event_id=str(item.get("eventId") or "").strip() or None,
+        )
+        for item in items
+    ]
+    return deepcopy(normalized_items[:limit] if limit is not None else normalized_items)
+
+
+def refresh_metrics_snapshot(
+    *,
+    snapshot_date: date | str | None = None,
+    batch_name: str | None = None,
+    write_postgres: bool = False,
+    apply_schema: bool = False,
+    dsn: str | None = None,
+    trigger_source: str = "atlas-ui",
+) -> dict[str, Any]:
+    from jobs.refresh_metrics import build_snapshot, materialize_metrics_run
+    from .persistence import persist_metrics_snapshot_to_postgres
+
+    if snapshot_date is None:
+        resolved_snapshot_date = datetime.now().astimezone().date()
+    elif isinstance(snapshot_date, str):
+        resolved_snapshot_date = date.fromisoformat(snapshot_date)
+    else:
+        resolved_snapshot_date = snapshot_date
+
+    resolved_batch_name = str(batch_name or f"staged-metrics-{resolved_snapshot_date.isoformat()}").strip()
+    if not resolved_batch_name:
+        raise ValueError("batch_name cannot be empty")
+
+    metrics_run: dict[str, Any] | None = None
+    postgres_payload: dict[str, Any] | None = None
+    steps: list[dict[str, Any]] = []
+    metrics_response_summary = {
+        "communityMetricCount": 0,
+        "buildingFloorMetricCount": 0,
+        "communityCoverageCount": 0,
+        "buildingCoverageCount": 0,
+    }
+    history_status = "completed"
+    postgres_status = "pending" if write_postgres else "skipped"
+
+    try:
+        snapshot = build_snapshot(resolved_snapshot_date)
+        metrics_run = materialize_metrics_run(snapshot, batch_name=resolved_batch_name)
+        raw_metrics_summary = metrics_run.get("summary") or {}
+        metrics_response_summary = {
+            "communityMetricCount": int(raw_metrics_summary.get("community_metric_count") or 0),
+            "buildingFloorMetricCount": int(raw_metrics_summary.get("building_floor_metric_count") or 0),
+            "communityCoverageCount": int(raw_metrics_summary.get("community_coverage_count") or 0),
+            "buildingCoverageCount": int(raw_metrics_summary.get("building_coverage_count") or 0),
+        }
+        steps.append(
+            {
+                "step": "staged",
+                "status": "completed",
+                "runId": metrics_run.get("runId"),
+                "summary": metrics_run.get("summary"),
+            }
+        )
+        if write_postgres:
+            postgres_payload = persist_metrics_snapshot_to_postgres(snapshot, dsn=dsn, apply_schema=apply_schema)
+            postgres_status = "completed"
+            steps.append(
+                {
+                    "step": "postgres",
+                    "status": "completed",
+                    "summary": postgres_payload,
+                }
+            )
+        else:
+            steps.append({"step": "postgres", "status": "skipped", "reason": "调用方未请求 PostgreSQL 写入。"})
+
+        return {
+            "status": "completed",
+            "metricsRun": metrics_run,
+            "postgres": postgres_payload,
+            "steps": steps,
+            "requested": {
+                "snapshotDate": resolved_snapshot_date.isoformat(),
+                "batchName": resolved_batch_name,
+                "writePostgres": write_postgres,
+                "triggerSource": str(trigger_source or "atlas-ui").strip().lower() or "atlas-ui",
+            },
+            "summary": metrics_response_summary,
+        }
+    except Exception as exc:
+        if not steps:
+            history_status = "error"
+            steps.append({"step": "staged", "status": "error", "reason": str(exc)})
+        elif write_postgres and postgres_status == "pending":
+            postgres_status = "error"
+            steps.append({"step": "postgres", "status": "error", "reason": str(exc)})
+            history_status = "partial"
+        else:
+            history_status = "error"
+        raise
+    finally:
+        try:
+            append_metrics_refresh_history(
+                build_metrics_refresh_history_entry(
+                    batch_name=resolved_batch_name,
+                    snapshot_date=resolved_snapshot_date.isoformat(),
+                    write_postgres=write_postgres,
+                    trigger_source=trigger_source,
+                    status=history_status,
+                    postgres_status=postgres_status,
+                    metrics_run=metrics_run,
+                    postgres_summary=postgres_payload,
+                    summary=metrics_response_summary,
+                    error=steps[-1].get("reason") if steps and steps[-1].get("status") == "error" else None,
+                )
+            )
+        except Exception as history_exc:  # pragma: no cover - best effort local history
+            print(f"[atlas] metrics refresh history append failed: {history_exc}", file=sys.stderr)
+        clear_runtime_caches()
+
+
 def write_json_file(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    clear_runtime_caches()
 
 
 def resolve_artifact_path(path_value: str | None) -> Path | None:
@@ -255,6 +504,7 @@ def write_csv_rows(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in fieldnames})
+    clear_runtime_caches()
 
 
 def import_run_summary_from_manifest(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
@@ -340,7 +590,8 @@ def import_run_summary_from_db_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def list_import_runs() -> list[dict[str, Any]]:
+@lru_cache(maxsize=1)
+def _list_import_runs_cached() -> tuple[dict[str, Any], ...]:
     runs_by_id: dict[str, dict[str, Any]] = {}
     for row in db_import_run_rows():
         run_summary = import_run_summary_from_db_row(row)
@@ -360,7 +611,11 @@ def list_import_runs() -> list[dict[str, Any]]:
         runs_by_id[run_summary["runId"]] = run_summary
     runs = list(runs_by_id.values())
     runs.sort(key=lambda item: item.get("createdAt") or "", reverse=True)
-    return runs
+    return tuple(runs)
+
+
+def list_import_runs() -> list[dict[str, Any]]:
+    return deepcopy(list(_list_import_runs_cached()))
 
 
 def reference_run_summary_from_manifest(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
@@ -425,7 +680,8 @@ def reference_run_summary_from_db_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def list_reference_runs() -> list[dict[str, Any]]:
+@lru_cache(maxsize=1)
+def _list_reference_runs_cached() -> tuple[dict[str, Any], ...]:
     runs_by_id: dict[str, dict[str, Any]] = {}
     for row in db_reference_run_rows():
         run_summary = reference_run_summary_from_db_row(row)
@@ -445,7 +701,11 @@ def list_reference_runs() -> list[dict[str, Any]]:
         runs_by_id[run_summary["runId"]] = run_summary
     runs = list(runs_by_id.values())
     runs.sort(key=lambda item: item.get("createdAt") or "", reverse=True)
-    return runs
+    return tuple(runs)
+
+
+def list_reference_runs() -> list[dict[str, Any]]:
+    return deepcopy(list(_list_reference_runs_cached()))
 
 
 def reference_manifest_path_for_run(run_id: str) -> Path | None:
@@ -456,7 +716,8 @@ def reference_manifest_path_for_run(run_id: str) -> Path | None:
     return None
 
 
-def reference_run_detail_full(run_id: str) -> dict[str, Any] | None:
+@lru_cache(maxsize=64)
+def _reference_run_detail_full_cached(run_id: str) -> dict[str, Any] | None:
     manifest_path = reference_manifest_path_for_run(run_id)
     if manifest_path is None:
         return None
@@ -523,6 +784,11 @@ def reference_run_detail_full(run_id: str) -> dict[str, Any] | None:
     }
 
 
+def reference_run_detail_full(run_id: str) -> dict[str, Any] | None:
+    detail = _reference_run_detail_full_cached(run_id)
+    return deepcopy(detail) if detail else None
+
+
 def metrics_run_summary_from_manifest(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
     summary = manifest.get("summary", {})
     return {
@@ -541,7 +807,8 @@ def metrics_run_summary_from_manifest(manifest: dict[str, Any], manifest_path: P
     }
 
 
-def list_metrics_runs() -> list[dict[str, Any]]:
+@lru_cache(maxsize=1)
+def _list_metrics_runs_cached() -> tuple[dict[str, Any], ...]:
     runs: list[dict[str, Any]] = []
     for manifest_path in metrics_manifest_paths():
         manifest = read_json_file(manifest_path)
@@ -549,10 +816,15 @@ def list_metrics_runs() -> list[dict[str, Any]]:
             continue
         runs.append(metrics_run_summary_from_manifest(manifest, manifest_path))
     runs.sort(key=lambda item: item.get("createdAt") or "", reverse=True)
-    return runs
+    return tuple(runs)
 
 
-def metrics_run_detail(run_id: str) -> dict[str, Any] | None:
+def list_metrics_runs() -> list[dict[str, Any]]:
+    return deepcopy(list(_list_metrics_runs_cached()))
+
+
+@lru_cache(maxsize=64)
+def _metrics_run_detail_cached(run_id: str) -> dict[str, Any] | None:
     for manifest_path in metrics_manifest_paths():
         manifest = read_json_file(manifest_path)
         if not isinstance(manifest, dict) or manifest.get("run_id") != run_id:
@@ -574,6 +846,11 @@ def metrics_run_detail(run_id: str) -> dict[str, Any] | None:
             },
         }
     return None
+
+
+def metrics_run_detail(run_id: str) -> dict[str, Any] | None:
+    detail = _metrics_run_detail_cached(run_id)
+    return deepcopy(detail) if detail else None
 
 
 def latest_metrics_run_detail() -> dict[str, Any] | None:
@@ -644,7 +921,8 @@ def browser_capture_run_summary_from_manifest(manifest: dict[str, Any], manifest
     }
 
 
-def list_browser_capture_runs(limit: int | None = None) -> list[dict[str, Any]]:
+@lru_cache(maxsize=8)
+def _list_browser_capture_runs_cached(limit: int | None = None) -> tuple[dict[str, Any], ...]:
     runs: list[dict[str, Any]] = []
     for manifest_path in browser_capture_manifest_paths():
         manifest = read_json_file(manifest_path)
@@ -653,11 +931,16 @@ def list_browser_capture_runs(limit: int | None = None) -> list[dict[str, Any]]:
         runs.append(browser_capture_run_summary_from_manifest(manifest, manifest_path))
     runs.sort(key=lambda item: item.get("createdAt") or "", reverse=True)
     if limit is not None:
-        return runs[:limit]
-    return runs
+        return tuple(runs[:limit])
+    return tuple(runs)
 
 
-def browser_capture_run_detail(run_id: str) -> dict[str, Any] | None:
+def list_browser_capture_runs(limit: int | None = None) -> list[dict[str, Any]]:
+    return deepcopy(list(_list_browser_capture_runs_cached(limit)))
+
+
+@lru_cache(maxsize=64)
+def _browser_capture_run_detail_cached(run_id: str) -> dict[str, Any] | None:
     run_summary = next((item for item in list_browser_capture_runs() if item.get("runId") == run_id), None)
     if not run_summary:
         return None
@@ -720,7 +1003,13 @@ def browser_capture_run_detail(run_id: str) -> dict[str, Any] | None:
     }
 
 
-def browser_capture_task_history_index() -> dict[str, dict[str, Any]]:
+def browser_capture_run_detail(run_id: str) -> dict[str, Any] | None:
+    detail = _browser_capture_run_detail_cached(run_id)
+    return deepcopy(detail) if detail else None
+
+
+@lru_cache(maxsize=1)
+def _browser_capture_task_history_index_cached() -> dict[str, dict[str, Any]]:
     latest_by_task: dict[str, dict[str, Any]] = {}
     capture_runs = list_browser_capture_runs(limit=80)
     grouped_counts: dict[str, int] = {}
@@ -740,6 +1029,10 @@ def browser_capture_task_history_index() -> dict[str, dict[str, Any]]:
         item["taskLifecycleStatus"] = "needs_review" if attention_count > 0 else "captured"
         item["taskLifecycleLabel"] = "已采待复核" if attention_count > 0 else "已采仍需补采"
     return latest_by_task
+
+
+def browser_capture_task_history_index() -> dict[str, dict[str, Any]]:
+    return deepcopy(_browser_capture_task_history_index_cached())
 
 
 def latest_reference_anchor_review_lookup() -> dict[str, dict[str, Any]]:
@@ -833,7 +1126,8 @@ def geo_asset_run_summary_from_db_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def list_geo_asset_runs() -> list[dict[str, Any]]:
+@lru_cache(maxsize=1)
+def _list_geo_asset_runs_cached() -> tuple[dict[str, Any], ...]:
     runs_by_id: dict[str, dict[str, Any]] = {}
     for row in db_geo_asset_run_rows():
         run_summary = geo_asset_run_summary_from_db_row(row)
@@ -853,10 +1147,15 @@ def list_geo_asset_runs() -> list[dict[str, Any]]:
         runs_by_id[run_summary["runId"]] = run_summary
     runs = list(runs_by_id.values())
     runs.sort(key=lambda item: item.get("createdAt") or "", reverse=True)
-    return runs
+    return tuple(runs)
 
 
-def runtime_data_state() -> dict[str, Any]:
+def list_geo_asset_runs() -> list[dict[str, Any]]:
+    return deepcopy(list(_list_geo_asset_runs_cached()))
+
+
+@lru_cache(maxsize=1)
+def _runtime_data_state_cached() -> dict[str, Any]:
     postgres_status = postgres_runtime_status()
     db_snapshot = postgres_data_snapshot()
     staged_reference_runs = list_reference_runs()
@@ -897,6 +1196,10 @@ def runtime_data_state() -> dict[str, Any]:
             has_real_data=has_real_data,
         ),
     }
+
+
+def runtime_data_state() -> dict[str, Any]:
+    return deepcopy(_runtime_data_state_cached())
 
 
 def database_mode_active() -> bool:
@@ -1004,7 +1307,8 @@ def anchor_decision_state_for(
     return "pending"
 
 
-def reference_catalog_indices() -> dict[str, Any]:
+@lru_cache(maxsize=1)
+def _reference_catalog_indices_cached() -> dict[str, Any]:
     catalog = load_reference_catalog(allow_mock=False)
     district_index: dict[str, dict[str, Any]] = {}
     community_index: dict[str, dict[str, Any]] = {}
@@ -1103,6 +1407,10 @@ def reference_catalog_indices() -> dict[str, Any]:
             "anchorQuality": ref.anchor_quality,
         }
     return {"districts": district_index, "communities": community_index, "buildings": building_index}
+
+
+def reference_catalog_indices() -> dict[str, Any]:
+    return deepcopy(_reference_catalog_indices_cached())
 
 
 def place_labels_from_indices(indexes: dict[str, Any], community_id: str | None, building_id: str | None = None) -> dict[str, str | None]:
@@ -2755,7 +3063,8 @@ def db_import_run_detail_full(run_id: str) -> dict[str, Any] | None:
     }
 
 
-def import_run_detail_full(run_id: str) -> dict[str, Any] | None:
+@lru_cache(maxsize=128)
+def _import_run_detail_full_cached(run_id: str) -> dict[str, Any] | None:
     manifest_path = import_manifest_path_for_run(run_id)
     if manifest_path:
         manifest = read_json_file(manifest_path)
@@ -2825,6 +3134,11 @@ def import_run_detail_full(run_id: str) -> dict[str, Any] | None:
                 "rentIndex": rent_index,
             }
     return db_import_run_detail_full(run_id)
+
+
+def import_run_detail_full(run_id: str) -> dict[str, Any] | None:
+    detail = _import_run_detail_full_cached(run_id)
+    return deepcopy(detail) if detail else None
 
 
 def import_run_detail(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
@@ -3064,11 +3378,12 @@ def import_floor_evidence_for(building_id: str, floor_no: int) -> dict[str, Any]
     return None
 
 
-def import_floor_history_for(building_id: str, floor_no: int) -> dict[str, Any]:
+@lru_cache(maxsize=512)
+def _import_floor_history_for_cached(building_id: str, floor_no: int) -> dict[str, Any]:
     history_rows: list[dict[str, Any]] = []
 
-    for run_summary in sorted(list_import_runs(), key=lambda item: item.get("createdAt") or ""):
-        detail = import_run_detail_full(run_summary["runId"])
+    for run_summary in sorted(_list_import_runs_cached(), key=lambda item: item.get("createdAt") or ""):
+        detail = _import_run_detail_full_cached(run_summary["runId"])
         if not detail:
             continue
 
@@ -3155,6 +3470,10 @@ def import_floor_history_for(building_id: str, floor_no: int) -> dict[str, Any]:
         "timeline": list(reversed(history_rows)),
         "summary": summary,
     }
+
+
+def import_floor_history_for(building_id: str, floor_no: int) -> dict[str, Any]:
+    return deepcopy(_import_floor_history_for_cached(building_id, floor_no))
 
 
 def floor_watchlist(
@@ -4535,7 +4854,8 @@ def db_geo_asset_run_detail_full(run_id: str) -> dict[str, Any] | None:
     }
 
 
-def geo_asset_run_detail_full(run_id: str) -> dict[str, Any] | None:
+@lru_cache(maxsize=64)
+def _geo_asset_run_detail_full_cached(run_id: str) -> dict[str, Any] | None:
     manifest_path = geo_manifest_path_for_run(run_id)
     if manifest_path:
         manifest = read_json_file(manifest_path)
@@ -4593,6 +4913,11 @@ def geo_asset_run_detail_full(run_id: str) -> dict[str, Any] | None:
                 "workOrderEvents": work_order_events,
             }
     return db_geo_asset_run_detail_full(run_id)
+
+
+def geo_asset_run_detail_full(run_id: str) -> dict[str, Any] | None:
+    detail = _geo_asset_run_detail_full_cached(run_id)
+    return deepcopy(detail) if detail else None
 
 
 def build_geo_asset_run_view(detail: dict[str, Any]) -> dict[str, Any]:
@@ -4887,7 +5212,8 @@ def compare_geo_asset_run_details(
     }
 
 
-def geo_asset_run_comparison(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
+@lru_cache(maxsize=128)
+def _geo_asset_run_comparison_cached(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
     current_detail = geo_asset_run_detail_full(run_id)
     if not current_detail:
         return None
@@ -4907,13 +5233,24 @@ def geo_asset_run_comparison(run_id: str, baseline_run_id: str | None = None) ->
     return compare_geo_asset_run_details(current_view, current_detail, baseline_view, baseline_detail)
 
 
-def geo_asset_run_detail(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
+def geo_asset_run_comparison(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
+    comparison = _geo_asset_run_comparison_cached(run_id, baseline_run_id)
+    return deepcopy(comparison) if comparison else None
+
+
+@lru_cache(maxsize=128)
+def _geo_asset_run_detail_cached(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
     detail = geo_asset_run_detail_full(run_id)
     if not detail:
         return None
     current_view = build_geo_asset_run_view(detail)
     current_view["comparison"] = geo_asset_run_comparison(run_id, baseline_run_id=baseline_run_id)
     return current_view
+
+
+def geo_asset_run_detail(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
+    detail = _geo_asset_run_detail_cached(run_id, baseline_run_id)
+    return deepcopy(detail) if detail else None
 
 
 def geo_task_watchlist(
@@ -6666,12 +7003,14 @@ def db_floor_history(building_id: str, floor_no: int) -> dict[str, Any]:
     }
 
 
-def operations_payload() -> dict[str, Any]:
+@lru_cache(maxsize=1)
+def _operations_payload_cached() -> dict[str, Any]:
     runtime = runtime_data_state()
     reference_runs = list_reference_runs()
     import_runs = list_import_runs()
     geo_asset_runs = list_geo_asset_runs()
     metrics_runs = list_metrics_runs()
+    metrics_refresh_history = list_metrics_refresh_history(limit=8)
     browser_capture_runs = list_browser_capture_runs(limit=10)
     reference_index = reference_catalog_indices()
     community_dataset = current_community_dataset()
@@ -6769,11 +7108,13 @@ def operations_payload() -> dict[str, Any]:
             "latestListingRunAt": latest_import_run.get("createdAt") if latest_import_run else None,
             "latestGeoRunAt": latest_geo_run.get("createdAt") if latest_geo_run else None,
             "latestMetricsRunAt": latest_metrics_run.get("createdAt") if latest_metrics_run else None,
+            "latestStagedMetricsRunAt": latest_metrics_run.get("createdAt") if latest_metrics_run else None,
             "latestBrowserCaptureAt": browser_capture_runs[0].get("createdAt") if browser_capture_runs else None,
             "latestReferencePersistAt": db_snapshot.get("latestReferencePersistAt"),
             "latestImportPersistAt": db_snapshot.get("latestImportPersistAt"),
             "latestGeoPersistAt": db_snapshot.get("latestGeoPersistAt"),
             "latestMetricsRefreshAt": latest_metrics_refresh_at,
+            "latestDatabaseMetricsRefreshAt": db_snapshot.get("latestMetricsRefreshAt"),
             "browserCaptureAttentionCount": sum(int(item.get("attentionCount") or 0) for item in browser_capture_runs),
         },
         "runtime": runtime,
@@ -6784,8 +7125,13 @@ def operations_payload() -> dict[str, Any]:
         "importRuns": import_runs,
         "geoAssetRuns": geo_asset_runs,
         "metricsRuns": metrics_runs,
+        "metricsRefreshHistory": metrics_refresh_history,
         "browserCaptureRuns": browser_capture_runs,
     }
+
+
+def operations_payload() -> dict[str, Any]:
+    return deepcopy(_operations_payload_cached())
 
 
 def bootstrap_payload() -> dict[str, Any]:
@@ -6805,12 +7151,14 @@ def bootstrap_payload() -> dict[str, Any]:
     }
 
 
-def bootstrap_operations_payload() -> dict[str, Any]:
+@lru_cache(maxsize=1)
+def _bootstrap_operations_payload_cached() -> dict[str, Any]:
     runtime = runtime_data_state()
     reference_runs = list_reference_runs()
     import_runs = list_import_runs()
     geo_asset_runs = list_geo_asset_runs()
     metrics_runs = list_metrics_runs()
+    metrics_refresh_history = list_metrics_refresh_history(limit=8)
     browser_capture_runs = list_browser_capture_runs(limit=10)
     reference_index = reference_catalog_indices()
     city_community_count = len(reference_index["communities"])
@@ -6859,8 +7207,10 @@ def bootstrap_operations_payload() -> dict[str, Any]:
             "latestListingRunAt": import_runs[0].get("createdAt") if import_runs else None,
             "latestGeoRunAt": geo_asset_runs[0].get("createdAt") if geo_asset_runs else None,
             "latestMetricsRunAt": metrics_runs[0].get("createdAt") if metrics_runs else None,
+            "latestStagedMetricsRunAt": metrics_runs[0].get("createdAt") if metrics_runs else None,
             "latestBrowserCaptureAt": browser_capture_runs[0].get("createdAt") if browser_capture_runs else None,
             "latestMetricsRefreshAt": metrics_runs[0].get("createdAt") if metrics_runs else None,
+            "latestDatabaseMetricsRefreshAt": runtime.get("databaseSnapshot", {}).get("latestMetricsRefreshAt"),
             "latestReferencePersistAt": None,
             "latestImportPersistAt": None,
             "latestGeoPersistAt": None,
@@ -6881,11 +7231,17 @@ def bootstrap_operations_payload() -> dict[str, Any]:
         "importRuns": import_runs,
         "geoAssetRuns": geo_asset_runs,
         "metricsRuns": metrics_runs,
+        "metricsRefreshHistory": metrics_refresh_history,
         "browserCaptureRuns": browser_capture_runs,
     }
 
 
-def system_strategy_payload() -> dict[str, Any]:
+def bootstrap_operations_payload() -> dict[str, Any]:
+    return deepcopy(_bootstrap_operations_payload_cached())
+
+
+@lru_cache(maxsize=1)
+def _system_strategy_payload_cached() -> dict[str, Any]:
     runtime = runtime_data_state()
     strategy = deepcopy(SYSTEM_STRATEGY)
     strategy["data_runtime"] = {
@@ -6915,6 +7271,10 @@ def system_strategy_payload() -> dict[str, Any]:
         "data_sources": runtime["providerReadiness"],
         "runtime": runtime,
     }
+
+
+def system_strategy_payload() -> dict[str, Any]:
+    return deepcopy(_system_strategy_payload_cached())
 
 
 def bootstrap_local_database(
@@ -7064,14 +7424,19 @@ def flatten_communities(
     return communities
 
 
-def current_community_dataset(*, use_staged_metrics_overlay: bool = True) -> list[dict[str, Any]]:
+@lru_cache(maxsize=2)
+def _current_community_dataset_cached(use_staged_metrics_overlay: bool = True) -> tuple[dict[str, Any], ...]:
     if database_mode_active():
-        return db_community_dataset()
+        return tuple(db_community_dataset())
     if staged_mode_active():
-        return staged_community_dataset(use_metrics_overlay=use_staged_metrics_overlay)
+        return tuple(staged_community_dataset(use_metrics_overlay=use_staged_metrics_overlay))
     if demo_mode_active():
-        return [enrich_community(community, district_item) for district_item in DISTRICTS for community in district_item["communities"]]
-    return []
+        return tuple(enrich_community(community, district_item) for district_item in DISTRICTS for community in district_item["communities"])
+    return tuple()
+
+
+def current_community_dataset(*, use_staged_metrics_overlay: bool = True) -> list[dict[str, Any]]:
+    return deepcopy(list(_current_community_dataset_cached(use_staged_metrics_overlay)))
 
 
 def map_communities_payload(
@@ -8907,27 +9272,14 @@ def submit_browser_sampling_capture(payload: dict[str, Any]) -> dict[str, Any]:
     refresh_metrics = bool(payload.get("refresh_metrics", True))
     metrics_result: dict[str, Any] | None = None
     if refresh_metrics:
-        metrics_command = [
-            sys.executable,
-            str(ROOT_DIR / "jobs" / "refresh_metrics.py"),
-            "--date",
-            datetime.now().date().isoformat(),
-            "--batch-name",
-            metrics_batch_name,
-        ]
         try:
-            metrics_completed = subprocess.run(
-                metrics_command,
-                cwd=ROOT_DIR,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as exc:  # pragma: no cover - surfaced via API
-            stderr = (exc.stderr or exc.stdout or "").strip()
-            raise ValueError(f"指标快照刷新失败: {stderr or exc}") from exc
-        metrics_stdout = metrics_completed.stdout.strip() or "{}"
-        metrics_result = json.loads(metrics_stdout).get("metricsRun")
+            metrics_result = refresh_metrics_snapshot(
+                snapshot_date=datetime.now().date(),
+                batch_name=metrics_batch_name,
+                trigger_source="browser-sampling",
+            ).get("metricsRun")
+        except Exception as exc:  # pragma: no cover - surfaced via API
+            raise ValueError(f"指标快照刷新失败: {exc}") from exc
 
     manifest = {
         "run_id": capture_run_id,

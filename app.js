@@ -691,7 +691,9 @@ const amapState = {
   infoWindow: null,
   scriptPromise: null,
   hasInitialFit: false,
-  modeNote: "未检测到 AMAP_API_KEY，当前使用 SVG 示意图。"
+  modeNote: "未检测到 AMAP_API_KEY，当前只保留真地图容器。",
+  transitionTimer: null,
+  transitionToken: 0
 };
 
 const state = {
@@ -700,6 +702,9 @@ const state = {
   maxBudget: 10000,
   minSamples: 1,
   granularity: "community",
+  researchSearchQuery: "",
+  researchSearchOpen: false,
+  searchSelectedIndex: 0,
   selectedDistrictId: "pudong",
   selectedCommunityId: "zhangjiang-park",
   selectedBuildingId: null,
@@ -714,7 +719,9 @@ const state = {
   summary: null,
   opportunityItems: [],
   floorWatchlistItems: [],
+  floorWatchlistLoading: false,
   browserSamplingPackItems: [],
+  mobileInspectorPanel: "detail",
   selectedBrowserSamplingTaskId: null,
   selectedCommunityDetail: null,
   selectedBuildingDetail: null,
@@ -723,6 +730,7 @@ const state = {
   selectedGeoAssetRunDetail: null,
   selectedBrowserCaptureRunId: null,
   selectedBrowserCaptureRunDetail: null,
+  mapWaypoint: null,
   mapCommunities: [],
   buildingGeoFeatures: [],
   floorGeoFeatures: [],
@@ -732,6 +740,8 @@ const state = {
   opsMessageContext: "import",
   busyReferencePersistRunId: null,
   busyBootstrapDatabase: false,
+  busyMetricsRefresh: false,
+  busyMetricsRefreshMode: null,
   busyPersistRunId: null,
   busyReviewQueueId: null,
   busyAnchorCommunityId: null,
@@ -774,6 +784,8 @@ let buildingRequestId = 0;
 let floorRequestId = 0;
 let amapRenderRequestId = 0;
 let geoAssetRequestId = 0;
+let floorWatchlistRequestId = 0;
+let mapWaypointTimer = null;
 
 function canUseDemoFallback() {
   return Boolean(runtimeConfig?.mockEnabled);
@@ -806,15 +818,15 @@ const minSamplesFilter = document.querySelector("#minSamplesFilter");
 const minYieldValue = document.querySelector("#minYieldValue");
 const maxBudgetValue = document.querySelector("#maxBudgetValue");
 const minSamplesValue = document.querySelector("#minSamplesValue");
+const researchSearchInput = document.querySelector("#researchSearchInput");
+const researchSearchResults = document.querySelector("#researchSearchResults");
+const searchClearButton = document.querySelector("#searchClearButton");
+const globalFeedback = document.querySelector("#globalFeedback");
 const summaryGrid = document.querySelector("#summaryGrid");
-const districtLayer = document.querySelector("#districtLayer");
-const markerLayer = document.querySelector("#markerLayer");
-const mapGrid = document.querySelector("#mapGrid");
 const amapContainer = document.querySelector("#amapContainer");
-const mapFallback = document.querySelector("#mapFallback");
+const mapWaypointBadge = document.querySelector("#mapWaypointBadge");
 const mapModeBadge = document.querySelector("#mapModeBadge");
 const mapNote = document.querySelector("#mapNote");
-const mapReferenceOverlay = document.querySelector("#mapReferenceOverlay");
 const detailCard = document.querySelector("#detailCard");
 const rankingList = document.querySelector("#rankingList");
 const rankingCount = document.querySelector("#rankingCount");
@@ -831,6 +843,7 @@ const exportGeoTaskWatchlistCsvButton = document.querySelector("#exportGeoTaskWa
 const exportBrowserSamplingPackCsvButton = document.querySelector("#exportBrowserSamplingPackCsvButton");
 const matrixTable = document.querySelector("#matrixTable");
 const matrixTitle = document.querySelector("#matrixTitle");
+const mapFrame = document.querySelector(".map-frame");
 const pipeline = document.querySelector("#pipeline");
 const schemaList = document.querySelector("#schemaList");
 const strategyPanel = document.querySelector("#strategyPanel");
@@ -844,12 +857,14 @@ const geoAssetRunDetail = document.querySelector("#geoAssetRunDetail");
 const importRunDetail = document.querySelector("#importRunDetail");
 const sourceHealthList = document.querySelector("#sourceHealthList");
 const browserSamplingWorkbench = document.querySelector("#browserSamplingWorkbench");
+const browserSamplingCoverageBoard = document.querySelector("#browserSamplingCoverageBoard");
 const addressQueueList = document.querySelector("#addressQueueList");
 const anchorWatchlist = document.querySelector("#anchorWatchlist");
 const floorEvidence = document.querySelector("#floorEvidence");
 const exportKmlButton = document.querySelector("#exportKmlButton");
 const exportGeoJsonButton = document.querySelector("#exportGeoJsonButton");
 const granularityGroup = document.querySelector("#granularityGroup");
+const inspectorToggleButtons = document.querySelectorAll("[data-inspector-toggle]");
 
 function hydrateDistrictsPayload(rawDistricts) {
   return (rawDistricts ?? []).map((district) => ({
@@ -986,28 +1001,45 @@ function closeAnchorManualEditor() {
 async function init() {
   await Promise.all([loadRuntimeConfig(), loadBootstrapData()]);
   applyDataModeDefaults();
-  buildGrid();
   buildFilters();
   setGranularity(state.granularity);
   renderPipeline();
   renderSchemas();
   renderStrategy();
-  await refreshData();
   render();
+  scheduleUiHydrationRetry();
   attachEvents();
-  void refreshOperationsWorkbench({ reloadFloor: false })
+  scheduleMapInitializationRetry();
+  void refreshData()
     .then(() => {
       render();
+      scheduleUiHydrationRetry();
+      scheduleMapInitializationRetry();
     })
     .catch(() => {
       render();
+      scheduleUiHydrationRetry();
+      scheduleMapInitializationRetry();
+    });
+  void refreshOperationsWorkbench({ reloadFloor: false })
+    .then(() => {
+      render();
+      scheduleUiHydrationRetry();
+      scheduleMapInitializationRetry();
+    })
+    .catch(() => {
+      render();
+      scheduleUiHydrationRetry();
+      scheduleMapInitializationRetry();
     });
   void initializeMapExperience()
     .then(() => {
       render();
+      scheduleUiHydrationRetry();
     })
     .catch(() => {
       render();
+      scheduleUiHydrationRetry();
     });
 }
 
@@ -1087,8 +1119,6 @@ async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
   await loadOperationsOverview();
   ensureImportRunSelection();
   ensureGeoAssetRunSelection();
-  await loadSelectedImportRunDetail();
-  await loadSelectedGeoAssetRunDetail();
   if (
     state.selectedBrowserCaptureRunId &&
     !(effectiveOperationsOverview().browserCaptureRuns ?? []).some((item) => item.runId === state.selectedBrowserCaptureRunId)
@@ -1096,12 +1126,18 @@ async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
     state.selectedBrowserCaptureRunId = null;
     state.selectedBrowserCaptureRunDetail = null;
   }
-  if (state.selectedBrowserCaptureRunId) {
-    await loadSelectedBrowserCaptureRunDetail(state.selectedBrowserCaptureRunId);
-  }
-  if (reloadFloor && state.selectedBuildingId && state.selectedFloorNo) {
-    await loadSelectedFloorDetail();
-  }
+  await Promise.all([
+    loadSelectedImportRunDetail({ reloadFloorWatchlist: false }),
+    loadFloorWatchlist()
+  ]);
+  void Promise.allSettled([
+    loadSelectedGeoAssetRunDetail(),
+    state.selectedBrowserCaptureRunId ? loadSelectedBrowserCaptureRunDetail(state.selectedBrowserCaptureRunId) : Promise.resolve(),
+    reloadFloor && state.selectedBuildingId && state.selectedFloorNo ? loadSelectedFloorDetail() : Promise.resolve()
+  ]).then(() => {
+    render();
+    scheduleUiHydrationRetry();
+  });
 }
 
 function ensureImportRunSelection() {
@@ -1173,10 +1209,12 @@ function normalizeGeoWorkOrderFilters() {
   }
 }
 
-async function loadSelectedImportRunDetail() {
+async function loadSelectedImportRunDetail({ reloadFloorWatchlist = true } = {}) {
   if (!state.selectedImportRunId) {
     state.selectedImportRunDetail = null;
-    await loadFloorWatchlist();
+    if (reloadFloorWatchlist) {
+      await loadFloorWatchlist();
+    }
     return;
   }
 
@@ -1195,7 +1233,9 @@ async function loadSelectedImportRunDetail() {
   } catch (error) {
     state.selectedImportRunDetail = buildFallbackImportRunDetail(state.selectedImportRunId);
   }
-  await loadFloorWatchlist();
+  if (reloadFloorWatchlist) {
+    await loadFloorWatchlist();
+  }
 }
 
 async function loadSelectedGeoAssetRunDetail() {
@@ -1255,6 +1295,8 @@ function availableBaselineRunsFor(runId) {
 }
 
 async function loadFloorWatchlist() {
+  const requestId = ++floorWatchlistRequestId;
+  state.floorWatchlistLoading = true;
   const params = new URLSearchParams({
     district: state.districtFilter,
     min_yield: String(state.minYield),
@@ -1276,11 +1318,22 @@ async function loadFloorWatchlist() {
       throw new Error(`Floor watchlist failed with ${response.status}`);
     }
     const payload = await response.json();
+    if (requestId !== floorWatchlistRequestId) {
+      return;
+    }
     state.floorWatchlistItems = payload.items ?? [];
+    state.floorWatchlistLoading = false;
   } catch (error) {
+    if (requestId !== floorWatchlistRequestId) {
+      return;
+    }
     state.floorWatchlistItems = canUseDemoFallback() ? getFallbackFloorWatchlistItems() : [];
+    state.floorWatchlistLoading = false;
   }
 
+  if (requestId !== floorWatchlistRequestId) {
+    return;
+  }
   await loadGeoAssets();
 }
 
@@ -1328,7 +1381,7 @@ async function loadGeoAssets() {
 
 async function initializeMapExperience() {
   if (!runtimeConfig.hasAmapKey || !runtimeConfig.amapApiKey) {
-    setMapMode("fallback", "未检测到 AMAP_API_KEY，当前使用 SVG 示意图。配置 key 后刷新即可切换到高德真地图。");
+    setMapMode("fallback", "未检测到 AMAP_API_KEY，当前仅保留真地图容器。配置 key 后即可启用高德底图。");
     return;
   }
 
@@ -1336,58 +1389,82 @@ async function initializeMapExperience() {
     "loading",
     runtimeConfig.hasAmapSecurityJsCode
       ? "正在加载高德底图与行政区图层能力。已检测到 Web 端安全密钥。"
-      : "正在加载高德底图与行政区图层能力。若 key、白名单或安全密钥未配置正确，将自动回退到 SVG。"
+      : "正在加载高德底图与行政区图层能力。请确认 key、白名单与安全密钥配置正确。"
   );
 
   try {
     await loadAmapScript(runtimeConfig.amapApiKey, runtimeConfig.amapSecurityJsCode);
-    amapContainer.classList.remove("is-hidden");
-    mapFallback.classList.add("is-hidden");
     createAmapInstance();
     requestAnimationFrame(() => {
       amapState.map?.resize?.();
     });
     setMapMode("ready", "当前为高德真地图模式。区块边界、小区点位和楼栋下钻会同步到真实底图。");
   } catch (error) {
-    setMapMode("error", "高德底图加载失败，已自动回退到 SVG 示意图。请检查 key、域名白名单、安全密钥或网络环境。");
+    setMapMode("error", "高德底图加载失败。请检查 key、域名白名单、安全密钥或网络环境。");
   }
+}
+
+function scheduleMapInitializationRetry() {
+  if (!runtimeConfig?.hasAmapKey || !runtimeConfig?.amapApiKey) {
+    return;
+  }
+  if (amapState.map || amapState.scriptPromise || amapState.status === "loading" || amapState.status === "ready") {
+    return;
+  }
+  requestAnimationFrame(() => {
+    if (!runtimeConfig?.hasAmapKey || !runtimeConfig?.amapApiKey) {
+      return;
+    }
+    if (amapState.map || amapState.scriptPromise || amapState.status === "loading" || amapState.status === "ready") {
+      return;
+    }
+    void initializeMapExperience()
+      .then(() => {
+        render();
+      })
+      .catch(() => {
+        render();
+      });
+  });
+}
+
+function scheduleUiHydrationRetry() {
+  requestAnimationFrame(() => {
+    const summaryRendered = Boolean(summaryGrid?.textContent?.trim());
+    const noteRendered = Boolean(mapNote?.textContent?.trim() && !mapNote.textContent.includes("交互原型示意"));
+    const hasStateSummary = Boolean(state?.summary && typeof state.summary.communityCount === "number");
+    const hasMapData =
+      Array.isArray(state?.mapCommunities) ||
+      Array.isArray(state?.opportunityItems) ||
+      Array.isArray(state?.floorWatchlistItems);
+
+    if ((hasStateSummary || hasMapData) && (!summaryRendered || !noteRendered)) {
+      render();
+    }
+    scheduleMapInitializationRetry();
+  });
 }
 
 function setMapMode(mode, noteText) {
   amapState.status = mode;
   amapState.modeNote = noteText;
   const labelMap = {
-    loading: "AMap Loading",
+    loading: "地图加载中",
     ready: "AMap Live",
-    fallback: "SVG Fallback",
-    error: "AMap Error"
+    fallback: "地图待接入",
+    error: "地图异常"
   };
 
-  mapModeBadge.textContent = labelMap[mode] ?? "SVG Fallback";
+  mapModeBadge.textContent = labelMap[mode] ?? "地图待接入";
   mapModeBadge.style.borderColor = mode === "ready" ? "rgba(117, 240, 207, 0.6)" : "rgba(151, 191, 226, 0.14)";
   mapModeBadge.style.background =
     mode === "ready"
       ? "linear-gradient(180deg, rgba(117, 240, 207, 0.2), rgba(117, 240, 207, 0.08))"
       : "rgba(255, 255, 255, 0.04)";
 
-  if (mode === "ready") {
-    amapContainer.classList.remove("is-hidden");
-    mapFallback.classList.add("is-hidden");
-  } else {
-    amapContainer.classList.add("is-hidden");
-    mapFallback.classList.remove("is-hidden");
-  }
-
-  updateMapReferenceOverlay();
+  amapContainer.dataset.mapStage = mode;
+  amapContainer.setAttribute("aria-busy", mode === "loading" ? "true" : "false");
   updateMapNote();
-}
-
-function updateMapReferenceOverlay() {
-  if (!mapReferenceOverlay) {
-    return;
-  }
-  const showReference = amapState.status === "ready" && currentDataMode() === "empty";
-  mapReferenceOverlay.classList.toggle("is-hidden", !showReference);
 }
 
 function loadAmapScript(apiKey, securityJsCode) {
@@ -1466,6 +1543,7 @@ function createAmapInstance() {
   }, 80);
 
   amapState.infoWindow = new window.AMap.InfoWindow({
+    isCustom: true,
     offset: new window.AMap.Pixel(0, -20),
     closeWhenClickMap: true
   });
@@ -1541,6 +1619,9 @@ async function refreshData() {
     state.opportunityItems = (opportunitiesPayload.items ?? []).map(hydrateCommunity);
     state.browserSamplingPackItems = browserPackPayload.items ?? [];
     ensureBrowserSamplingTaskSelection();
+    render();
+    scheduleUiHydrationRetry();
+    scheduleMapInitializationRetry();
   } catch (error) {
     districts = hydrateDistrictsPayload(canUseDemoFallback() ? fallbackDistricts : []);
     mapCommunities = canUseDemoFallback() ? getFilteredCommunities() : [];
@@ -1557,12 +1638,18 @@ async function refreshData() {
     state.opportunityItems = canUseDemoFallback() ? getFallbackOpportunityItems() : [];
     state.browserSamplingPackItems = [];
     ensureBrowserSamplingTaskSelection();
+    render();
+    scheduleUiHydrationRetry();
+    scheduleMapInitializationRetry();
   }
 
   buildFilters();
   ensureValidSelection();
   await loadSelectedCommunityDetail();
   await loadFloorWatchlist();
+  render();
+  scheduleUiHydrationRetry();
+  scheduleMapInitializationRetry();
 }
 
 function getFallbackOpportunityItems() {
@@ -1649,28 +1736,6 @@ function getFallbackFloorWatchlistItems() {
   ];
 }
 
-function buildGrid() {
-  for (let x = 0; x <= 760; x += 40) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", x);
-    line.setAttribute("x2", x);
-    line.setAttribute("y1", "0");
-    line.setAttribute("y2", "520");
-    line.setAttribute("class", "grid-line");
-    mapGrid.appendChild(line);
-  }
-
-  for (let y = 0; y <= 520; y += 40) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", "0");
-    line.setAttribute("x2", "760");
-    line.setAttribute("y1", y);
-    line.setAttribute("y2", y);
-    line.setAttribute("class", "grid-line");
-    mapGrid.appendChild(line);
-  }
-}
-
 function buildFilters() {
   minYieldFilter.min = "0";
   minYieldFilter.max = "5";
@@ -1699,16 +1764,96 @@ function setGranularity(granularity) {
   state.granularity = granularity;
   granularityGroup
     .querySelectorAll("button")
-    .forEach((item) => item.classList.toggle("is-active", item.dataset.granularity === granularity));
+    .forEach((item) => {
+      const active = item.dataset.granularity === granularity;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+  renderMapChromeState();
+  triggerMapTransition("granularity");
+}
+
+function renderGlobalFeedback() {
+  if (!globalFeedback) {
+    return;
+  }
+  const show = Boolean(state.opsMessage && state.opsMessageContext === "global");
+  globalFeedback.hidden = !show;
+  globalFeedback.className = `ops-feedback global-feedback ${state.opsMessageTone ?? "info"}`;
+  globalFeedback.textContent = show ? state.opsMessage : "";
+}
+
+function renderInspectorPanels() {
+  document.querySelectorAll("[data-inspector-panel]").forEach((panel) => {
+    const key = panel.dataset.inspectorPanel;
+    const expanded = state.mobileInspectorPanel === key;
+    panel.classList.toggle("is-collapsed", !expanded);
+    const button = panel.querySelector("[data-inspector-toggle]");
+    if (button) {
+      button.setAttribute("aria-expanded", String(expanded));
+      button.textContent = expanded ? "收起" : "展开";
+    }
+  });
+}
+
+function bindKeyboardActivation(element, callback) {
+  if (!element) {
+    return;
+  }
+  element.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    if (event.target.closest("button, a, input, textarea, select") && event.currentTarget !== event.target) {
+      return;
+    }
+    event.preventDefault();
+    await callback();
+  });
+}
+
+async function runExportAction(
+  button,
+  pendingLabel,
+  successLabel,
+  endpoint,
+  filename,
+  fallbackBuilder,
+  mimeType,
+  queryString = buildExportQuery()
+) {
+  if (!button) {
+    return;
+  }
+  const defaultLabel = button.dataset.defaultLabel || button.textContent.trim();
+  button.dataset.defaultLabel = defaultLabel;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.textContent = pendingLabel;
+  state.opsMessage = null;
+  state.opsMessageTone = "info";
+  state.opsMessageContext = "global";
+  renderGlobalFeedback();
+  try {
+    const mode = await exportWithFallback(endpoint, filename, fallbackBuilder, mimeType, queryString);
+    state.opsMessage = `${successLabel}${mode === "fallback" ? "（本地兜底）" : ""}`;
+    state.opsMessageTone = mode === "fallback" ? "info" : "success";
+    state.opsMessageContext = "global";
+  } catch (error) {
+    state.opsMessage = error.message || "导出失败。";
+    state.opsMessageTone = "error";
+    state.opsMessageContext = "global";
+  } finally {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    button.textContent = defaultLabel;
+    render();
+  }
 }
 
 function attachEvents() {
   districtFilter.addEventListener("change", async (event) => {
-    state.districtFilter = event.target.value;
-    if (state.districtFilter !== "all") {
-      state.selectedDistrictId = state.districtFilter;
-    }
-    await refreshData();
+    await applyDistrictScope(event.target.value);
     render();
   });
 
@@ -1742,16 +1887,43 @@ function attachEvents() {
     render();
   });
 
+  inspectorToggleButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.inspectorToggle;
+      state.mobileInspectorPanel = state.mobileInspectorPanel === key ? null : key;
+      renderInspectorPanels();
+    });
+  });
+
   exportKmlButton.addEventListener("click", async () => {
-    await exportWithFallback("/api/export/kml", "shanghai-yield-atlas.kml", buildKml, "application/vnd.google-earth.kml+xml");
+    await runExportAction(
+      exportKmlButton,
+      "导出中…",
+      "KML 已导出",
+      "/api/export/kml",
+      "shanghai-yield-atlas.kml",
+      buildKml,
+      "application/vnd.google-earth.kml+xml"
+    );
   });
 
   exportGeoJsonButton.addEventListener("click", async () => {
-    await exportWithFallback("/api/export/geojson", "shanghai-yield-atlas.geojson", buildGeoJson, "application/geo+json");
+    await runExportAction(
+      exportGeoJsonButton,
+      "导出中…",
+      "GeoJSON 已导出",
+      "/api/export/geojson",
+      "shanghai-yield-atlas.geojson",
+      buildGeoJson,
+      "application/geo+json"
+    );
   });
 
   exportFloorWatchlistKmlButton.addEventListener("click", async () => {
-    await exportWithFallback(
+    await runExportAction(
+      exportFloorWatchlistKmlButton,
+      "导出中…",
+      "楼层 KML 已导出",
       "/api/export/floor-watchlist.kml",
       buildFloorWatchlistExportFilename("kml"),
       buildFloorWatchlistKml,
@@ -1761,7 +1933,10 @@ function attachEvents() {
   });
 
   exportFloorWatchlistGeoJsonButton.addEventListener("click", async () => {
-    await exportWithFallback(
+    await runExportAction(
+      exportFloorWatchlistGeoJsonButton,
+      "导出中…",
+      "楼层 GeoJSON 已导出",
       "/api/export/floor-watchlist.geojson",
       buildFloorWatchlistExportFilename("geojson"),
       buildFloorWatchlistGeoJson,
@@ -1771,7 +1946,10 @@ function attachEvents() {
   });
 
   exportGeoTaskWatchlistGeoJsonButton.addEventListener("click", async () => {
-    await exportWithFallback(
+    await runExportAction(
+      exportGeoTaskWatchlistGeoJsonButton,
+      "导出中…",
+      "补采 GeoJSON 已导出",
       "/api/export/geo-task-watchlist.geojson",
       buildGeoTaskWatchlistExportFilename("geojson"),
       buildGeoTaskWatchlistGeoJson,
@@ -1781,7 +1959,10 @@ function attachEvents() {
   });
 
   exportGeoTaskWatchlistCsvButton.addEventListener("click", async () => {
-    await exportWithFallback(
+    await runExportAction(
+      exportGeoTaskWatchlistCsvButton,
+      "导出中…",
+      "补采 CSV 已导出",
       "/api/export/geo-task-watchlist.csv",
       buildGeoTaskWatchlistExportFilename("csv"),
       buildGeoTaskWatchlistCsv,
@@ -1791,13 +1972,72 @@ function attachEvents() {
   });
 
   exportBrowserSamplingPackCsvButton.addEventListener("click", async () => {
-    await exportWithFallback(
+    await runExportAction(
+      exportBrowserSamplingPackCsvButton,
+      "导出中…",
+      "采样 CSV 已导出",
       "/api/export/browser-sampling-pack.csv",
       buildBrowserSamplingPackExportFilename("csv"),
       buildBrowserSamplingPackCsv,
       "text/csv;charset=utf-8",
       buildBrowserSamplingPackExportQuery()
     );
+  });
+
+  researchSearchInput.addEventListener("input", (event) => {
+    state.researchSearchQuery = event.target.value;
+    state.researchSearchOpen = true;
+    state.searchSelectedIndex = 0;
+    renderSearchResults();
+  });
+
+  researchSearchInput.addEventListener("focus", () => {
+    state.researchSearchOpen = true;
+    renderSearchResults();
+  });
+
+  researchSearchInput.addEventListener("keydown", async (event) => {
+    const results = getSearchResults();
+    if (!results.length && event.key !== "Escape") {
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      state.researchSearchOpen = true;
+      state.searchSelectedIndex = (state.searchSelectedIndex + 1) % results.length;
+      renderSearchResults();
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      state.researchSearchOpen = true;
+      state.searchSelectedIndex = (state.searchSelectedIndex - 1 + results.length) % results.length;
+      renderSearchResults();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const target = results[state.searchSelectedIndex] ?? results[0];
+      if (target) {
+        await openSearchResult(target);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      state.researchSearchOpen = false;
+      renderSearchResults();
+    }
+  });
+
+  searchClearButton.addEventListener("click", () => {
+    clearSearch();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".search-field")) {
+      state.researchSearchOpen = false;
+      renderSearchResults();
+    }
   });
 }
 
@@ -2601,16 +2841,477 @@ function buildScoreBreakdown(building, community, sampleSizeEstimate, avgPriceWa
 }
 
 function render() {
+  renderGlobalFeedback();
+  renderInspectorPanels();
   renderSummary();
-  renderDistricts();
-  renderMarkers();
+  renderSearchResults();
   renderDetail();
   renderFloorEvidence();
   renderRanking();
   renderMatrix();
   renderOperations();
+  renderMapChromeState();
+  renderMapWaypointBadge();
   renderMapExperience();
-  updateMapReferenceOverlay();
+}
+
+function renderMapChromeState() {
+  if (!mapFrame || !amapContainer) {
+    return;
+  }
+  mapFrame.dataset.granularity = state.granularity;
+  amapContainer.dataset.granularity = state.granularity;
+
+  const hasCommunitySelection = Boolean(state.selectedCommunityId);
+  const hasBuildingSelection = Boolean(state.selectedBuildingId);
+  const hasFloorSelection = Boolean(state.selectedBuildingId && state.selectedFloorNo != null);
+  const hasGeoTaskSelection = Boolean(state.selectedGeoTaskId);
+  const hasBrowserTaskSelection = Boolean(state.selectedBrowserSamplingTaskId);
+  const hasWaypointSelection = Boolean(state.mapWaypoint?.label);
+
+  mapFrame.classList.toggle("has-community-focus", hasCommunitySelection);
+  mapFrame.classList.toggle("has-building-focus", hasBuildingSelection);
+  mapFrame.classList.toggle("has-floor-focus", hasFloorSelection);
+  mapFrame.classList.toggle("has-geo-task-focus", hasGeoTaskSelection);
+  mapFrame.classList.toggle("has-browser-task-focus", hasBrowserTaskSelection);
+  mapFrame.classList.toggle("has-waypoint-focus", hasWaypointSelection);
+
+  amapContainer.classList.toggle("has-community-focus", hasCommunitySelection);
+  amapContainer.classList.toggle("has-building-focus", hasBuildingSelection);
+  amapContainer.classList.toggle("has-floor-focus", hasFloorSelection);
+  amapContainer.classList.toggle("has-geo-task-focus", hasGeoTaskSelection);
+  amapContainer.classList.toggle("has-browser-task-focus", hasBrowserTaskSelection);
+  amapContainer.classList.toggle("has-waypoint-focus", hasWaypointSelection);
+}
+
+function triggerMapTransition(mode = "focus") {
+  if (!mapFrame || !amapContainer) {
+    return;
+  }
+  const token = ++amapState.transitionToken;
+  if (amapState.transitionTimer) {
+    window.clearTimeout(amapState.transitionTimer);
+    amapState.transitionTimer = null;
+  }
+
+  mapFrame.classList.remove("is-shifting", "is-granularity-shift", "is-focus-shift");
+  amapContainer.classList.remove("is-shifting", "is-granularity-shift", "is-focus-shift");
+
+  const className = mode === "granularity" ? "is-granularity-shift" : "is-focus-shift";
+  mapFrame.classList.add("is-shifting", className);
+  amapContainer.classList.add("is-shifting", className);
+
+  amapState.transitionTimer = window.setTimeout(() => {
+    if (token !== amapState.transitionToken) {
+      return;
+    }
+    mapFrame.classList.remove("is-shifting", "is-granularity-shift", "is-focus-shift");
+    amapContainer.classList.remove("is-shifting", "is-granularity-shift", "is-focus-shift");
+    amapState.transitionTimer = null;
+  }, mode === "granularity" ? 520 : 420);
+}
+
+function mapWaypointSourceLabel(source) {
+  return (
+    {
+      opportunity: "机会榜",
+      floor_watchlist: "持续套利楼层榜",
+      matrix: "楼栋矩阵",
+      search: "全局搜索",
+      browser_sampling: "公开页采样台",
+      geo_task: "几何补采榜",
+      coverage: "采样覆盖看板",
+      capture_run: "采样批次回看",
+      queue: "运行队列"
+    }[source] ?? "研究台"
+  );
+}
+
+function mapWaypointTone(source) {
+  if (["browser_sampling", "coverage", "capture_run"].includes(source)) {
+    return "sampling";
+  }
+  if (source === "geo_task") {
+    return "geo";
+  }
+  if (source === "search") {
+    return "district-active";
+  }
+  return "yield";
+}
+
+function renderMapWaypointBadge() {
+  if (!mapWaypointBadge) {
+    return;
+  }
+  const waypoint = state.mapWaypoint;
+  if (!waypoint?.label) {
+    mapWaypointBadge.className = "map-waypoint-badge is-hidden";
+    mapWaypointBadge.innerHTML = "";
+    return;
+  }
+  mapWaypointBadge.className = `map-waypoint-badge is-visible tone-${waypoint.tone ?? "yield"}`;
+  mapWaypointBadge.innerHTML = `
+    <span class="map-waypoint-badge__eyebrow">${waypoint.sourceLabel ?? "研究台跳转"}</span>
+    <strong>${waypoint.label}</strong>
+    ${waypoint.detail ? `<span class="map-waypoint-badge__detail">${waypoint.detail}</span>` : ""}
+  `;
+}
+
+function clearMapWaypoint({ silent = false } = {}) {
+  if (mapWaypointTimer) {
+    window.clearTimeout(mapWaypointTimer);
+    mapWaypointTimer = null;
+  }
+  state.mapWaypoint = null;
+  if (!silent) {
+    renderDetail();
+    renderMapWaypointBadge();
+    renderMapChromeState();
+    updateMapNote();
+  }
+}
+
+function announceMapWaypoint({ source = "queue", label, detail = "" } = {}) {
+  if (!label) {
+    clearMapWaypoint();
+    return;
+  }
+  if (mapWaypointTimer) {
+    window.clearTimeout(mapWaypointTimer);
+    mapWaypointTimer = null;
+  }
+  state.mapWaypoint = {
+    source,
+    sourceLabel: mapWaypointSourceLabel(source),
+    tone: mapWaypointTone(source),
+    label,
+    detail
+  };
+  renderDetail();
+  renderMapWaypointBadge();
+  renderMapChromeState();
+  updateMapNote();
+  mapWaypointTimer = window.setTimeout(() => {
+    clearMapWaypoint();
+  }, 4200);
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
+function tokenizeSearchQuery(value) {
+  return String(value ?? "")
+    .split(/[\s·•|/]+/g)
+    .map((token) => normalizeSearchText(token))
+    .filter(Boolean);
+}
+
+function searchScore(text, query) {
+  if (!text || !query) {
+    return 0;
+  }
+  if (text === query) {
+    return 120;
+  }
+  if (text.startsWith(query)) {
+    return 96;
+  }
+  if (text.includes(query)) {
+    return 72;
+  }
+  return 0;
+}
+
+function collectSearchCandidates() {
+  const candidates = [];
+  const seen = new Set();
+  const pushCandidate = (candidate) => {
+    if (!candidate?.id || seen.has(candidate.id)) {
+      return;
+    }
+    candidate.keywords = Array.from(
+      new Set([candidate.label, candidate.subtitle, ...(candidate.keywords ?? [])].filter(Boolean))
+    );
+    seen.add(candidate.id);
+    candidates.push(candidate);
+  };
+  const pushBuildingCandidate = ({
+    communityId,
+    buildingId,
+    districtId,
+    districtName,
+    communityName,
+    buildingName,
+    totalFloors,
+    buildingAliases = [],
+    communityAliases = []
+  }) => {
+    if (!communityId || !buildingId || !buildingName) {
+      return;
+    }
+    pushCandidate({
+      type: "building",
+      id: `building:${buildingId}`,
+      communityId,
+      buildingId,
+      districtId,
+      label: `${communityName} · ${buildingName}`,
+      subtitle: `${districtName ?? "未知行政区"} · 楼栋 · ${totalFloors ?? "?"}层`,
+      keywords: [communityName, buildingName, districtName, ...buildingAliases, ...communityAliases]
+    });
+  };
+
+  const communities = mapCommunities ?? [];
+  communities.forEach((community) => {
+    pushCandidate({
+      type: "community",
+      id: `community:${community.id}`,
+      communityId: community.id,
+      districtId: community.districtId,
+      label: community.name,
+      subtitle: `${community.districtName ?? "未知行政区"} · ${community.sampleStatusLabel ?? "状态待补"}`,
+      keywords: [community.name, community.districtName, community.districtShort, ...(community.communityAliases ?? [])]
+    });
+    (community.buildings ?? []).forEach((building) => {
+      pushBuildingCandidate({
+        communityId: community.id,
+        buildingId: building.id,
+        districtId: community.districtId,
+        districtName: community.districtName,
+        communityName: community.name,
+        buildingName: building.name,
+        totalFloors: building.totalFloors,
+        buildingAliases: building.buildingAliases ?? [],
+        communityAliases: community.communityAliases ?? []
+      });
+    });
+  });
+  (state.selectedCommunityDetail?.buildings ?? []).forEach((building) => {
+    pushBuildingCandidate({
+      communityId: state.selectedCommunityDetail.id,
+      buildingId: building.id,
+      districtId: state.selectedCommunityDetail.districtId,
+      districtName: state.selectedCommunityDetail.districtName,
+      communityName: state.selectedCommunityDetail.name,
+      buildingName: building.name,
+      totalFloors: building.totalFloors,
+      buildingAliases: building.buildingAliases ?? [],
+      communityAliases: state.selectedCommunityDetail.communityAliases ?? []
+    });
+  });
+  (state.floorWatchlistItems ?? []).forEach((item) => {
+    pushBuildingCandidate({
+      communityId: item.communityId,
+      buildingId: item.buildingId,
+      districtId: item.districtId,
+      districtName: item.districtName,
+      communityName: item.communityName,
+      buildingName: item.buildingName,
+      totalFloors: item.totalFloors
+    });
+    pushCandidate({
+      type: "floor",
+      id: `floor:${item.buildingId}:${item.floorNo}`,
+      communityId: item.communityId,
+      buildingId: item.buildingId,
+      floorNo: item.floorNo,
+      districtId: item.districtId,
+      label: `${item.communityName} · ${item.buildingName} · ${item.floorNo}层`,
+      subtitle: `${item.districtName ?? "未知行政区"} · 楼层机会 ${Number(item.latestYieldPct ?? 0).toFixed(2)}%`,
+      keywords: [item.communityName, item.buildingName, `${item.floorNo}层`, item.districtName]
+    });
+  });
+  (state.browserSamplingPackItems ?? []).forEach((task) => {
+    pushBuildingCandidate({
+      communityId: task.communityId,
+      buildingId: task.buildingId,
+      districtId: task.districtId,
+      districtName: task.districtName,
+      communityName: task.communityName,
+      buildingName: task.buildingName,
+      totalFloors: task.totalFloors
+    });
+    pushCandidate({
+      type: "sampling",
+      id: `sampling:${task.taskId}`,
+      taskId: task.taskId,
+      communityId: task.communityId,
+      buildingId: task.buildingId ?? null,
+      floorNo: task.floorNo ?? null,
+      districtId: task.districtId,
+      label: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}`,
+      subtitle: `${task.districtName ?? "未知行政区"} · 采样任务 · ${task.taskLifecycleLabel ?? "待采样"}`,
+      keywords: [
+        task.communityName,
+        task.buildingName,
+        task.districtName,
+        task.taskTypeLabel,
+        `${task.floorNo ?? ""}层`
+      ]
+    });
+  });
+  return candidates;
+}
+
+function getSearchResults(limit = 10) {
+  const query = normalizeSearchText(state.researchSearchQuery);
+  const queryTokens = tokenizeSearchQuery(state.researchSearchQuery);
+  const candidates = collectSearchCandidates();
+  if (!query) {
+    return candidates
+      .slice()
+      .sort((left, right) => String(left.label).localeCompare(String(right.label), "zh-Hans-CN"))
+      .slice(0, limit);
+  }
+  return candidates
+    .map((candidate) => {
+      const normalizedKeywords = candidate.keywords.map((keyword) => normalizeSearchText(keyword)).filter(Boolean);
+      const combinedText = normalizedKeywords.join(" ");
+      const score = Math.max(
+        ...normalizedKeywords.map((keyword) => searchScore(keyword, query)),
+        queryTokens.length > 1 && queryTokens.every((token) => combinedText.includes(token)) ? 88 + queryTokens.length : 0,
+        0
+      );
+      return { ...candidate, score };
+    })
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score || String(left.label).localeCompare(String(right.label), "zh-Hans-CN"))
+    .slice(0, limit);
+}
+
+function searchTypeLabel(type) {
+  return {
+    community: "小区",
+    building: "楼栋",
+    floor: "楼层",
+    sampling: "采样"
+  }[type] ?? "对象";
+}
+
+async function openSearchResult(result) {
+  if (!result) {
+    return;
+  }
+  state.researchSearchQuery = result.label;
+  state.researchSearchOpen = false;
+  state.searchSelectedIndex = 0;
+  if (researchSearchInput) {
+    researchSearchInput.value = result.label;
+    researchSearchInput.blur();
+  }
+  renderSearchResults();
+  if (result.type === "community") {
+    setGranularity("community");
+    await selectCommunity(result.communityId, result.districtId);
+    announceMapWaypoint({
+      source: "search",
+      label: result.label,
+      detail: "小区研究摘要与楼栋矩阵"
+    });
+    return;
+  }
+  if (result.type === "building") {
+    setGranularity("building");
+    await selectCommunity(result.communityId, result.districtId);
+    await selectBuilding(result.buildingId);
+    announceMapWaypoint({
+      source: "search",
+      label: result.label,
+      detail: "楼栋研究摘要与楼层机会带"
+    });
+    return;
+  }
+  if (result.type === "floor") {
+    setGranularity("floor");
+    await navigateToEvidenceTarget(result.communityId, result.buildingId, result.floorNo, {
+      waypoint: {
+        source: "search",
+        label: result.label,
+        detail: "楼层证据、批次历史与样本配对"
+      }
+    });
+    return;
+  }
+  if (result.type === "sampling") {
+    await navigateToBrowserSamplingTask(result, {
+      waypoint: {
+        source: "search",
+        label: result.label,
+        detail: "公开页采样执行台与对应证据"
+      }
+    });
+  }
+}
+
+function clearSearch() {
+  state.researchSearchQuery = "";
+  state.researchSearchOpen = false;
+  state.searchSelectedIndex = 0;
+  if (researchSearchInput) {
+    researchSearchInput.value = "";
+  }
+  renderSearchResults();
+}
+
+function renderSearchResults() {
+  if (!researchSearchResults) {
+    return;
+  }
+  const results = getSearchResults();
+  if (state.searchSelectedIndex >= results.length) {
+    state.searchSelectedIndex = 0;
+  }
+  researchSearchInput?.setAttribute("aria-expanded", String(state.researchSearchOpen));
+  if (!state.researchSearchOpen) {
+    researchSearchResults.innerHTML = "";
+    researchSearchResults.classList.remove("is-open");
+    researchSearchInput?.removeAttribute("aria-activedescendant");
+    return;
+  }
+  researchSearchResults.classList.add("is-open");
+  if (!results.length) {
+    researchSearchResults.innerHTML = `<div class="search-empty">没有找到匹配对象，试试小区名、楼栋名、楼层或采样任务。</div>`;
+    researchSearchInput?.removeAttribute("aria-activedescendant");
+    return;
+  }
+  const activeResult = results[state.searchSelectedIndex] ?? results[0];
+  const activeDescendantId = activeResult ? `search-result-${activeResult.id.replace(/[^a-zA-Z0-9_-]/g, "-")}` : "";
+  researchSearchResults.innerHTML = results
+    .map(
+      (result, index) => `
+        <button
+          type="button"
+          id="search-result-${result.id.replace(/[^a-zA-Z0-9_-]/g, "-")}"
+          class="search-result-item ${index === state.searchSelectedIndex ? "is-active" : ""}"
+          data-search-result-id="${result.id}"
+          role="option"
+          aria-selected="${index === state.searchSelectedIndex ? "true" : "false"}"
+        >
+          <div class="search-result-top">
+            <strong>${result.label}</strong>
+            <span class="search-result-type">${searchTypeLabel(result.type)}</span>
+          </div>
+          <p>${result.subtitle}</p>
+        </button>
+      `
+    )
+    .join("");
+  if (activeDescendantId) {
+    researchSearchInput?.setAttribute("aria-activedescendant", activeDescendantId);
+  } else {
+    researchSearchInput?.removeAttribute("aria-activedescendant");
+  }
+  researchSearchResults.querySelectorAll("[data-search-result-id]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const result = results.find((item) => item.id === button.dataset.searchResultId);
+      await openSearchResult(result);
+    });
+  });
 }
 
 function renderMapExperience() {
@@ -2660,28 +3361,13 @@ async function renderAmapDistricts(visibleDistricts, requestId) {
             zIndex: 26
           })
         );
-        const labelPosition = polygonCenterLonLat(path) ?? normalizeSvgToLonLat(district.labelX, district.labelY);
-        if (labelPosition) {
-          overlays.push(
-            new window.AMap.Text({
-              text: district.short ?? district.name,
-              position: labelPosition,
-              anchor: "center",
-              zIndex: 30,
-              style: {
-                padding: "2px 6px",
-                borderRadius: "999px",
-                background: "rgba(7, 18, 29, 0.72)",
-                border: "1px solid rgba(151, 191, 226, 0.18)",
-                color: "#f4f8fb",
-                fontSize: "12px",
-                fontWeight: "700",
-                boxShadow: "0 8px 22px rgba(0, 0, 0, 0.22)"
-              }
-            })
-          );
-        }
       });
+      const labelPosition =
+        polygonCenterLonLat(boundaries[0]) ?? normalizeSvgToLonLat(district.labelX, district.labelY);
+      const label = createAmapDistrictChip(district, labelPosition, { selected: district.id === state.selectedDistrictId });
+      if (label) {
+        overlays.push(label);
+      }
     });
     if (!overlays.length) {
       fallbackDistricts.forEach((district) => {
@@ -2737,6 +3423,21 @@ async function renderAmapDistricts(visibleDistricts, requestId) {
       });
       overlays.push(polygon);
     });
+    const labelPosition =
+      polygonCenterLonLat(boundaries[0]) ?? normalizeSvgToLonLat(district.labelX, district.labelY);
+    const label = createAmapDistrictChip(district, labelPosition, { selected: district.id === state.selectedDistrictId });
+    if (label) {
+      label.on("click", async () => {
+        state.selectedDistrictId = district.id;
+        const firstCommunity = district.communities.find(isCommunityVisible) ?? district.communities[0];
+        if (firstCommunity) {
+          await selectCommunity(firstCommunity.id, district.id);
+          return;
+        }
+        render();
+      });
+      overlays.push(label);
+    }
   }
 
   if (overlays.length) {
@@ -2749,12 +3450,16 @@ function renderAmapCommunities(visibleCommunities) {
   clearAmapCommunities();
   const overlays = [];
   const geoTaskItems = getGeoTaskMapItems();
+  const browserSamplingTasks = getBrowserSamplingTaskMaps();
   const geoTaskByBuildingId = new Map(
     geoTaskItems.filter((item) => item.buildingId).map((item) => [item.buildingId, item])
   );
   const geoTaskByCommunityId = new Map(
     geoTaskItems.filter((item) => item.communityId).map((item) => [item.communityId, item])
   );
+  const browserTaskByBuildingId = browserSamplingTasks.buildingMap;
+  const browserTaskByCommunityId = browserSamplingTasks.communityMap;
+  const browserTaskByFloorKey = browserSamplingTasks.floorMap;
 
   if (state.granularity === "building") {
     getVisibleBuildingItems().forEach(({ community, building, isSelected }) => {
@@ -2762,12 +3467,41 @@ function renderAmapCommunities(visibleCommunities) {
       const position = geometry.position;
       const path = geometry.lonLatPath;
       const geoTask = geoTaskByBuildingId.get(building.id) ?? null;
+      const browserTask = browserTaskByBuildingId.get(building.id) ?? null;
+      const isSelectedGeo = isSelectedGeoTask(geoTask);
+      const isSelectedBrowser = isSelectedBrowserSamplingTask(browserTask);
+      if (isSelected) {
+        overlays.push(
+          new window.AMap.CircleMarker({
+            center: position,
+            radius: 16,
+            strokeColor: "rgba(255,255,255,0.86)",
+            strokeWeight: 1.4,
+            fillColor: getYieldColor(building.yieldAvg ?? community.yield),
+            fillOpacity: 0.12,
+            zIndex: 111,
+            bubble: false
+          })
+        );
+      }
+      if (isSelectedGeo) {
+        const halo = createAmapTaskFocusHalo(position, { tone: "geo", radius: 22, zIndex: 114 });
+        if (halo) {
+          overlays.push(halo);
+        }
+      }
+      if (isSelectedBrowser) {
+        const halo = createAmapTaskFocusHalo(position, { tone: "sampling", radius: 24, zIndex: 115 });
+        if (halo) {
+          overlays.push(halo);
+        }
+      }
       const polygon = new window.AMap.Polygon({
         path,
-        strokeColor: "#ffffff",
-        strokeWeight: isSelected ? 2.4 : 1.4,
+        strokeColor: isSelectedBrowser ? "#ffd166" : isSelectedGeo ? "#ff9966" : "#ffffff",
+        strokeWeight: isSelected ? 2.6 : isSelectedBrowser || isSelectedGeo ? 2.1 : 1.4,
         fillColor: getYieldColor(building.yieldAvg ?? community.yield),
-        fillOpacity: isSelected ? 0.72 : 0.54,
+        fillOpacity: isSelected ? 0.72 : isSelectedBrowser || isSelectedGeo ? 0.62 : 0.54,
         zIndex: isSelected ? 126 : 112,
         bubble: true,
         cursor: "pointer"
@@ -2776,17 +3510,22 @@ function renderAmapCommunities(visibleCommunities) {
       polygon.on("click", async () => {
         openAmapInfoWindowAt(
           position,
-          `
-            <div class="amap-info">
-              <strong>${community.name} · ${building.name}</strong>
-              <p>${community.districtName}</p>
-              <div class="amap-meta">
-                <span class="amap-pill">楼栋均值 ${(building.yieldAvg ?? community.yield).toFixed(2)}%</span>
-                <span class="amap-pill">总层数 ${building.totalFloors}</span>
-                <span class="amap-pill">机会分 ${building.score ?? community.score}</span>
-              </div>
-            </div>
-          `
+          renderAmapInfoCard({
+            kicker: "楼栋研究对象",
+            title: `${community.name} · ${building.name}`,
+            subtitle: community.districtName,
+            stats: [
+              { label: "楼栋均值", value: `${(building.yieldAvg ?? community.yield).toFixed(2)}%`, tone: "yield" },
+              { label: "总层数", value: `${building.totalFloors}`, tone: "neutral" },
+              { label: "机会分", value: `${building.score ?? community.score}分`, tone: "score" },
+              { label: "几何", value: building.geometrySourceLabel ?? building.geometrySource ?? "待补", tone: "neutral" }
+            ],
+            note:
+              building.dataFreshnessLabel ??
+              building.dataFreshness ??
+              `${community.sampleStatusLabel ?? "样本状态待补"} · ${community.latestBatchName ? `批次 ${community.latestBatchName}` : "批次待补"}`,
+            actionHint: "点击后右侧会切到这栋楼的楼层机会带和样本证据。"
+          })
         );
         await selectCommunity(community.id, community.districtId);
         await selectBuilding(building.id);
@@ -2794,6 +3533,41 @@ function renderAmapCommunities(visibleCommunities) {
       });
 
       overlays.push(polygon);
+      if (isSelected) {
+        const chip = createAmapContextChip(building.name, position, { tone: "yield", zIndex: 135, offsetY: -30 });
+        if (chip) {
+          chip.on("click", async () => {
+            await selectCommunity(community.id, community.districtId);
+            await selectBuilding(building.id);
+            focusAmapPosition(position, 13);
+          });
+          overlays.push(chip);
+        }
+      }
+      if (isSelectedGeo) {
+        const chip = createAmapContextChip("几何任务", position, { tone: "geo", zIndex: 136, offsetY: isSelected ? -56 : -30 });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToGeoTask(geoTask);
+            focusAmapPosition(position, 13);
+          });
+          overlays.push(chip);
+        }
+      }
+      if (isSelectedBrowser) {
+        const chip = createAmapContextChip(browserSamplingCoverageLabel(browserTask), position, {
+          tone: "sampling",
+          zIndex: 137,
+          offsetY: isSelected || isSelectedGeo ? -56 : -30
+        });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToBrowserSamplingTask(browserTask);
+            focusAmapPosition(position, 13);
+          });
+          overlays.push(chip);
+        }
+      }
       if (geoTask) {
         const badge = new window.AMap.CircleMarker({
           center: position,
@@ -2809,21 +3583,37 @@ function renderAmapCommunities(visibleCommunities) {
         badge.on("click", async () => {
           openAmapInfoWindowAt(
             position,
-            `
-              <div class="amap-info">
-                <strong>${geoTask.communityName ?? community.name} · ${geoTask.buildingName ?? building.name}</strong>
-                <p>${geoTask.impactLabel} · 影响 ${geoTask.impactScore ?? 0} · ${geoTask.taskScopeLabel ?? "几何任务"}</p>
-                <div class="amap-meta">
-                  <span class="amap-pill">状态 ${geoTaskStatusLabel(geoTask.status)}</span>
-                  <span class="amap-pill">榜单 ${geoTask.watchlistHits ?? 0}</span>
-                </div>
-              </div>
-            `
-          );
+            renderAmapInfoCard({
+              kicker: "几何补采任务",
+              title: `${geoTask.communityName ?? community.name} · ${geoTask.buildingName ?? building.name}`,
+              subtitle: `${geoTask.impactLabel} · ${geoTask.taskScopeLabel ?? "几何任务"}`,
+            stats: [
+              { label: "任务状态", value: geoTaskStatusLabel(geoTask.status), tone: "warning" },
+              { label: "影响分", value: `${geoTask.impactScore ?? 0}`, tone: "score" },
+              { label: "榜单命中", value: `${geoTask.watchlistHits ?? 0}`, tone: "neutral" }
+            ],
+            note: geoTask.geometryGapNote ?? geoTask.captureGoal ?? "优先补齐这栋楼的真实 footprint。",
+            actionHint: "点击后会跳到几何补采工作台，并把地图聚焦到当前楼栋。"
+          })
+        );
           await navigateToGeoTask(geoTask);
           focusAmapPosition(position, 13);
         });
         overlays.push(badge);
+      }
+      if (browserTask) {
+        const badge = createAmapBrowserSamplingBadge(browserTask, position, {
+          hasGeoTask: Boolean(geoTask),
+          zIndex: isSelected ? 138 : 128
+        });
+        badge?.on("click", async () => {
+          openAmapInfoWindowAt(position, browserSamplingTaskInfoHtml(browserTask));
+          await navigateToBrowserSamplingTask(browserTask);
+          focusAmapPosition(position, 13);
+        });
+        if (badge) {
+          overlays.push(badge);
+        }
       }
     });
   } else if (state.granularity === "floor") {
@@ -2836,12 +3626,41 @@ function renderAmapCommunities(visibleCommunities) {
       const isSelected = item.buildingId === state.selectedBuildingId && Number(item.floorNo) === Number(state.selectedFloorNo);
       const path = geometry.lonLatPath;
       const geoTask = geoTaskByBuildingId.get(item.buildingId) ?? null;
+      const browserTask = browserTaskByFloorKey.get(`${item.buildingId}:${item.floorNo}`) ?? browserTaskByBuildingId.get(item.buildingId) ?? null;
+      const isSelectedGeo = isSelectedGeoTask(geoTask);
+      const isSelectedBrowser = isSelectedBrowserSamplingTask(browserTask);
+      if (isSelected) {
+        overlays.push(
+          new window.AMap.CircleMarker({
+            center: position,
+            radius: 17,
+            strokeColor: "rgba(255,255,255,0.9)",
+            strokeWeight: 1.4,
+            fillColor: getYieldColor(item.latestYieldPct),
+            fillOpacity: 0.14,
+            zIndex: 117,
+            bubble: false
+          })
+        );
+      }
+      if (isSelectedGeo) {
+        const halo = createAmapTaskFocusHalo(position, { tone: "geo", radius: 22, zIndex: 119 });
+        if (halo) {
+          overlays.push(halo);
+        }
+      }
+      if (isSelectedBrowser) {
+        const halo = createAmapTaskFocusHalo(position, { tone: "sampling", radius: 24, zIndex: 120 });
+        if (halo) {
+          overlays.push(halo);
+        }
+      }
       const polygon = new window.AMap.Polygon({
         path,
-        strokeColor: "#ffffff",
-        strokeWeight: isSelected ? 2.6 : 1.4,
+        strokeColor: isSelectedBrowser ? "#ffd166" : isSelectedGeo ? "#ff9966" : "#ffffff",
+        strokeWeight: isSelected ? 2.8 : isSelectedBrowser || isSelectedGeo ? 2.2 : 1.4,
         fillColor: getYieldColor(item.latestYieldPct),
-        fillOpacity: isSelected ? 0.86 : 0.68,
+        fillOpacity: isSelected ? 0.86 : isSelectedBrowser || isSelectedGeo ? 0.76 : 0.68,
         zIndex: isSelected ? 132 : 118,
         bubble: true,
         cursor: "pointer"
@@ -2850,23 +3669,63 @@ function renderAmapCommunities(visibleCommunities) {
       polygon.on("click", async () => {
         openAmapInfoWindowAt(
           position,
-          `
-            <div class="amap-info">
-              <strong>${item.communityName} · ${item.buildingName} · ${item.floorNo}层</strong>
-              <p>${item.districtName} · ${item.trendLabel}</p>
-              <div class="amap-meta">
-                <span class="amap-pill">当前 ${Number(item.latestYieldPct).toFixed(2)}%</span>
-                <span class="amap-pill">持续分 ${item.persistenceScore}</span>
-                <span class="amap-pill">${item.baselineBatchName ? `基线 ${item.baselineBatchName}` : "首批样本"}</span>
-              </div>
-            </div>
-          `
+          renderAmapInfoCard({
+            kicker: "楼层证据对象",
+            title: `${item.communityName} · ${item.buildingName} · ${item.floorNo}层`,
+            subtitle: `${item.districtName} · ${item.trendLabel}`,
+            stats: [
+              { label: "当前回报", value: `${Number(item.latestYieldPct).toFixed(2)}%`, tone: "yield" },
+              { label: "持续分", value: `${item.persistenceScore}`, tone: "score" },
+              { label: "样本对", value: `${item.latestPairCount ?? item.pairCount ?? 0}`, tone: "neutral" },
+              { label: "基线", value: item.baselineBatchName ?? "首批样本", tone: "neutral" }
+            ],
+            note: item.latestBatchName ? `当前批次 ${item.latestBatchName}` : "当前批次待补",
+            actionHint: "点击后右侧会直接展开这一层的样本配对、历史批次和地址归一路径。"
+          })
         );
         await navigateToEvidenceTarget(item.communityId, item.buildingId, item.floorNo);
         focusAmapPosition(position, 13.8);
       });
 
       overlays.push(polygon);
+      if (isSelected) {
+        const chip = createAmapContextChip(`${item.floorNo}层`, position, { tone: "yield", zIndex: 141, offsetY: -30 });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToEvidenceTarget(item.communityId, item.buildingId, item.floorNo);
+            focusAmapPosition(position, 13.8);
+          });
+          overlays.push(chip);
+        }
+      }
+      if (isSelectedGeo) {
+        const chip = createAmapContextChip("几何任务", position, {
+          tone: "geo",
+          zIndex: 142,
+          offsetY: isSelected ? -56 : -30
+        });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToGeoTask(geoTask);
+            focusAmapPosition(position, 13.8);
+          });
+          overlays.push(chip);
+        }
+      }
+      if (isSelectedBrowser) {
+        const chip = createAmapContextChip(browserSamplingCoverageLabel(browserTask), position, {
+          tone: "sampling",
+          zIndex: 143,
+          offsetY: isSelected || isSelectedGeo ? -56 : -30
+        });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToBrowserSamplingTask(browserTask);
+            focusAmapPosition(position, 13.8);
+          });
+          overlays.push(chip);
+        }
+      }
       if (geoTask) {
         const badge = new window.AMap.CircleMarker({
           center: position,
@@ -2882,21 +3741,37 @@ function renderAmapCommunities(visibleCommunities) {
         badge.on("click", async () => {
           openAmapInfoWindowAt(
             position,
-            `
-              <div class="amap-info">
-                <strong>${geoTask.communityName ?? item.communityName} · ${geoTask.buildingName ?? item.buildingName}</strong>
-                <p>${geoTask.impactLabel} · 影响 ${geoTask.impactScore ?? 0} · ${geoTask.taskScopeLabel ?? "几何任务"}</p>
-                <div class="amap-meta">
-                  <span class="amap-pill">状态 ${geoTaskStatusLabel(geoTask.status)}</span>
-                  <span class="amap-pill">榜单 ${geoTask.watchlistHits ?? 0}</span>
-                </div>
-              </div>
-            `
-          );
+            renderAmapInfoCard({
+              kicker: "几何补采任务",
+              title: `${geoTask.communityName ?? item.communityName} · ${geoTask.buildingName ?? item.buildingName}`,
+              subtitle: `${geoTask.impactLabel} · ${geoTask.taskScopeLabel ?? "几何任务"}`,
+            stats: [
+              { label: "任务状态", value: geoTaskStatusLabel(geoTask.status), tone: "warning" },
+              { label: "影响分", value: `${geoTask.impactScore ?? 0}`, tone: "score" },
+              { label: "榜单命中", value: `${geoTask.watchlistHits ?? 0}`, tone: "neutral" }
+            ],
+            note: geoTask.geometryGapNote ?? geoTask.captureGoal ?? "优先补齐这栋楼的真实 footprint。",
+            actionHint: "点击后会切到几何补采任务，并把楼层证据保持在当前对象上。"
+          })
+        );
           await navigateToGeoTask(geoTask);
           focusAmapPosition(position, 13.8);
         });
         overlays.push(badge);
+      }
+      if (browserTask) {
+        const badge = createAmapBrowserSamplingBadge(browserTask, position, {
+          hasGeoTask: Boolean(geoTask),
+          zIndex: isSelected ? 142 : 130
+        });
+        badge?.on("click", async () => {
+          openAmapInfoWindowAt(position, browserSamplingTaskInfoHtml(browserTask));
+          await navigateToBrowserSamplingTask(browserTask);
+          focusAmapPosition(position, 13.8);
+        });
+        if (badge) {
+          overlays.push(badge);
+        }
       }
     });
   } else {
@@ -2904,8 +3779,39 @@ function renderAmapCommunities(visibleCommunities) {
       const position = communityCenter(community);
       const selected = community.id === state.selectedCommunityId;
       const geoTask = geoTaskByCommunityId.get(community.id) ?? null;
+      const browserTask = browserTaskByCommunityId.get(community.id) ?? null;
+      const isSelectedGeo = isSelectedGeoTask(geoTask);
+      const isSelectedBrowser = isSelectedBrowserSamplingTask(browserTask);
       const isDictionaryOnly = community.sampleStatus === "dictionary_only";
       const isSparse = community.sampleStatus === "sparse_sample";
+      const halo = new window.AMap.CircleMarker({
+        center: position,
+        radius: selected
+          ? (isDictionaryOnly ? 15 : isSparse ? 17 : sizeByScore(community.score) + 9)
+          : isDictionaryOnly
+          ? 11
+          : isSparse
+          ? 12
+          : sizeByScore(community.score) + 6,
+        strokeColor: "rgba(255,255,255,0)",
+        strokeWeight: 0,
+        fillColor: isDictionaryOnly ? "#95a8bb" : getYieldColor(community.yield),
+        fillOpacity: selected ? 0.18 : isSelectedBrowser || isSelectedGeo ? 0.14 : isDictionaryOnly ? 0.06 : 0.08,
+        zIndex: selected ? 98 : 90,
+        bubble: false
+      });
+      if (isSelectedGeo) {
+        const taskHalo = createAmapTaskFocusHalo(position, { tone: "geo", radius: 19, zIndex: 96 });
+        if (taskHalo) {
+          overlays.push(taskHalo);
+        }
+      }
+      if (isSelectedBrowser) {
+        const taskHalo = createAmapTaskFocusHalo(position, { tone: "sampling", radius: 21, zIndex: 97 });
+        if (taskHalo) {
+          overlays.push(taskHalo);
+        }
+      }
       const marker = new window.AMap.CircleMarker({
         center: position,
         radius: selected
@@ -2915,8 +3821,8 @@ function renderAmapCommunities(visibleCommunities) {
           : isSparse
           ? 7.5
           : sizeByScore(community.score),
-        strokeColor: "#ffffff",
-        strokeWeight: selected ? 2 : 1,
+        strokeColor: isSelectedBrowser ? "#ffd166" : isSelectedGeo ? "#ff9966" : "#ffffff",
+        strokeWeight: selected ? 2.2 : isSelectedBrowser || isSelectedGeo ? 1.8 : 1,
         fillColor: isDictionaryOnly ? "#95a8bb" : getYieldColor(community.yield),
         fillOpacity: isDictionaryOnly ? (selected ? 0.66 : 0.42) : selected ? 0.92 : isSparse ? 0.68 : 0.76,
         zIndex: selected ? 120 : 100,
@@ -2930,7 +3836,49 @@ function renderAmapCommunities(visibleCommunities) {
         focusAmapOnCommunity(community);
       });
 
-      overlays.push(marker);
+      overlays.push(halo, marker);
+      if (selected) {
+        const chip = createAmapContextChip(community.name, position, {
+          tone: isDictionaryOnly ? "pending" : "yield",
+          zIndex: 121,
+          offsetY: -30
+        });
+        if (chip) {
+          chip.on("click", async () => {
+            await selectCommunity(community.id, community.districtId);
+            focusAmapOnCommunity(community);
+          });
+          overlays.push(chip);
+        }
+      }
+      if (isSelectedGeo) {
+        const chip = createAmapContextChip("几何任务", position, {
+          tone: "geo",
+          zIndex: 122,
+          offsetY: selected ? -56 : -30
+        });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToGeoTask(geoTask);
+            focusAmapPosition(position, 12.5);
+          });
+          overlays.push(chip);
+        }
+      }
+      if (isSelectedBrowser) {
+        const chip = createAmapContextChip(browserSamplingCoverageLabel(browserTask), position, {
+          tone: "sampling",
+          zIndex: 123,
+          offsetY: selected || isSelectedGeo ? -56 : -30
+        });
+        if (chip) {
+          chip.on("click", async () => {
+            await navigateToBrowserSamplingTask(browserTask);
+            focusAmapPosition(position, 12.5);
+          });
+          overlays.push(chip);
+        }
+      }
       if (geoTask) {
         const badge = new window.AMap.CircleMarker({
           center: position,
@@ -2946,21 +3894,36 @@ function renderAmapCommunities(visibleCommunities) {
         badge.on("click", async () => {
           openAmapInfoWindowAt(
             position,
-            `
-              <div class="amap-info">
-                <strong>${geoTask.communityName ?? community.name}</strong>
-                <p>${geoTask.impactLabel} · 影响 ${geoTask.impactScore ?? 0} · ${geoTask.taskScopeLabel ?? "几何任务"}</p>
-                <div class="amap-meta">
-                  <span class="amap-pill">${geoTask.buildingName ?? "待识别楼栋"}</span>
-                  <span class="amap-pill">榜单 ${geoTask.watchlistHits ?? 0}</span>
-                </div>
-              </div>
-            `
+            renderAmapInfoCard({
+              kicker: "几何补采任务",
+              title: geoTask.communityName ?? community.name,
+              subtitle: `${geoTask.impactLabel} · ${geoTask.taskScopeLabel ?? "几何任务"}`,
+              stats: [
+                { label: "楼栋对象", value: geoTask.buildingName ?? "待识别楼栋", tone: "neutral" },
+                { label: "影响分", value: `${geoTask.impactScore ?? 0}`, tone: "score" },
+                { label: "榜单命中", value: `${geoTask.watchlistHits ?? 0}`, tone: "neutral" }
+              ],
+              note: geoTask.geometryGapNote ?? geoTask.captureGoal ?? "当前这条任务会优先影响研究窗口里的对象判断。"
+            })
           );
           await navigateToGeoTask(geoTask);
           focusAmapPosition(position, 12.5);
         });
         overlays.push(badge);
+      }
+      if (browserTask) {
+        const badge = createAmapBrowserSamplingBadge(browserTask, position, {
+          hasGeoTask: Boolean(geoTask),
+          zIndex: selected ? 128 : 110
+        });
+        badge?.on("click", async () => {
+          openAmapInfoWindowAt(position, browserSamplingTaskInfoHtml(browserTask));
+          await navigateToBrowserSamplingTask(browserTask);
+          focusAmapPosition(position, 12.5);
+        });
+        if (badge) {
+          overlays.push(badge);
+        }
       }
     });
 
@@ -2992,43 +3955,48 @@ function renderAmapCommunities(visibleCommunities) {
         cursor: "pointer"
       });
       const label = new window.AMap.Text({
-        text: `${selectedCommunity.name} · 预锚点`,
+        text: "",
         position,
-        offset: new window.AMap.Pixel(0, -22),
+        offset: new window.AMap.Pixel(0, 0),
         anchor: "bottom-center",
         zIndex: 126,
-        style: {
-          padding: "3px 8px",
-          borderRadius: "999px",
-          background: "rgba(7, 18, 29, 0.88)",
-          border: "1px dashed rgba(255, 209, 102, 0.82)",
-          color: "#fff4cf",
-          fontSize: "12px",
-          fontWeight: "700",
-          boxShadow: "0 10px 24px rgba(0, 0, 0, 0.3)"
-        }
+        style: { background: "transparent", border: "0", padding: "0" }
       });
+      label.setText?.("");
       const openPreview = () => {
         openAmapInfoWindowAt(
           position,
-          `
-            <div class="amap-info">
-              <strong>${selectedCommunity.name} · 预锚点</strong>
-              <p>${selectedCommunity.districtName ?? ""} · ${preview.anchorSource ?? "candidate_preview"}</p>
-              <div class="amap-meta">
-                <span class="amap-pill">${preview.anchorName ?? "待确认候选"}</span>
-                <span class="amap-pill">${preview.anchorQuality != null ? `置信 ${Math.round(Number(preview.anchorQuality) * 100)}%` : "待人工确认"}</span>
-              </div>
-              ${preview.anchorAddress ? `<p>${preview.anchorAddress}</p>` : ""}
-            </div>
-          `
+          renderAmapInfoCard({
+            kicker: "锚点待确认",
+            title: `${selectedCommunity.name} · 预锚点`,
+            subtitle: `${selectedCommunity.districtName ?? ""}${preview.anchorSource ? ` · ${preview.anchorSource}` : ""}`,
+            stats: [
+              { label: "候选名", value: preview.anchorName ?? "待确认候选", tone: "warning" },
+              {
+                label: "置信度",
+                value: preview.anchorQuality != null ? `${Math.round(Number(preview.anchorQuality) * 100)}%` : "待人工确认",
+                tone: "warning"
+              }
+            ],
+            note: preview.anchorAddress ?? "当前只作为预锚点预览，确认后才会正式写回主档。"
+          })
         );
         focusAmapPosition(position, 12.5);
       };
       halo.on("click", openPreview);
       marker.on("click", openPreview);
-      label.on?.("click", openPreview);
-      overlays.push(halo, marker, label);
+      const previewChip = createAmapContextChip(`${selectedCommunity.name} · 预锚点`, position, {
+        tone: "pending",
+        zIndex: 126,
+        offsetY: -32
+      });
+      previewChip?.on("click", openPreview);
+      if (previewChip) {
+        overlays.push(halo, marker, previewChip);
+      } else {
+        label.on?.("click", openPreview);
+        overlays.push(halo, marker, label);
+      }
     }
   }
 
@@ -3070,17 +4038,22 @@ function openAmapInfoWindow(community, position) {
   const yieldText = community.sampleStatus === "dictionary_only" ? "待补样本" : `回报 ${Number(community.yield).toFixed(2)}%`;
   openAmapInfoWindowAt(
     position,
-    `
-    <div class="amap-info">
-      <strong>${community.name}</strong>
-      <p>${community.districtName ?? getSelectedDistrict()?.name ?? ""}</p>
-      <div class="amap-meta">
-        <span class="amap-pill">${yieldText}</span>
-        <span class="amap-pill">${statusLabel}</span>
-        <span class="amap-pill">${community.anchorSource ? `坐标 ${community.anchorSource}` : "坐标待补"}</span>
-      </div>
-    </div>
-  `
+    renderAmapInfoCard({
+      kicker: community.sampleStatus === "dictionary_only" ? "已挂图 · 待补样本" : "小区研究对象",
+      title: community.name,
+      subtitle: community.districtName ?? getSelectedDistrict()?.name ?? "",
+      stats: [
+        { label: "当前判断", value: yieldText, tone: community.sampleStatus === "dictionary_only" ? "warning" : "yield" },
+        { label: "样本状态", value: statusLabel, tone: "neutral" },
+        { label: "机会分", value: `${community.score ?? 0}分`, tone: "score" },
+        { label: "坐标来源", value: community.anchorSource ? `${community.anchorSource}` : "待补", tone: "neutral" }
+      ],
+      note:
+        community.sampleStatus === "dictionary_only"
+          ? "这类小区已经挂图，但还没有足够出售/出租样本进入主榜。"
+          : `${community.saleSample ?? community.sample ?? 0} 套出售样本 · ${community.rentSample ?? community.sample ?? 0} 套出租样本`,
+      actionHint: "点击后会把右侧研究列切到这个小区，并联动楼栋 × 楼层表。"
+    })
   );
 }
 
@@ -3098,7 +4071,34 @@ function focusAmapPosition(position, minZoom = 12) {
     return;
   }
   const zoom = Math.max(Number(amapState.map.getZoom?.() ?? 10.8), minZoom);
-  amapState.map.setZoomAndCenter(zoom, position);
+  const currentZoom = Number(amapState.map.getZoom?.() ?? 10.8);
+  triggerMapTransition("focus");
+  if (typeof amapState.map.panTo === "function") {
+    amapState.map.panTo(position);
+    if (currentZoom < zoom && typeof amapState.map.setZoom === "function") {
+      window.setTimeout(() => {
+        amapState.map?.setZoom?.(zoom);
+      }, 90);
+    }
+    return;
+  }
+  amapState.map.setZoomAndCenter?.(zoom, position);
+}
+
+async function applyDistrictScope(districtId, { refresh = true } = {}) {
+  const nextDistrictId = districtId || "all";
+  const changed = state.districtFilter !== nextDistrictId;
+  state.districtFilter = nextDistrictId;
+  if (districtFilter) {
+    districtFilter.value = nextDistrictId;
+  }
+  if (nextDistrictId !== "all") {
+    state.selectedDistrictId = nextDistrictId;
+  }
+  if (refresh && changed) {
+    await refreshData();
+  }
+  return changed;
 }
 
 function updateMapNote() {
@@ -3106,7 +4106,7 @@ function updateMapNote() {
     mapNote.innerHTML = `
       <strong>说明</strong>
       <p>${amapState.modeNote ?? "当前地图用于展示上海租售比机会分布。"}</p>
-      <p>当前没有数据库主读数据，所以地图先展示高德底图上的上海行政区参考图，不伪装成已经接通全市楼栋样本。</p>
+      <p>当前没有数据库主读数据，所以这里仅保留真地图容器与加载说明，并等待高德底图与 staged 数据同步完成。</p>
       <p>${runtimeConfig.hasPostgresDsn ? "本地库已经配置，但还没完成首轮 bootstrap。先跑 reference → import → geo → metrics。" : "下一步请先导入授权 / 官方批次，完成地址标准化与 PostgreSQL 落库；需要联调时也可以显式开启 demo mock。"}</p>
     `;
     return;
@@ -3128,18 +4128,34 @@ function updateMapNote() {
   const latestAnchorReviewAt = opsSummaryData.latestAnchorReviewAt ?? null;
   const geoTaskItems = getGeoTaskMapItems();
   const topGeoTask = geoTaskItems[0] ?? null;
+  const browserSamplingTaskMaps = getBrowserSamplingTaskMaps();
+  const browserSamplingOpenTasks = browserSamplingTaskMaps.tasks;
+  const browserSamplingVisibleCount =
+    state.granularity === "community"
+      ? browserSamplingTaskMaps.communityMap.size
+      : state.granularity === "building"
+      ? browserSamplingTaskMaps.buildingMap.size
+      : browserSamplingTaskMaps.floorMap.size;
+  const browserSamplingReviewCount = browserSamplingOpenTasks.filter((task) => browserSamplingCoverageState(task) === "needs_review").length;
+  const topBrowserSamplingTask = browserSamplingOpenTasks[0] ?? null;
   const selectedCommunity = state.selectedCommunityDetail ?? getSelectedCommunity();
   const selectedPreview = communityAnchorPreview(selectedCommunity);
+  const waypoint = state.mapWaypoint;
   const currentBatch = state.selectedImportRunDetail?.batchName ?? state.selectedImportRunDetail?.runId ?? "当前批次";
   const baselineBatch = state.selectedImportRunDetail?.comparison?.baselineBatchName ?? null;
+  const isFloorWatchlistLoading = state.granularity === "floor" && state.floorWatchlistLoading;
   const scopeText =
-    state.granularity === "community"
-      ? `当前显示 ${visibleCount} 个小区点，适合做全市级热力筛选；同时挂着 ${geoTaskItems.length} 个高影响几何缺口。`
+    isFloorWatchlistLoading
+      ? `持续套利楼层带仍在计算中，当前先保留 ${getVisibleBuildingItems().length} 个楼栋面的上下文，并挂着 ${geoTaskItems.length} 个高影响几何缺口与 ${browserSamplingVisibleCount} 个采样任务标记。`
+      : state.granularity === "community"
+      ? `当前显示 ${visibleCount} 个小区点，适合做全市级热力筛选；同时挂着 ${geoTaskItems.length} 个高影响几何缺口和 ${browserSamplingVisibleCount} 个公开页采样缺口。`
       : state.granularity === "building"
-      ? `当前显示 ${visibleCount} 个楼栋面，并叠加 ${geoTaskItems.length} 个高影响几何补采点。`
-      : `当前显示 ${visibleCount} 个持续套利楼层面，并叠加 ${geoTaskItems.length} 个会影响楼层定位的几何缺口。`;
+      ? `当前显示 ${visibleCount} 个楼栋面，并叠加 ${geoTaskItems.length} 个高影响几何补采点与 ${browserSamplingVisibleCount} 个采样任务标记。`
+      : `当前显示 ${visibleCount} 个持续套利楼层面，并叠加 ${geoTaskItems.length} 个会影响楼层定位的几何缺口与 ${browserSamplingVisibleCount} 个采样任务标记。`;
   const windowText =
-    state.granularity === "floor"
+    isFloorWatchlistLoading
+      ? `研究窗口：${currentBatch}${baselineBatch ? ` vs ${baselineBatch}` : "（自动首批基线）"}，楼层榜正在异步刷新。`
+      : state.granularity === "floor"
       ? `研究窗口：${currentBatch}${baselineBatch ? ` vs ${baselineBatch}` : "（自动首批基线）"}。`
       : `当前粒度：${granularityLabel(state.granularity)}。`;
   const geometrySource =
@@ -3167,6 +4183,12 @@ function updateMapNote() {
   const taskText = topGeoTask
     ? `当前最该补的几何缺口是 ${topGeoTask.communityName ?? "待识别小区"} · ${topGeoTask.buildingName ?? "待识别楼栋"}，${topGeoTask.impactLabel}。`
     : "当前筛选窗口下没有高影响几何缺口。";
+  const samplingText = topBrowserSamplingTask
+    ? `当前还有 ${browserSamplingOpenTasks.length} 个公开页采样缺口${browserSamplingReviewCount ? `，其中 ${browserSamplingReviewCount} 个待复核` : ""}；最紧急的是 ${topBrowserSamplingTask.communityName ?? "待识别小区"}${topBrowserSamplingTask.buildingName ? ` · ${topBrowserSamplingTask.buildingName}` : ""}${topBrowserSamplingTask.floorNo != null ? ` · ${topBrowserSamplingTask.floorNo}层` : ""}，${browserSamplingCoverageLabel(topBrowserSamplingTask)}。`
+    : "当前筛选窗口下没有公开页采样缺口。";
+  const waypointText = waypoint
+    ? `刚刚从${waypoint.sourceLabel ?? "研究台"}跳转到了 ${waypoint.label}${waypoint.detail ? `，当前正在联动 ${waypoint.detail}` : ""}。`
+    : null;
   const previewText = selectedPreview
     ? `当前选中的 ${selectedCommunity?.name ?? "小区"} 还没正式写回主档坐标，地图正在用候选预锚点 ${selectedPreview.anchorName ?? "待确认候选"} 做人工判断参考。`
     : `当前没有处于预锚点评估中的小区；当前批次仍有 ${Number(opsSummaryData.pendingAnchorCount ?? unanchoredCommunityCount)} 个小区待确认锚点${latestAnchorReviewAt ? `，最近一次确认在 ${formatTimestamp(latestAnchorReviewAt)}` : ""}。`;
@@ -3177,6 +4199,8 @@ function updateMapNote() {
     <p>${scopeText}</p>
     <p>${windowText}</p>
     <p>${geometryText}</p>
+    <p>${samplingText}</p>
+    ${waypointText ? `<p>${waypointText}</p>` : ""}
     <p>${previewText}</p>
     <p>${taskText}</p>
   `;
@@ -3459,32 +4483,82 @@ function resolveFloorGeometry(item) {
   };
 }
 
-function appendSvgGeoTaskBadge(group, footprint, task) {
-  const outline = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-  outline.setAttribute("class", "entity-task-outline");
-  outline.setAttribute("points", polygonPointsAttribute(scaleRelativePolygon(footprint, 1.09)));
-  outline.setAttribute("stroke", geoTaskColor(task.impactBand));
-  outline.setAttribute("fill", "transparent");
-  group.appendChild(outline);
+function createAmapBrowserSamplingBadge(task, position, { hasGeoTask = false, zIndex = 134 } = {}) {
+  if (!task || !window.AMap) {
+    return null;
+  }
+  return new window.AMap.Marker({
+    position,
+    anchor: "center",
+    offset: new window.AMap.Pixel(hasGeoTask ? -14 : 24, -18),
+    content: `
+      <div class="amap-task-badge amap-task-badge--${browserSamplingCoverageState(task)}">
+        <span class="amap-task-badge__dot"></span>
+        <span class="amap-task-badge__text">${browserSamplingCoverageLabel(task)}</span>
+        <span class="amap-task-badge__count">${browserSamplingBadgeCounter(task)}</span>
+      </div>
+    `,
+    bubble: true,
+    zIndex,
+  });
+}
 
-  const bounds = polygonBounds(footprint);
-  const badge = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  badge.setAttribute("class", "entity-task-badge");
-  badge.setAttribute("transform", `translate(${bounds.maxX + 8} ${bounds.minY - 8})`);
+function createAmapContextChip(text, position, { tone = "yield", zIndex = 132, offsetY = -28 } = {}) {
+  if (!window.AMap || !text) {
+    return null;
+  }
+  return new window.AMap.Marker({
+    position,
+    anchor: "center",
+    offset: new window.AMap.Pixel(0, offsetY),
+    content: `<div class="amap-context-chip amap-context-chip--${tone}">${text}</div>`,
+    bubble: true,
+    zIndex
+  });
+}
 
-  const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  dot.setAttribute("r", task.impactBand === "critical" ? "8" : task.impactBand === "high" ? "7" : "6");
-  dot.setAttribute("fill", geoTaskColor(task.impactBand));
-  dot.setAttribute("stroke", "rgba(7, 18, 29, 0.86)");
-  dot.setAttribute("stroke-width", "1.6");
+function createAmapTaskFocusHalo(position, { tone = "sampling", radius = 20, zIndex = 133 } = {}) {
+  if (!window.AMap || !position) {
+    return null;
+  }
+  const palette =
+    tone === "geo"
+      ? { stroke: "rgba(255, 153, 102, 0.92)", fill: "rgba(255, 153, 102, 0.16)" }
+      : { stroke: "rgba(255, 209, 102, 0.94)", fill: "rgba(255, 209, 102, 0.14)" };
 
-  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  text.setAttribute("class", "entity-task-label");
-  text.textContent = geoTaskBadgeText(task);
+  return new window.AMap.CircleMarker({
+    center: position,
+    radius,
+    strokeColor: palette.stroke,
+    strokeWeight: 2,
+    fillColor: palette.fill,
+    fillOpacity: 0.42,
+    strokeStyle: "dashed",
+    zIndex,
+    bubble: false
+  });
+}
 
-  badge.appendChild(dot);
-  badge.appendChild(text);
-  group.appendChild(badge);
+function isSelectedGeoTask(task) {
+  return Boolean(task?.taskId && task.taskId === state.selectedGeoTaskId);
+}
+
+function isSelectedBrowserSamplingTask(task) {
+  return Boolean(task?.taskId && task.taskId === state.selectedBrowserSamplingTaskId);
+}
+
+function createAmapDistrictChip(district, position, { selected = false } = {}) {
+  if (!window.AMap || !district || !position) {
+    return null;
+  }
+  return new window.AMap.Marker({
+    position,
+    anchor: "center",
+    offset: new window.AMap.Pixel(0, 0),
+    content: `<div class="amap-context-chip amap-context-chip--${selected ? "district-active" : "district"}">${district.short ?? district.name}</div>`,
+    bubble: true,
+    zIndex: selected ? 66 : 44
+  });
 }
 
 function getVisibleBuildingItems() {
@@ -3575,6 +4649,47 @@ function formatTimestamp(value) {
     return "时间待补";
   }
   return value.replace("T", " ").slice(0, 16);
+}
+
+function metricsRefreshStatusTone(status) {
+  return {
+    completed: "resolved",
+    partial: "matching",
+    error: "needs_review"
+  }[String(status ?? "").trim().toLowerCase()] ?? "captured";
+}
+
+function metricsRefreshStatusLabel(status) {
+  return {
+    completed: "已完成",
+    partial: "部分完成",
+    error: "失败"
+  }[String(status ?? "").trim().toLowerCase()] ?? "状态待补";
+}
+
+function metricsRefreshModeLabel(mode) {
+  return {
+    staged: "仅 staged",
+    "staged+postgres": "staged + PostgreSQL",
+    "postgres-only": "仅 PostgreSQL"
+  }[String(mode ?? "").trim().toLowerCase()] ?? "模式待补";
+}
+
+function metricsRefreshTriggerLabel(source) {
+  return {
+    "atlas-ui": "工作台手动",
+    "browser-sampling": "公开页采样",
+    bootstrap: "本地 Bootstrap"
+  }[String(source ?? "").trim().toLowerCase()] ?? "系统触发";
+}
+
+function metricsRefreshPostgresLabel(status) {
+  return {
+    completed: "DB 已同步",
+    skipped: "DB 未写入",
+    error: "DB 同步失败",
+    pending: "DB 等待中"
+  }[String(status ?? "").trim().toLowerCase()] ?? "DB 状态待补";
 }
 
 function truncate(value, maxLength = 48) {
@@ -3711,12 +4826,145 @@ function compareBrowserSamplingTask(left, right) {
   );
 }
 
+function compareBrowserSamplingMapTask(left, right) {
+  const statusRank = { needs_review: 0, needs_capture: 1, in_progress: 2, resolved: 3 };
+  return (
+    (statusRank[browserSamplingCoverageState(left)] ?? 9) - (statusRank[browserSamplingCoverageState(right)] ?? 9) ||
+    compareBrowserSamplingTask(left, right)
+  );
+}
+
 function getBrowserSamplingPackItems(limit = 8) {
   const tasks = (state.browserSamplingPackItems ?? [])
     .filter((task) => state.districtFilter === "all" || task.districtId === state.districtFilter)
     .slice()
     .sort(compareBrowserSamplingTask);
   return tasks.slice(0, limit);
+}
+
+function getOpenBrowserSamplingTasks() {
+  return (state.browserSamplingPackItems ?? [])
+    .filter((task) => state.districtFilter === "all" || task.districtId === state.districtFilter)
+    .filter((task) => browserSamplingCoverageState(task) !== "resolved")
+    .slice()
+    .sort(compareBrowserSamplingMapTask);
+}
+
+function setBestBrowserSamplingTask(map, key, task) {
+  if (!key) {
+    return;
+  }
+  const current = map.get(key);
+  if (!current || compareBrowserSamplingMapTask(task, current) < 0) {
+    map.set(key, task);
+  }
+}
+
+function browserSamplingTaskKey(task) {
+  return task?.buildingId && task?.floorNo != null ? `${task.buildingId}:${task.floorNo}` : null;
+}
+
+function getBrowserSamplingTaskMaps() {
+  const tasks = getOpenBrowserSamplingTasks();
+  const communityMap = new Map();
+  const buildingMap = new Map();
+  const floorMap = new Map();
+
+  tasks.forEach((task) => {
+    setBestBrowserSamplingTask(communityMap, task.communityId, task);
+    setBestBrowserSamplingTask(buildingMap, task.buildingId, task);
+    setBestBrowserSamplingTask(floorMap, browserSamplingTaskKey(task), task);
+  });
+
+  return { tasks, communityMap, buildingMap, floorMap };
+}
+
+function browserSamplingBadgeCounter(task) {
+  const stateLabel = browserSamplingCoverageState(task);
+  const reviewCount = Number(task?.latestCaptureAttentionCount ?? 0);
+  const missingCount = browserSamplingMissingCount(task);
+  return String(
+    stateLabel === "needs_review" ? reviewCount || 1 : missingCount > 9 ? "9+" : Math.max(missingCount, 1)
+  );
+}
+
+function browserSamplingCountSummary(task) {
+  const current = browserSamplingCurrentCount(task);
+  const target = browserSamplingTargetCount(task);
+  const prefix = task?.targetGranularity === "floor" ? "样本对" : "样本";
+  return `${prefix} ${current}/${target || current || 0}`;
+}
+
+function browserSamplingTaskInfoHtml(task) {
+  if (!task) {
+    return "";
+  }
+  return renderAmapInfoCard({
+    kicker: "公开页采样任务",
+    title: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}`,
+    subtitle: `${task.districtName ?? "未知行政区"} · ${task.taskTypeLabel ?? task.taskType ?? "公开页采样"}`,
+    stats: [
+      { label: "任务状态", value: browserSamplingCoverageLabel(task), tone: "warning" },
+      { label: "覆盖进度", value: browserSamplingCountSummary(task), tone: "neutral" },
+      { label: "优先分", value: `${task.priorityScore ?? 0}`, tone: "score" },
+      task.currentYieldPct != null
+        ? { label: "当前回报", value: `${Number(task.currentYieldPct).toFixed(2)}%`, tone: "yield" }
+        : null
+    ],
+    note: task.captureGoal ?? task.reason ?? "等待补齐公开页原文。",
+    footer: task.latestCaptureAt ? `最近采样 ${formatTimestamp(task.latestCaptureAt)}` : "最近采样待补",
+    actionHint: "点击后会切到公开页采样执行台，并把对应楼栋/楼层证据一并展开。"
+  });
+}
+
+function renderAmapInfoCard({ kicker = "", title = "", subtitle = "", stats = [], note = "", footer = "", actionHint = "" } = {}) {
+  const cards = stats
+    .filter(Boolean)
+    .map(
+      (item) => `
+        <div class="amap-card__stat amap-card__stat--${item.tone ?? "neutral"}">
+          <span class="amap-card__stat-label">${item.label}</span>
+          <strong class="amap-card__stat-value">${item.value}</strong>
+        </div>
+      `
+    )
+    .join("");
+
+  return `
+    <div class="amap-info-window-shell">
+      <section class="amap-card">
+        ${kicker ? `<p class="amap-card__kicker">${kicker}</p>` : ""}
+        ${title ? `<h3 class="amap-card__title">${title}</h3>` : ""}
+        ${subtitle ? `<p class="amap-card__subtitle">${subtitle}</p>` : ""}
+        ${cards ? `<div class="amap-card__stats">${cards}</div>` : ""}
+        ${note ? `<p class="amap-card__note">${note}</p>` : ""}
+        ${actionHint ? `<p class="amap-card__action">${actionHint}</p>` : ""}
+        ${footer ? `<p class="amap-card__footer">${footer}</p>` : ""}
+      </section>
+    </div>
+  `;
+}
+
+async function navigateToBrowserSamplingTask(task, { resetDraft = false, waypoint = null, revealLatestCaptureRun = "auto" } = {}) {
+  if (!task?.taskId) {
+    return;
+  }
+  selectBrowserSamplingTask(task.taskId, { resetDraft });
+  await navigateToEvidenceTarget(task.communityId, task.buildingId || null, task.floorNo || null, {
+    waypoint:
+      waypoint ??
+      {
+        source: "browser_sampling",
+        label: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}`,
+        detail: "公开页采样执行台与对应证据"
+      }
+  });
+  const shouldRevealAttentionRun =
+    Boolean(task.latestCaptureRunId) &&
+    (revealLatestCaptureRun === true || (revealLatestCaptureRun === "auto" && Number(task.latestCaptureAttentionCount ?? 0) > 0));
+  if (shouldRevealAttentionRun) {
+    await loadSelectedBrowserCaptureRunDetail(task.latestCaptureRunId);
+  }
 }
 
 function currentBrowserSamplingTask() {
@@ -3749,12 +4997,270 @@ function currentBrowserCaptureSubmission() {
   return submission.taskId === state.selectedBrowserSamplingTaskId ? submission : null;
 }
 
+function getBrowserSamplingWorkbenchQueue(task = currentBrowserSamplingTask()) {
+  const openTasks = (state.browserSamplingPackItems ?? [])
+    .filter((item) => item.taskId !== task?.taskId)
+    .filter((item) => browserSamplingCoverageState(item) !== "resolved")
+    .slice()
+    .sort(compareBrowserSamplingMapTask);
+  const districtTasks = task?.districtId
+    ? openTasks.filter((item) => item.districtId === task.districtId)
+    : openTasks;
+  const taskPool = districtTasks.length ? districtTasks : openTasks;
+  return {
+    districtTasks: taskPool,
+    nextDistrictTask: taskPool[0] ?? null,
+    nextReviewTask: taskPool.find((item) => browserSamplingCoverageState(item) === "needs_review") ?? null,
+    nextCaptureTask:
+      taskPool.find((item) => ["needs_capture", "in_progress"].includes(browserSamplingCoverageState(item))) ?? null,
+    previewTasks: taskPool.slice(0, 4)
+  };
+}
+
+function browserSamplingInstructionText(task) {
+  if (!task) {
+    return "";
+  }
+  return [
+    `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""} · ${task.districtName ?? "未知行政区"}`,
+    `状态：${browserSamplingCoverageLabel(task)} · ${task.sampleStatusLabel ?? "状态待补"}`,
+    task.captureGoal ? `目标：${task.captureGoal}` : "",
+    task.reason ? `原因：${task.reason}` : "",
+    task.saleQuery ? `Sale 检索：${task.saleQuery}` : "",
+    task.rentQuery ? `Rent 检索：${task.rentQuery}` : "",
+    task.targetQuery ? `目标检索：${task.targetQuery}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function browserCaptureLifecycleStatus(attentionCount) {
   return Number(attentionCount || 0) > 0 ? "needs_review" : "captured";
 }
 
 function browserCaptureLifecycleLabel(attentionCount) {
   return Number(attentionCount || 0) > 0 ? "已采待复核" : "已采仍需补采";
+}
+
+function browserSamplingTargetCount(task) {
+  if (!task) {
+    return 0;
+  }
+  return Number(
+    task.targetGranularity === "floor"
+      ? task.targetPairCount ?? 0
+      : task.targetSampleSize ?? 0
+  );
+}
+
+function browserSamplingCurrentCount(task) {
+  if (!task) {
+    return 0;
+  }
+  return Number(
+    task.targetGranularity === "floor"
+      ? task.currentPairCount ?? 0
+      : task.currentSampleSize ?? 0
+  );
+}
+
+function browserSamplingMissingCount(task) {
+  return Math.max(browserSamplingTargetCount(task) - browserSamplingCurrentCount(task), 0);
+}
+
+function browserSamplingCoverageState(task) {
+  const attentionCount = Number(task?.latestCaptureAttentionCount ?? 0);
+  if (attentionCount > 0) {
+    return "needs_review";
+  }
+  if (browserSamplingMissingCount(task) <= 0 && browserSamplingTargetCount(task) > 0) {
+    return "resolved";
+  }
+  if (browserSamplingCurrentCount(task) > 0 || Number(task?.captureHistoryCount ?? 0) > 0) {
+    return "in_progress";
+  }
+  return "needs_capture";
+}
+
+function browserSamplingCoverageLabel(task) {
+  return {
+    resolved: "已采够",
+    in_progress: "补采中",
+    needs_review: "待复核",
+    needs_capture: "待采样"
+  }[browserSamplingCoverageState(task)];
+}
+
+function browserSamplingCoverageProgress(task) {
+  const target = browserSamplingTargetCount(task);
+  if (target <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round((browserSamplingCurrentCount(task) / target) * 100)));
+}
+
+function browserSamplingCoveragePayload() {
+  const tasks = (state.browserSamplingPackItems ?? [])
+    .filter((task) => state.districtFilter === "all" || task.districtId === state.districtFilter)
+    .slice();
+
+  const districtsMap = new Map();
+  const communitiesMap = new Map();
+
+  tasks.forEach((task) => {
+    const districtKey = task.districtId ?? task.districtName ?? "unknown";
+    const districtEntry =
+      districtsMap.get(districtKey) ??
+      {
+        districtId: task.districtId ?? null,
+        districtName: task.districtName ?? "未知行政区",
+        taskCount: 0,
+        completedTaskCount: 0,
+        reviewTaskCount: 0,
+        inProgressTaskCount: 0,
+        targetCount: 0,
+        currentCount: 0,
+        priorityScore: 0,
+        latestCaptureAt: null,
+        missingCount: 0,
+        highestPriorityTask: task,
+        outstandingTask: task
+      };
+
+    districtEntry.taskCount += 1;
+    districtEntry.targetCount += browserSamplingTargetCount(task);
+    districtEntry.currentCount += Math.min(browserSamplingCurrentCount(task), browserSamplingTargetCount(task) || browserSamplingCurrentCount(task));
+    districtEntry.missingCount += browserSamplingMissingCount(task);
+    districtEntry.priorityScore = Math.max(districtEntry.priorityScore, Number(task.priorityScore ?? 0));
+    if (!districtEntry.latestCaptureAt || String(task.latestCaptureAt ?? "") > String(districtEntry.latestCaptureAt ?? "")) {
+      districtEntry.latestCaptureAt = task.latestCaptureAt ?? districtEntry.latestCaptureAt;
+    }
+    if (compareBrowserSamplingTask(task, districtEntry.highestPriorityTask) < 0) {
+      districtEntry.highestPriorityTask = task;
+    }
+    const currentDistrictOutstanding = districtEntry.outstandingTask;
+    const currentDistrictOutstandingMissing = browserSamplingMissingCount(currentDistrictOutstanding);
+    const candidateDistrictMissing = browserSamplingMissingCount(task);
+    if (
+      !currentDistrictOutstanding ||
+      candidateDistrictMissing > currentDistrictOutstandingMissing ||
+      (candidateDistrictMissing === currentDistrictOutstandingMissing && compareBrowserSamplingTask(task, currentDistrictOutstanding) < 0)
+    ) {
+      districtEntry.outstandingTask = task;
+    }
+
+    const taskState = browserSamplingCoverageState(task);
+    if (taskState === "resolved") {
+      districtEntry.completedTaskCount += 1;
+    } else if (taskState === "needs_review") {
+      districtEntry.reviewTaskCount += 1;
+    } else if (taskState === "in_progress") {
+      districtEntry.inProgressTaskCount += 1;
+    }
+    districtsMap.set(districtKey, districtEntry);
+
+    const communityKey = task.communityId ?? `${districtKey}:${task.communityName ?? task.taskId ?? "unknown"}`;
+    const communityEntry =
+      communitiesMap.get(communityKey) ??
+      {
+        communityId: task.communityId ?? null,
+        communityName: task.communityName ?? "待识别小区",
+        districtId: task.districtId ?? null,
+        districtName: task.districtName ?? "未知行政区",
+        focusScope: task.focusScope ?? "citywide",
+        taskCount: 0,
+        completedTaskCount: 0,
+        reviewTaskCount: 0,
+        inProgressTaskCount: 0,
+        targetCount: 0,
+        currentCount: 0,
+        missingCount: 0,
+        latestCaptureAt: null,
+        latestCaptureAttentionCount: 0,
+        highestPriorityTask: task,
+        outstandingTask: task,
+        taskItems: []
+      };
+
+    communityEntry.taskCount += 1;
+    communityEntry.targetCount += browserSamplingTargetCount(task);
+    communityEntry.currentCount += Math.min(browserSamplingCurrentCount(task), browserSamplingTargetCount(task) || browserSamplingCurrentCount(task));
+    communityEntry.missingCount += browserSamplingMissingCount(task);
+    communityEntry.taskItems.push(task);
+    communityEntry.latestCaptureAttentionCount += Number(task.latestCaptureAttentionCount ?? 0);
+    if (!communityEntry.latestCaptureAt || String(task.latestCaptureAt ?? "") > String(communityEntry.latestCaptureAt ?? "")) {
+      communityEntry.latestCaptureAt = task.latestCaptureAt ?? communityEntry.latestCaptureAt;
+    }
+    if (compareBrowserSamplingTask(task, communityEntry.highestPriorityTask) < 0) {
+      communityEntry.highestPriorityTask = task;
+    }
+    const currentOutstanding = communityEntry.outstandingTask;
+    const currentOutstandingMissing = browserSamplingMissingCount(currentOutstanding);
+    const candidateMissing = browserSamplingMissingCount(task);
+    if (
+      !currentOutstanding ||
+      candidateMissing > currentOutstandingMissing ||
+      (candidateMissing === currentOutstandingMissing && compareBrowserSamplingTask(task, currentOutstanding) < 0)
+    ) {
+      communityEntry.outstandingTask = task;
+    }
+
+    if (taskState === "resolved") {
+      communityEntry.completedTaskCount += 1;
+    } else if (taskState === "needs_review") {
+      communityEntry.reviewTaskCount += 1;
+    } else if (taskState === "in_progress") {
+      communityEntry.inProgressTaskCount += 1;
+    }
+    communitiesMap.set(communityKey, communityEntry);
+  });
+
+  const districts = Array.from(districtsMap.values())
+    .map((entry) => ({
+      ...entry,
+      completionPct:
+        entry.targetCount > 0
+          ? Math.max(0, Math.min(100, Math.round((entry.currentCount / entry.targetCount) * 100)))
+          : 0
+    }))
+    .sort(
+      (left, right) =>
+        Number(right.reviewTaskCount ?? 0) - Number(left.reviewTaskCount ?? 0) ||
+        Number(left.completionPct ?? 0) - Number(right.completionPct ?? 0) ||
+        Number(right.priorityScore ?? 0) - Number(left.priorityScore ?? 0) ||
+        String(left.districtName ?? "").localeCompare(String(right.districtName ?? ""))
+    );
+
+  const communities = Array.from(communitiesMap.values())
+    .map((entry) => ({
+      ...entry,
+      completionPct:
+        entry.targetCount > 0
+          ? Math.max(0, Math.min(100, Math.round((entry.currentCount / entry.targetCount) * 100)))
+          : 0
+    }))
+    .sort(
+      (left, right) =>
+        Number(right.reviewTaskCount ?? 0) - Number(left.reviewTaskCount ?? 0) ||
+        Number(right.missingCount ?? 0) - Number(left.missingCount ?? 0) ||
+        compareBrowserSamplingTask(right.highestPriorityTask, left.highestPriorityTask) ||
+        String(left.communityName ?? "").localeCompare(String(right.communityName ?? ""))
+    );
+
+  return {
+    tasks,
+    districts,
+    communities,
+    summary: {
+      taskCount: tasks.length,
+      districtCount: districts.length,
+      communityCount: communities.length,
+      resolvedTaskCount: tasks.filter((task) => browserSamplingCoverageState(task) === "resolved").length,
+      reviewTaskCount: tasks.filter((task) => browserSamplingCoverageState(task) === "needs_review").length,
+      inProgressTaskCount: tasks.filter((task) => browserSamplingCoverageState(task) === "in_progress").length,
+      pendingTaskCount: tasks.filter((task) => browserSamplingCoverageState(task) === "needs_capture").length
+    }
+  };
 }
 
 function buildOptimisticBrowserCaptureRun(task, body) {
@@ -3972,7 +5478,7 @@ function geoTaskTarget(task) {
   };
 }
 
-async function navigateToEvidenceTarget(communityId, buildingId, floorNo, { preserveGeoTask = false } = {}) {
+async function navigateToEvidenceTarget(communityId, buildingId, floorNo, { preserveGeoTask = false, waypoint = null } = {}) {
   if (!communityId) {
     return;
   }
@@ -3986,16 +5492,30 @@ async function navigateToEvidenceTarget(communityId, buildingId, floorNo, { pres
   if (floorNo) {
     await selectFloor(Number(floorNo), { preserveGeoTask });
   }
+  if (waypoint?.label) {
+    announceMapWaypoint(waypoint);
+  }
 }
 
-async function navigateToGeoTask(task) {
+async function navigateToGeoTask(task, { waypoint = null } = {}) {
   if (!task) {
     return;
   }
   state.selectedGeoTaskId = task.taskId ?? null;
   const target = geoTaskTarget(task);
   setGranularity(target.granularity);
-  await navigateToEvidenceTarget(task.communityId, task.buildingId, target.floorNo, { preserveGeoTask: true });
+  await navigateToEvidenceTarget(task.communityId, task.buildingId, target.floorNo, {
+    preserveGeoTask: true,
+    waypoint:
+      waypoint ??
+      (task.communityName
+        ? {
+            source: "geo_task",
+            label: `${task.communityName}${task.buildingName ? ` · ${task.buildingName}` : ""}`,
+            detail: target.floorNo != null ? `${target.floorNo}层证据与几何补采任务` : "楼栋证据与几何补采任务"
+          }
+        : null)
+  });
 }
 
 async function submitAnchorConfirmation(communityId, payload, { closeEditor = false } = {}) {
@@ -4188,6 +5708,54 @@ async function bootstrapLocalDatabaseRequest({
     state.opsMessageTone = "error";
   } finally {
     state.busyBootstrapDatabase = false;
+    await Promise.all([loadRuntimeConfig(), refreshOperationsWorkbench({ reloadFloor: true }), refreshData()]);
+    render();
+  }
+}
+
+async function refreshMetricsSnapshotRequest({
+  writePostgres = false,
+  applySchema = false
+} = {}) {
+  state.busyMetricsRefresh = true;
+  state.busyMetricsRefreshMode = writePostgres ? "postgres" : "staged";
+  state.opsMessage = null;
+  state.opsMessageContext = "database";
+  render();
+
+  try {
+    const response = await fetch("/api/jobs/refresh-metrics", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        write_postgres: writePostgres,
+        apply_schema: applySchema
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `Metrics refresh failed with ${response.status}`);
+    }
+    const metricsRun = payload.metricsRun ?? null;
+    const refreshSummary = payload.summary ?? {};
+    const summaryMessage =
+      refreshSummary.communityMetricCount || refreshSummary.buildingFloorMetricCount
+        ? `（小区 ${refreshSummary.communityMetricCount ?? 0} / 楼栋分桶 ${refreshSummary.buildingFloorMetricCount ?? 0}）`
+        : "";
+    const postgresMessage = payload.postgres ? "，并同步写入 PostgreSQL" : "";
+    state.opsMessage = metricsRun?.batchName
+      ? `已刷新指标快照 ${metricsRun.batchName}${summaryMessage}${postgresMessage}。`
+      : `指标快照已刷新${summaryMessage}${postgresMessage}。`;
+    state.opsMessageTone = "success";
+  } catch (error) {
+    state.opsMessage = error.message || "指标快照刷新失败。";
+    state.opsMessageTone = "error";
+  } finally {
+    state.busyMetricsRefresh = false;
+    state.busyMetricsRefreshMode = null;
     await Promise.all([loadRuntimeConfig(), refreshOperationsWorkbench({ reloadFloor: true }), refreshData()]);
     render();
   }
@@ -4599,18 +6167,18 @@ function renderSummary() {
         });
 
   const metrics = [
-    { label: "筛选后小区", value: summary.communityCount, suffix: "个", note: "当前筛选结果" },
-    { label: "平均年化回报", value: Number(summary.avgYield).toFixed(2), suffix: "%", note: "中位样本口径" },
-    { label: "平均挂牌总价", value: Number(summary.avgBudget).toFixed(0), suffix: "万", note: "出售样本均值" },
-    { label: "平均月租", value: Number(summary.avgMonthlyRent).toFixed(0), suffix: "元", note: "出租样本均值" },
-    { label: "最高机会分", value: summary.bestScore, suffix: "分", note: "筛选池 top1" },
-    { label: "导出粒度", value: granularityLabel(state.granularity), suffix: "", note: "当前导出对象" }
+    { key: "community_count", label: "筛选后小区", value: summary.communityCount, suffix: "个", note: "当前筛选结果" },
+    { key: "avg_yield", label: "平均年化回报", value: Number(summary.avgYield).toFixed(2), suffix: "%", note: "中位样本口径" },
+    { key: "avg_budget", label: "平均挂牌总价", value: Number(summary.avgBudget).toFixed(0), suffix: "万", note: "出售样本均值" },
+    { key: "avg_monthly_rent", label: "平均月租", value: Number(summary.avgMonthlyRent).toFixed(0), suffix: "元", note: "出租样本均值" },
+    { key: "best_score", label: "最高机会分", value: summary.bestScore, suffix: "分", note: "筛选池 top1" },
+    { key: "granularity", label: "导出粒度", value: granularityLabel(state.granularity), suffix: "", note: "当前导出对象" }
   ];
 
   summaryGrid.innerHTML = metrics
     .map(
       (metric) => `
-        <article class="metric">
+        <article class="metric" data-summary-metric="${metric.key}">
           <span class="metric-label">${metric.label}</span>
           <strong>${metric.value}${metric.suffix}</strong>
           <small>${metric.note}</small>
@@ -4620,229 +6188,11 @@ function renderSummary() {
     .join("");
 }
 
-function renderDistricts() {
-  const visibleDistricts = getFilteredDistricts();
-  districtLayer.innerHTML = "";
-
-  visibleDistricts.forEach((district) => {
-    const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-    polygon.setAttribute("points", district.polygon);
-    polygon.setAttribute("class", "district-shape");
-    polygon.setAttribute("fill", getYieldColor(district.yield));
-    polygon.setAttribute("fill-opacity", district.id === getSelectedDistrict().id ? "0.82" : "0.58");
-    polygon.dataset.id = district.id;
-    polygon.classList.toggle("is-active", district.id === getSelectedDistrict().id);
-    polygon.addEventListener("click", async () => {
-      state.selectedDistrictId = district.id;
-      const firstCommunity = district.communities.find(isCommunityVisible);
-      if (firstCommunity) {
-        await selectCommunity(firstCommunity.id, district.id);
-        return;
-      }
-      render();
-    });
-    districtLayer.appendChild(polygon);
-
-    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    label.setAttribute("x", district.labelX);
-    label.setAttribute("y", district.labelY);
-    label.setAttribute("class", "district-label");
-    label.textContent = district.short;
-    districtLayer.appendChild(label);
-  });
-}
-
-function renderMarkers() {
-  markerLayer.innerHTML = "";
-  const geoTaskItems = getGeoTaskMapItems();
-  const geoTaskByBuildingId = new Map(
-    geoTaskItems.filter((item) => item.buildingId).map((item) => [item.buildingId, item])
-  );
-  const geoTaskByCommunityId = new Map(
-    geoTaskItems.filter((item) => item.communityId).map((item) => [item.communityId, item])
-  );
-
-  if (state.granularity === "building") {
-    getVisibleBuildingItems().forEach(({ community, building, isSelected }) => {
-      const geometry = resolveBuildingGeometry(community, building);
-      const point = geometry.center;
-      const geoTask = geoTaskByBuildingId.get(building.id) ?? null;
-      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      group.setAttribute("class", "map-entity building-marker");
-      group.classList.toggle("is-selected", isSelected);
-      group.classList.toggle("is-muted", community.districtId !== getSelectedDistrict().id);
-      group.classList.toggle("has-geo-task", Boolean(geoTask));
-      group.setAttribute("transform", `translate(${point.x} ${point.y})`);
-
-      const footprint = geometry.svgPoints.map((shapePoint) => ({
-        x: shapePoint.x - point.x,
-        y: shapePoint.y - point.y
-      }));
-      const core = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-      core.setAttribute("class", "entity-footprint");
-      core.setAttribute("points", polygonPointsAttribute(footprint));
-      core.setAttribute("fill", getYieldColor(building.yieldAvg ?? community.yield));
-
-      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      label.setAttribute("class", "entity-label");
-      label.setAttribute("x", "0");
-      label.setAttribute("y", "-12");
-      label.textContent = building.name;
-
-      group.appendChild(core);
-      if (geoTask) {
-        appendSvgGeoTaskBadge(group, footprint, geoTask);
-      }
-      group.appendChild(label);
-      group.addEventListener("click", async () => {
-        await selectCommunity(community.id, community.districtId);
-        await selectBuilding(building.id);
-      });
-      markerLayer.appendChild(group);
-    });
-    return;
-  }
-
-  if (state.granularity === "floor") {
-    getVisibleFloorWatchlistItems().forEach((item) => {
-      const geometry = resolveFloorGeometry(item);
-      if (!geometry) {
-        return;
-      }
-      const point = geometry.center;
-      const isSelected = item.buildingId === state.selectedBuildingId && Number(item.floorNo) === Number(state.selectedFloorNo);
-      const geoTask = geoTaskByBuildingId.get(item.buildingId) ?? null;
-      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      group.setAttribute("class", "map-entity floor-marker");
-      group.classList.toggle("is-selected", isSelected);
-      group.classList.toggle("is-muted", item.districtId !== getSelectedDistrict().id);
-      group.classList.toggle("has-geo-task", Boolean(geoTask));
-      group.setAttribute("transform", `translate(${point.x} ${point.y})`);
-
-      const footprint = geometry.svgPoints.map((shapePoint) => ({
-        x: shapePoint.x - point.x,
-        y: shapePoint.y - point.y
-      }));
-      const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-      polygon.setAttribute("class", "entity-footprint");
-      polygon.setAttribute("points", polygonPointsAttribute(footprint));
-      polygon.setAttribute("fill", getYieldColor(item.latestYieldPct));
-
-      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      label.setAttribute("class", "entity-label");
-      label.setAttribute("x", "0");
-      label.setAttribute("y", "-12");
-      label.textContent = `${item.floorNo}F`;
-
-      group.appendChild(polygon);
-      if (geoTask) {
-        appendSvgGeoTaskBadge(group, footprint, geoTask);
-      }
-      group.appendChild(label);
-      group.addEventListener("click", async () => {
-        await navigateToEvidenceTarget(item.communityId, item.buildingId, item.floorNo);
-      });
-      markerLayer.appendChild(group);
-    });
-    return;
-  }
-
-  const visibleCommunities = getVisibleMapCommunities();
-  visibleCommunities.forEach((community) => {
-    const geoTask = geoTaskByCommunityId.get(community.id) ?? null;
-    const centerPoint =
-      community.centerLng != null && community.centerLat != null
-        ? normalizeLonLatToSvg(community.centerLng, community.centerLat)
-        : { x: community.x, y: community.y };
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("class", "community-marker");
-    group.classList.toggle("is-selected", community.id === state.selectedCommunityId);
-    group.classList.toggle("is-muted", community.districtId !== getSelectedDistrict().id);
-    group.classList.toggle("is-dictionary-only", community.sampleStatus === "dictionary_only");
-    group.setAttribute("transform", `translate(${centerPoint.x} ${centerPoint.y})`);
-
-    const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    pulse.setAttribute("class", "community-pulse");
-    pulse.setAttribute("r", String((community.sampleStatus === "dictionary_only" ? 6 : sizeByScore(community.score)) + 8));
-    pulse.setAttribute("stroke", community.sampleStatus === "dictionary_only" ? "#95a8bb" : getYieldColor(community.yield));
-    pulse.setAttribute("filter", "url(#glow)");
-
-    const core = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    core.setAttribute("class", "community-core");
-    core.setAttribute("r", String(community.sampleStatus === "dictionary_only" ? 6 : community.sampleStatus === "sparse_sample" ? 7.5 : sizeByScore(community.score)));
-    core.setAttribute("fill", community.sampleStatus === "dictionary_only" ? "#95a8bb" : getYieldColor(community.yield));
-
-    const halo = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    halo.setAttribute("r", String((community.sampleStatus === "dictionary_only" ? 6 : sizeByScore(community.score)) + 14));
-    halo.setAttribute("fill", "transparent");
-
-    group.appendChild(pulse);
-    group.appendChild(core);
-    if (geoTask) {
-      const badge = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      badge.setAttribute("class", "entity-task-badge community-task-badge");
-      const markerRadius = community.sampleStatus === "dictionary_only" ? 6 : community.sampleStatus === "sparse_sample" ? 7.5 : sizeByScore(community.score);
-      badge.setAttribute("transform", `translate(${markerRadius + 10} ${-markerRadius - 8})`);
-
-      const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      dot.setAttribute("r", geoTask.impactBand === "critical" ? "7.5" : "6.5");
-      dot.setAttribute("fill", geoTaskColor(geoTask.impactBand));
-      dot.setAttribute("stroke", "rgba(7, 18, 29, 0.86)");
-      dot.setAttribute("stroke-width", "1.6");
-
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("class", "entity-task-label");
-      text.textContent = geoTaskBadgeText(geoTask);
-
-      badge.appendChild(dot);
-      badge.appendChild(text);
-      group.appendChild(badge);
-    }
-    group.appendChild(halo);
-    group.addEventListener("click", async () => {
-      await selectCommunity(community.id, community.districtId);
-    });
-    markerLayer.appendChild(group);
-  });
-
-  const selectedCommunity = state.selectedCommunityDetail ?? getSelectedCommunity();
-  const preview = communityAnchorPreview(selectedCommunity);
-  if (selectedCommunity && preview) {
-    const previewPoint = normalizeLonLatToSvg(preview.centerLng, preview.centerLat);
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("class", "community-marker is-preview-anchor");
-    group.setAttribute("transform", `translate(${previewPoint.x} ${previewPoint.y})`);
-
-    const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    pulse.setAttribute("class", "community-pulse");
-    pulse.setAttribute("r", "18");
-    pulse.setAttribute("stroke", "#ffd166");
-
-    const halo = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    halo.setAttribute("class", "community-core preview-anchor-core");
-    halo.setAttribute("r", "8");
-    halo.setAttribute("fill", "#ffd166");
-
-    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    label.setAttribute("class", "entity-label preview-anchor-label");
-    label.setAttribute("x", "0");
-    label.setAttribute("y", "-16");
-    label.textContent = `${selectedCommunity.name} · 预锚点`;
-
-    group.appendChild(pulse);
-    group.appendChild(halo);
-    group.appendChild(label);
-    group.addEventListener("click", () => {
-      focusAmapOnCommunity(selectedCommunity);
-    });
-    markerLayer.appendChild(group);
-  }
-}
-
 function renderDetail() {
   const community = state.selectedCommunityDetail ?? getSelectedCommunity();
   const district = getSelectedDistrict(community?.districtId ?? null);
   const building = state.selectedBuildingDetail;
+  const waypoint = state.mapWaypoint;
   const anchorPreview = communityAnchorPreview(community);
   const anchorDecisionState =
     community?.anchorDecisionState ??
@@ -4869,19 +6219,59 @@ function renderDetail() {
   }
 
   detailCard.innerHTML = `
-    <div class="detail-title">
-      <div>
-        <strong>${community.name}</strong>
-        <p class="detail-subtitle">${district.name} · 聚焦 ${building?.name ?? community.buildingFocus ?? "小区层"} · ${granularityLabel(state.granularity)}视图</p>
+    ${
+      waypoint?.label
+        ? `
+          <div class="detail-origin-banner tone-${waypoint.tone ?? "yield"}">
+            <span class="detail-origin-banner__eyebrow">来自 ${waypoint.sourceLabel ?? "研究台"}</span>
+            <strong>${waypoint.label}</strong>
+            ${
+              waypoint.detail
+                ? `<p>当前正在联动 ${waypoint.detail}。</p>`
+                : `<p>当前对象已经同步到地图与右侧研究列。</p>`
+            }
+          </div>
+        `
+        : ""
+    }
+    <div class="detail-hero">
+      <div class="detail-hero-copy">
+        <div class="detail-title">
+          <div>
+            <strong>${community.name}</strong>
+            <p class="detail-subtitle">${district.name} · 聚焦 ${building?.name ?? community.buildingFocus ?? "小区层"} · ${granularityLabel(state.granularity)}视图</p>
+          </div>
+          <span class="yield-chip ${yieldClass(community.yield)}">${community.sampleStatus === "dictionary_only" ? "待补样本" : `${community.yield.toFixed(2)}%`}</span>
+        </div>
+        <p class="detail-insight">${community.note}</p>
       </div>
-      <span class="yield-chip ${yieldClass(community.yield)}">${community.sampleStatus === "dictionary_only" ? "待补样本" : `${community.yield.toFixed(2)}%`}</span>
+      <div class="detail-kpi-strip">
+        <article class="detail-kpi">
+          <span>机会评分</span>
+          <strong>${community.score} 分</strong>
+          <small>当前研究窗口 top signal</small>
+        </article>
+        <article class="detail-kpi">
+          <span>有效样本</span>
+          <strong>${community.sample} 套</strong>
+          <small>${community.sampleStatusLabel ?? "状态待补"}</small>
+        </article>
+        <article class="detail-kpi">
+          <span>楼栋覆盖</span>
+          <strong>${community.buildingCount} 栋</strong>
+          <small>${["pudong", "jingan", "minhang"].includes(community.districtId) ? "重点区追踪中" : "小区级为主"}</small>
+        </article>
+      </div>
     </div>
 
-    <div class="detail-stats">
-      <div class="detail-stat">
-        <span>机会评分</span>
-        <strong>${community.score} 分</strong>
-      </div>
+    <div class="detail-meta-strip">
+      <span class="source-pill">${district.name}</span>
+      <span class="source-pill">行政区均值 ${district.yield.toFixed(2)}%</span>
+      <span class="source-pill">${community.sampleStatusLabel ?? "状态待补"}</span>
+      <span class="source-pill">最近有效批次 ${community.dataFreshness ? formatTimestamp(community.dataFreshness) : "待补样本"}</span>
+    </div>
+
+    <div class="detail-stats detail-stats--secondary">
       <div class="detail-stat">
         <span>挂牌均价</span>
         <strong>${community.avgPriceWan} 万</strong>
@@ -4890,26 +6280,6 @@ function renderDetail() {
         <span>月租中位数</span>
         <strong>${community.monthlyRent.toLocaleString()} 元</strong>
       </div>
-      <div class="detail-stat">
-        <span>有效样本</span>
-        <strong>${community.sample} 套</strong>
-      </div>
-      <div class="detail-stat">
-        <span>样本状态</span>
-        <strong>${community.sampleStatusLabel ?? "状态待补"}</strong>
-      </div>
-      <div class="detail-stat">
-        <span>楼栋数量</span>
-        <strong>${community.buildingCount} 栋</strong>
-      </div>
-      <div class="detail-stat">
-        <span>所在行政区均值</span>
-        <strong>${district.yield.toFixed(2)}%</strong>
-      </div>
-    </div>
-
-    <p>${community.note}</p>
-    <div class="detail-stats">
       <div class="detail-stat">
         <span>坐标来源</span>
         <strong>${community.anchorSource ?? "待补"}</strong>
@@ -5053,6 +6423,7 @@ function renderDetail() {
       building
         ? `
       <div class="detail-building">
+        <div class="detail-section-label">楼栋研究摘要</div>
         <div class="detail-title">
           <div>
             <strong>${building.name}</strong>
@@ -5060,7 +6431,12 @@ function renderDetail() {
           </div>
           <span class="yield-chip ${yieldClass(building.yieldAvg ?? community.yield)}">${(building.yieldAvg ?? community.yield).toFixed(2)}%</span>
         </div>
-        <div class="detail-stats">
+        <div class="detail-meta-strip">
+          <span class="source-pill">楼栋评分 ${building.score} 分</span>
+          <span class="source-pill">总层数 ${building.totalFloors} 层</span>
+          <span class="source-pill">样本 ${building.sampleSizeEstimate} 套</span>
+        </div>
+        <div class="detail-stats detail-stats--secondary">
           <div class="detail-stat">
             <span>估算总价</span>
             <strong>${building.avgPriceWanEstimate} 万</strong>
@@ -5233,7 +6609,7 @@ function renderFloorEvidence() {
     ${
       (floorDetail.historyTimeline ?? []).length
         ? `
-          <div class="trace-panel">
+          <div class="trace-panel evidence-section">
             <div class="detail-breakdown-head">
               <strong>批次历史</strong>
               <span class="detail-subtitle">${floorDetail.historySummary?.observedRuns ?? floorDetail.historyTimeline.length} 个批次</span>
@@ -5286,6 +6662,11 @@ function renderFloorEvidence() {
         `
         : ""
     }
+    <div class="evidence-section">
+      <div class="detail-breakdown-head">
+        <strong>样本配对</strong>
+        <span class="detail-subtitle">${floorDetail.samplePairs.length} 组</span>
+      </div>
     <div class="evidence-card-grid">
       ${floorDetail.samplePairs
         .map(
@@ -5328,7 +6709,8 @@ function renderFloorEvidence() {
         )
         .join("")}
     </div>
-    <div class="trace-panel">
+    </div>
+    <div class="trace-panel evidence-section">
       <div class="detail-breakdown-head">
         <strong>地址标准化路径</strong>
         <span class="detail-subtitle">district → resblock → building → unit → floor</span>
@@ -5345,11 +6727,11 @@ function renderFloorEvidence() {
                 <p>${item.detail}</p>
               </article>
             `
-          )
-          .join("")}
+        )
+        .join("")}
       </div>
     </div>
-    <div class="trace-panel">
+    <div class="trace-panel evidence-section">
       <div class="detail-breakdown-head">
         <strong>相关地址队列</strong>
         <span class="detail-subtitle">${floorDetail.queueItems.length} 条</span>
@@ -5389,10 +6771,16 @@ function renderRanking() {
   rankingCount.textContent = `${communities.length}`;
 
   rankingList.innerHTML = communities.length
-    ? communities
+      ? communities
     .map(
       (community, index) => `
-        <article class="ranking-item ${community.id === state.selectedCommunityId ? "is-active" : ""}" data-community-id="${community.id}">
+        <article
+          class="ranking-item ${community.id === state.selectedCommunityId ? "is-active" : ""} ${index < 3 ? "is-top-tier" : ""}"
+          data-community-id="${community.id}"
+          role="button"
+          tabindex="0"
+          aria-pressed="${community.id === state.selectedCommunityId ? "true" : "false"}"
+        >
           <div class="ranking-title">
             <strong>${index + 1}. ${community.name}</strong>
             <span class="yield-chip ${yieldClass(community.yield)}">${community.score}分</span>
@@ -5402,6 +6790,12 @@ function renderRanking() {
             <span>总价 ${community.avgPriceWan} 万</span>
             <span>回报 ${community.yield.toFixed(2)}%</span>
           </div>
+          <div class="source-meta">
+            <span class="source-pill">样本 ${community.sample} 套</span>
+            <span class="source-pill">${community.sampleStatusLabel ?? "状态待补"}</span>
+            <span class="source-pill">${community.dataFreshness ? formatTimestamp(community.dataFreshness) : "待补样本"}</span>
+          </div>
+          <small class="ranking-note">${community.note}</small>
         </article>
       `
     )
@@ -5415,17 +6809,24 @@ function renderRanking() {
       }</p>`;
 
   rankingList.querySelectorAll(".ranking-item").forEach((item) => {
-    item.addEventListener("click", async () => {
+    const activate = async () => {
       const community = communities.find((communityItem) => communityItem.id === item.dataset.communityId) ?? getSelectedCommunity();
       if (community) {
         await selectCommunity(community.id, community.districtId);
+        announceMapWaypoint({
+          source: "opportunity",
+          label: community.name,
+          detail: "小区研究摘要与楼栋矩阵"
+        });
         return;
       }
-    });
+    };
+    item.addEventListener("click", activate);
+    bindKeyboardActivation(item, activate);
   });
 
   const watchlistItems = state.floorWatchlistItems?.length ? state.floorWatchlistItems : canUseDemoFallback() ? getFallbackFloorWatchlistItems() : [];
-  floorWatchlistCount.textContent = `${watchlistItems.length}`;
+  floorWatchlistCount.textContent = state.floorWatchlistLoading ? "加载中" : `${watchlistItems.length}`;
   floorWatchlist.innerHTML = watchlistItems.length
     ? watchlistItems
     .map(
@@ -5435,6 +6836,9 @@ function renderRanking() {
           data-community-id="${item.communityId}"
           data-building-id="${item.buildingId}"
           data-floor-no="${item.floorNo}"
+          role="button"
+          tabindex="0"
+          aria-pressed="${item.buildingId === state.selectedBuildingId && Number(item.floorNo) === Number(state.selectedFloorNo) ? "true" : "false"}"
         >
           <div class="ranking-title">
             <strong>${index + 1}. ${item.communityName} · ${item.buildingName} · ${item.floorNo} 层</strong>
@@ -5467,6 +6871,8 @@ function renderRanking() {
       `
     )
     .join("")
+    : state.floorWatchlistLoading
+      ? `<p class="helper-text">持续套利楼层榜正在加载中。公开页样本与跨批次历史都已命中，列表会在后台计算完成后自动刷新。</p>`
     : `<p class="helper-text">${
         currentDataMode() === "database"
           ? "当前数据库里还没有满足阈值的逐层真实证据，所以楼层榜暂时为空。"
@@ -5474,9 +6880,17 @@ function renderRanking() {
       }</p>`;
 
   floorWatchlist.querySelectorAll(".ranking-item").forEach((item) => {
-    item.addEventListener("click", async () => {
-      await navigateToEvidenceTarget(item.dataset.communityId, item.dataset.buildingId, item.dataset.floorNo);
-    });
+    const activate = async () => {
+      await navigateToEvidenceTarget(item.dataset.communityId, item.dataset.buildingId, item.dataset.floorNo, {
+        waypoint: {
+          source: "floor_watchlist",
+          label: item.querySelector("strong")?.textContent?.replace(/^\d+\.\s*/, "") ?? "持续套利楼层",
+          detail: "楼层证据、批次历史与样本配对"
+        }
+      });
+    };
+    item.addEventListener("click", activate);
+    bindKeyboardActivation(item, activate);
   });
 
   const geoTasks = getGeoTaskWatchlistItems(6);
@@ -5495,6 +6909,9 @@ function renderRanking() {
               data-community-id="${item.communityId ?? ""}"
               data-building-id="${item.buildingId ?? ""}"
               data-floor-no="${focusFloor ?? ""}"
+              role="button"
+              tabindex="0"
+              aria-pressed="${active ? "true" : "false"}"
             >
               <div class="ranking-title">
                 <strong>${index + 1}. ${item.communityName ?? "待识别小区"} · ${item.buildingName ?? "待识别楼栋"}</strong>
@@ -5556,12 +6973,20 @@ function renderRanking() {
     : "<p class=\"helper-text\">当前筛选窗口下没有高影响几何缺口，楼栋 / 楼层 footprint 可以继续往更真实的 AOI 质量提升推进。</p>";
 
   geoTaskWatchlist.querySelectorAll(".ranking-item[data-geo-task-id]").forEach((item) => {
-    item.addEventListener("click", async () => {
+    const activate = async () => {
       const task = geoTasks.find((taskItem) => taskItem.taskId === item.dataset.geoTaskId);
       if (task) {
-        await navigateToGeoTask(task);
+        await navigateToGeoTask(task, {
+          waypoint: {
+            source: "geo_task",
+            label: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}`,
+            detail: task.watchlistFloors?.[0]?.floorNo != null ? `${task.watchlistFloors[0].floorNo}层证据与几何补采任务` : "楼栋证据与几何补采任务"
+          }
+        });
       }
-    });
+    };
+    item.addEventListener("click", activate);
+    bindKeyboardActivation(item, activate);
   });
 
   geoTaskWatchlist.querySelectorAll("[data-geo-create-work-order-task-id]").forEach((button) => {
@@ -5584,6 +7009,9 @@ function renderRanking() {
               data-community-id="${item.communityId ?? ""}"
               data-building-id="${item.buildingId ?? ""}"
               data-floor-no="${item.floorNo ?? ""}"
+              role="button"
+              tabindex="0"
+              aria-pressed="${active ? "true" : "false"}"
             >
               <div class="ranking-title">
                 <strong>${index + 1}. ${item.communityName}${item.buildingName ? ` · ${item.buildingName}` : ""}${item.floorNo != null ? ` · ${item.floorNo}层` : ""}</strong>
@@ -5638,13 +7066,22 @@ function renderRanking() {
       }</p>`;
 
   browserSamplingPack.querySelectorAll(".ranking-item[data-community-id]").forEach((item) => {
-    item.addEventListener("click", async () => {
+    const activate = async () => {
       const task = samplingTasks.find((taskItem) => taskItem.taskId === item.dataset.taskId);
-      if (task?.taskId) {
-        selectBrowserSamplingTask(task.taskId, { resetDraft: false });
+      if (!task?.taskId) {
+        return;
       }
-      await navigateToEvidenceTarget(item.dataset.communityId, item.dataset.buildingId || null, item.dataset.floorNo || null);
-    });
+      await navigateToBrowserSamplingTask(task, {
+        resetDraft: false,
+        waypoint: {
+          source: "browser_sampling",
+          label: item.querySelector("strong")?.textContent?.replace(/^\d+\.\s*/, "") ?? "公开页采样任务",
+          detail: "公开页采样执行台与对应证据"
+        }
+      });
+    };
+    item.addEventListener("click", activate);
+    bindKeyboardActivation(item, activate);
   });
 
   browserSamplingPack.querySelectorAll("[data-browser-copy-sale]").forEach((button) => {
@@ -5670,8 +7107,14 @@ function renderRanking() {
       if (!task) {
         return;
       }
-      selectBrowserSamplingTask(task.taskId);
-      await navigateToEvidenceTarget(task.communityId, task.buildingId || null, task.floorNo || null);
+      await navigateToBrowserSamplingTask(task, {
+        resetDraft: true,
+        waypoint: {
+          source: "browser_sampling",
+          label: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}`,
+          detail: "公开页采样执行台与对应证据"
+        }
+      });
       render();
     });
   });
@@ -5703,7 +7146,13 @@ function renderMatrix() {
         ${community.buildings
           .map(
             (building) => `
-              <tr class="${building.id === state.selectedBuildingId ? "is-active" : ""}" data-building-id="${building.id}">
+              <tr
+                class="${building.id === state.selectedBuildingId ? "is-active" : ""}"
+                data-building-id="${building.id}"
+                role="button"
+                tabindex="0"
+                aria-pressed="${building.id === state.selectedBuildingId ? "true" : "false"}"
+              >
                 <td>${building.name}</td>
                 <td>${building.totalFloors}</td>
                 <td><span class="yield-chip ${yieldClass(building.low)}">${building.low.toFixed(2)}%</span></td>
@@ -5719,9 +7168,16 @@ function renderMatrix() {
   `;
 
   matrixTable.querySelectorAll("tbody tr[data-building-id]").forEach((row) => {
-    row.addEventListener("click", async () => {
+    const activate = async () => {
       await selectBuilding(row.dataset.buildingId);
-    });
+      announceMapWaypoint({
+        source: "matrix",
+        label: `${community.name} · ${row.querySelector("td")?.textContent?.trim() ?? "楼栋"}`,
+        detail: "楼栋研究摘要与楼层机会带"
+      });
+    };
+    row.addEventListener("click", activate);
+    bindKeyboardActivation(row, activate);
   });
 }
 
@@ -5846,6 +7302,7 @@ function renderOperations() {
   const sourceHealth = operations.sourceHealth ?? [];
   const importRuns = operations.importRuns ?? [];
   const metricsRuns = operations.metricsRuns ?? [];
+  const metricsRefreshHistory = operations.metricsRefreshHistory ?? [];
   const geoAssetRuns = operations.geoAssetRuns ?? [];
   const queueItems = (operations.addressQueue ?? []).slice().sort((left, right) => {
     const leftScore = (left.communityId === selectedCommunityId ? 100 : 0) + left.confidence * 10;
@@ -5896,6 +7353,14 @@ function renderOperations() {
     : summary.databaseConnected
     ? "数据库已连通，但还没完成首轮 reference / import / geo / metrics 落库。"
     : "DSN 已配置，但当前数据库还不可读。";
+  const canWriteMetricsToDatabase = postgresReady && summary.databaseConnected && summary.databaseSeeded;
+  const stagedMetricsLabel = summary.latestStagedMetricsRunAt ? formatTimestamp(summary.latestStagedMetricsRunAt) : "未生成";
+  const databaseMetricsLabel = summary.latestDatabaseMetricsRefreshAt ? formatTimestamp(summary.latestDatabaseMetricsRefreshAt) : "未写库";
+  const metricsStatusHint = canWriteMetricsToDatabase
+    ? "数据库已就绪，可选择只更新 staged 或连带同步 PostgreSQL。"
+    : postgresReady && summary.databaseConnected
+    ? "数据库已连通，但建议先完成本地 Bootstrap 再同步 metrics 表。"
+    : "当前只刷新 staged metrics run，统一离线研究口径。";
 
   opsSummary.innerHTML = `
     ${
@@ -5988,7 +7453,7 @@ function renderOperations() {
       <strong>${summary.geoAssetWatchlistLinkedTaskCount ?? selectedGeoRunDetail?.taskSummary?.watchlistLinkedTaskCount ?? 0}</strong>
       <small>已挂到持续套利楼层榜的几何缺口</small>
     </article>
-    <article class="metric mini">
+    <article class="metric mini metric-action">
       <span class="metric-label">指标快照</span>
       <strong>${summary.latestMetricsRefreshAt ? formatTimestamp(summary.latestMetricsRefreshAt) : "待刷新"}</strong>
       <small>${
@@ -5996,6 +7461,39 @@ function renderOperations() {
           ? `${summary.databaseSaleListingCount ?? 0} sale / ${summary.databaseRentListingCount ?? 0} rent`
           : `${summary.metricsRunCount ?? metricsRuns.length} 个 staged metrics run`
       }</small>
+      <div class="comparison-strip">
+        <span class="source-pill">staged ${stagedMetricsLabel}</span>
+        <span class="source-pill">${postgresReady ? `db ${databaseMetricsLabel}` : "db 未配置"}</span>
+      </div>
+      <small>${metricsStatusHint}</small>
+      <div class="metric-action-buttons">
+        <button
+          class="action compact primary"
+          data-refresh-metrics
+          ${state.busyMetricsRefresh ? "disabled" : ""}
+          title="生成一批新的 staged metrics run，统一当前研究口径。"
+        >
+          ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "staged" ? "刷新中..." : "刷新 staged"}
+        </button>
+        ${
+          postgresReady
+            ? `
+              <button
+                class="action compact"
+                data-refresh-metrics-postgres
+                ${state.busyMetricsRefresh || !canWriteMetricsToDatabase ? "disabled" : ""}
+                title="${
+                  canWriteMetricsToDatabase
+                    ? "基于同一轮快照同时写入 PostgreSQL metrics 表。"
+                    : "先完成本地 Bootstrap，让数据库具备可写的基础表与首轮数据。"
+                }"
+              >
+                ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "postgres" ? "写库中..." : "同步 PostgreSQL"}
+              </button>
+            `
+            : ""
+        }
+      </div>
     </article>
     <article class="metric mini metric-action">
       <span class="metric-label">一键引导</span>
@@ -6068,7 +7566,50 @@ function renderOperations() {
         .join("")
     : "<p class=\"helper-text\">当前还没有导入批次。先运行授权 CSV 导入任务，这里会出现批次记录。</p>";
 
-  metricsRunList.innerHTML = metricsRuns.length
+  const metricsRefreshHistoryMarkup = metricsRefreshHistory.length
+    ? `
+        <article class="import-run-section">
+          <div class="breakdown-top">
+            <strong>最近指标刷新</strong>
+            <span class="badge">${metricsRefreshHistory.length}</span>
+          </div>
+          <div class="import-run-grid">
+            ${metricsRefreshHistory
+              .map((item, index) => {
+                const summaryCounts = item.summary ?? {};
+                const statusLabel = escapeHtml(item.statusLabel ?? metricsRefreshStatusLabel(item.status));
+                const triggerLabel = escapeHtml(item.triggerLabel ?? metricsRefreshTriggerLabel(item.triggerSource));
+                const modeLabel = escapeHtml(item.modeLabel ?? metricsRefreshModeLabel(item.mode));
+                const postgresLabel = escapeHtml(metricsRefreshPostgresLabel(item.postgresStatus));
+                const batchName = escapeHtml(truncate(item.batchName ?? "未命名批次", 60));
+                const snapshotDate = escapeHtml(item.snapshotDate ?? "待补");
+                const errorMarkup = item.error ? `<p class="helper-text">${escapeHtml(truncate(item.error, 96))}</p>` : "";
+                return `
+                  <article class="import-run-card ${index === 0 ? "is-active" : ""}">
+                    <div class="breakdown-top">
+                      <strong>${batchName}</strong>
+                      <span class="trace-status ${metricsRefreshStatusTone(item.status)}">${statusLabel}</span>
+                    </div>
+                    <p>${formatTimestamp(item.createdAt)} · ${triggerLabel} · ${modeLabel}</p>
+                    <div class="import-run-metrics">
+                      <span class="source-pill">快照日 ${snapshotDate}</span>
+                      <span class="source-pill">${postgresLabel}</span>
+                      <span class="source-pill">小区指标 ${Number(summaryCounts.communityMetricCount ?? 0)}</span>
+                      <span class="source-pill">楼栋分桶 ${Number(summaryCounts.buildingFloorMetricCount ?? 0)}</span>
+                      <span class="source-pill">小区覆盖 ${Number(summaryCounts.communityCoverageCount ?? 0)}</span>
+                      <span class="source-pill">楼栋覆盖 ${Number(summaryCounts.buildingCoverageCount ?? 0)}</span>
+                    </div>
+                    ${errorMarkup}
+                  </article>
+                `;
+              })
+              .join("")}
+          </div>
+        </article>
+      `
+    : "";
+
+  const metricsRunsMarkup = metricsRuns.length
     ? `
         <article class="import-run-section">
           <div class="breakdown-top">
@@ -6099,6 +7640,8 @@ function renderOperations() {
         </article>
       `
     : "<p class=\"helper-text\">当前还没有 staged metrics run。可以先运行 `python3 jobs/refresh_metrics.py --batch-name staged-metrics-YYYY-MM-DD` 生成统一指标口径。</p>";
+
+  metricsRunList.innerHTML = `${metricsRefreshHistoryMarkup}${metricsRunsMarkup}`;
 
   geoAssetRunList.innerHTML = geoAssetRuns.length
     ? `
@@ -6860,6 +8403,9 @@ function renderOperations() {
   const recentCaptureRuns = getBrowserCaptureRunItems(6, {
     districtId: state.districtFilter
   });
+  const browserSamplingCoverage = browserSamplingCoveragePayload();
+  const workbenchQueue = getBrowserSamplingWorkbenchQueue(selectedSamplingTask);
+
   browserSamplingWorkbench.innerHTML = selectedSamplingTask
     ? `
       ${
@@ -6876,12 +8422,42 @@ function renderOperations() {
         data-browser-capture-floor-no="${selectedSamplingTask.floorNo ?? ""}"
         data-browser-capture-district-name="${escapeHtml(selectedSamplingTask.districtName ?? "")}"
       >
-        <div class="breakdown-top">
-          <strong>公开页面采样执行台</strong>
-          <span class="badge">${selectedSamplingTask.taskTypeLabel}</span>
+        <div class="capture-workbench-hero">
+          <div class="capture-workbench-copy">
+            <div class="breakdown-top">
+              <strong>公开页面采样执行台</strong>
+              <span class="badge">${selectedSamplingTask.taskTypeLabel}</span>
+            </div>
+            <p class="capture-task-label" data-browser-capture-task-label="true">${selectedSamplingTask.communityName}${selectedSamplingTask.buildingName ? ` · ${selectedSamplingTask.buildingName}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""} · ${selectedSamplingTask.districtName}</p>
+            <small class="capture-task-brief">${selectedSamplingTask.reason} ${selectedSamplingTask.captureGoal}</small>
+          </div>
+          <div class="capture-workbench-kpis">
+            <article class="capture-kpi">
+              <span>优先级</span>
+              <strong>${selectedSamplingTask.priorityLabel}</strong>
+              <small>${selectedSamplingTask.focusScope === "priority" ? "重点区任务" : "全市任务"}</small>
+            </article>
+            <article class="capture-kpi">
+              <span>当前样本</span>
+              <strong>${
+                selectedSamplingTask.targetGranularity === "floor"
+                  ? `${selectedSamplingTask.currentPairCount ?? 0}/${selectedSamplingTask.targetPairCount ?? 0}`
+                  : `${selectedSamplingTask.currentSampleSize ?? 0}/${selectedSamplingTask.targetSampleSize ?? 0}`
+              }</strong>
+              <small>${selectedSamplingTask.targetGranularity === "floor" ? "样本对" : "聚合样本"}</small>
+            </article>
+            <article class="capture-kpi">
+              <span>当前收益</span>
+              <strong>${
+                selectedSamplingTask.currentYieldPct != null
+                  ? `${Number(selectedSamplingTask.currentYieldPct).toFixed(2)}%`
+                  : "待补"
+              }</strong>
+              <small>${selectedSamplingTask.sampleStatusLabel ?? "状态待补"}</small>
+            </article>
+          </div>
         </div>
-        <p data-browser-capture-task-label="true">${selectedSamplingTask.communityName}${selectedSamplingTask.buildingName ? ` · ${selectedSamplingTask.buildingName}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""} · ${selectedSamplingTask.districtName}</p>
-        <div class="comparison-strip">
+        <div class="comparison-strip capture-meta-strip">
           <span class="source-pill">${selectedSamplingTask.priorityLabel}</span>
           <span class="source-pill">${selectedSamplingTask.focusScope === "priority" ? "重点区任务" : "全市任务"}</span>
           <span class="source-pill">${selectedSamplingTask.sampleStatusLabel ?? "状态待补"}</span>
@@ -6896,7 +8472,6 @@ function renderOperations() {
               : `<span class="source-pill">样本 ${selectedSamplingTask.currentSampleSize ?? 0}/${selectedSamplingTask.targetSampleSize ?? 0}</span>`
           }
         </div>
-        <small>${selectedSamplingTask.reason} ${selectedSamplingTask.captureGoal}</small>
         ${
           currentCaptureSubmission
             ? `
@@ -6932,12 +8507,53 @@ function renderOperations() {
               : ""
           }
         </div>
-        <div class="action-row compact browser-task-actions">
-          <button class="action compact" data-browser-workbench-copy-sale="${selectedSamplingTask.taskId}">复制 Sale 检索词</button>
-          <button class="action compact" data-browser-workbench-copy-rent="${selectedSamplingTask.taskId}">复制 Rent 检索词</button>
-          <button class="action compact" data-browser-workbench-copy-target="${selectedSamplingTask.taskId}">复制目标检索词</button>
-        </div>
-        <div class="browser-capture-grid">
+        <div class="capture-workbench-layout">
+          <div class="capture-form-column">
+            <article class="import-run-section browser-task-queue-panel">
+              <div class="breakdown-top">
+                <strong>连续补样快捷台</strong>
+                <span class="badge">${workbenchQueue.previewTasks.length}</span>
+              </div>
+              <div class="comparison-strip">
+                <span class="source-pill">同区待办 ${workbenchQueue.districtTasks.length}</span>
+                <span class="source-pill">待复核 ${workbenchQueue.districtTasks.filter((task) => browserSamplingCoverageState(task) === "needs_review").length}</span>
+                <span class="source-pill">待采样/补采 ${workbenchQueue.districtTasks.filter((task) => ["needs_capture", "in_progress"].includes(browserSamplingCoverageState(task))).length}</span>
+              </div>
+              <div class="action-row compact browser-task-actions">
+                <button class="action compact" data-browser-workbench-copy-brief="${selectedSamplingTask.taskId}">复制整包采样指令</button>
+                <button class="action compact" data-browser-workbench-next-district="${workbenchQueue.nextDistrictTask?.taskId ?? ""}" ${workbenchQueue.nextDistrictTask ? "" : "disabled"}>下一个同区任务</button>
+                <button class="action compact" data-browser-workbench-next-review="${workbenchQueue.nextReviewTask?.taskId ?? ""}" ${workbenchQueue.nextReviewTask ? "" : "disabled"}>下一个待复核</button>
+                <button class="action compact" data-browser-workbench-next-capture="${workbenchQueue.nextCaptureTask?.taskId ?? ""}" ${workbenchQueue.nextCaptureTask ? "" : "disabled"}>下一个待采样</button>
+              </div>
+              ${
+                workbenchQueue.previewTasks.length
+                  ? `
+                    <div class="browser-task-queue">
+                      ${workbenchQueue.previewTasks
+                        .map(
+                          (task) => `
+                            <article class="browser-task-queue-item ${task.taskId === state.selectedBrowserSamplingTaskId ? "is-active" : ""}" data-browser-workbench-task-id="${task.taskId}">
+                              <div class="breakdown-top">
+                                <strong>${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}</strong>
+                                <span class="trace-status ${browserSamplingCoverageState(task)}">${browserSamplingCoverageLabel(task)}</span>
+                              </div>
+                              <p>${task.districtName ?? "未知行政区"} · ${task.taskTypeLabel ?? task.taskType ?? "公开页采样"} · ${task.captureGoal ?? task.reason ?? "等待补齐公开页原文。"}</p>
+                              <small>${browserSamplingCountSummary(task)} · 优先分 ${task.priorityScore ?? 0}</small>
+                            </article>
+                          `
+                        )
+                        .join("")}
+                    </div>
+                  `
+                  : `<p class="helper-text">当前区内没有其他待办采样任务，继续补当前对象就好。</p>`
+              }
+            </article>
+            <div class="action-row compact browser-task-actions capture-query-row">
+              <button class="action compact" data-browser-workbench-copy-sale="${selectedSamplingTask.taskId}">复制 Sale 检索词</button>
+              <button class="action compact" data-browser-workbench-copy-rent="${selectedSamplingTask.taskId}">复制 Rent 检索词</button>
+              <button class="action compact" data-browser-workbench-copy-target="${selectedSamplingTask.taskId}">复制目标检索词</button>
+            </div>
+            <div class="browser-capture-grid">
           <article class="browser-capture-card">
             <div class="breakdown-top">
               <strong>Sale 原文</strong>
@@ -7020,14 +8636,16 @@ function renderOperations() {
               <textarea data-browser-capture-field="note" data-browser-capture-channel="rent" data-browser-capture-input="rent-note" placeholder="例如：月租来自详情页，朝向在副标题里。">${escapeHtml(state.browserCaptureDraft.rent.note)}</textarea>
             </label>
           </article>
-        </div>
-        <div class="queue-item-footer browser-capture-footer">
-          <button class="action compact" data-browser-capture-reset="${selectedSamplingTask.taskId}" data-browser-capture-reset-button="${selectedSamplingTask.taskId}" ${state.busyBrowserSamplingSubmit ? "disabled" : ""}>清空草稿</button>
-          <button class="action compact primary" data-browser-capture-submit="${selectedSamplingTask.taskId}" data-browser-capture-submit-button="${selectedSamplingTask.taskId}" ${state.busyBrowserSamplingSubmit ? "disabled" : ""}>
-            ${state.busyBrowserSamplingSubmit ? "导入中..." : "生成采样批次并刷新"}
-          </button>
-        </div>
-        <article class="import-run-section">
+            </div>
+            <div class="queue-item-footer browser-capture-footer">
+              <button class="action compact" data-browser-capture-reset="${selectedSamplingTask.taskId}" data-browser-capture-reset-button="${selectedSamplingTask.taskId}" ${state.busyBrowserSamplingSubmit ? "disabled" : ""}>清空草稿</button>
+              <button class="action compact primary" data-browser-capture-submit="${selectedSamplingTask.taskId}" data-browser-capture-submit-button="${selectedSamplingTask.taskId}" ${state.busyBrowserSamplingSubmit ? "disabled" : ""}>
+                ${state.busyBrowserSamplingSubmit ? "导入中..." : "生成采样批次并刷新"}
+              </button>
+            </div>
+          </div>
+          <div class="capture-side-column">
+            <article class="import-run-section">
           <div class="breakdown-top">
             <strong>当前任务最近采样</strong>
             <span class="badge">${taskCaptureRuns.length}</span>
@@ -7056,8 +8674,8 @@ function renderOperations() {
                 : "<p class=\"helper-text\">当前任务还没有浏览器采样历史，第一次提交后这里会出现最近几次采样记录。</p>"
             }
           </div>
-        </article>
-        <article class="import-run-section">
+            </article>
+            <article class="import-run-section">
           <div class="breakdown-top">
             <strong>最近公开页采样批次</strong>
             <span class="badge">${recentCaptureRuns.length}</span>
@@ -7086,8 +8704,13 @@ function renderOperations() {
                 : "<p class=\"helper-text\">当前还没有公开页采样批次历史。</p>"
             }
           </div>
-        </article>
-        <article class="import-run-section">
+            </article>
+            <article
+              class="import-run-section"
+              data-browser-capture-attention-panel="true"
+              data-browser-capture-attention-run-id="${selectedCaptureRunDetail?.runId ?? ""}"
+              data-browser-capture-attention-count="${selectedCaptureRunDetail?.attentionCount ?? 0}"
+            >
           <div class="breakdown-top">
             <strong>attention 回看面板</strong>
             <span class="badge">${
@@ -7141,13 +8764,144 @@ function renderOperations() {
                 `
                 : `<p class="helper-text">点击上面的最近采样批次后，这里会展开 attention 明细，并支持一键回填到 sale / rent 草稿。</p>`
           }
-        </article>
+            </article>
+          </div>
+        </div>
       </article>
     `
     : `<p class="helper-text">${
         (state.browserSamplingPackItems ?? []).length
           ? "选择一条公开页面采样任务后，这里会出现可直接粘贴公开页原文的执行工作台。"
           : "当前没有待执行的公开页面采样任务。"
+      }</p>`;
+
+  browserSamplingCoverageBoard.innerHTML = browserSamplingCoverage.communities.length
+    ? `
+        <article class="import-run-section">
+          <div class="breakdown-top">
+            <strong>采样覆盖看板</strong>
+            <span class="badge">${browserSamplingCoverage.summary.communityCount}</span>
+          </div>
+          <div class="comparison-strip">
+            <span class="source-pill">任务 ${browserSamplingCoverage.summary.taskCount}</span>
+            <span class="source-pill">已采够 ${browserSamplingCoverage.summary.resolvedTaskCount}</span>
+            <span class="source-pill">补采中 ${browserSamplingCoverage.summary.inProgressTaskCount}</span>
+            <span class="source-pill">待复核 ${browserSamplingCoverage.summary.reviewTaskCount}</span>
+            <span class="source-pill">待采样 ${browserSamplingCoverage.summary.pendingTaskCount}</span>
+          </div>
+          <div class="import-run-grid">
+            <article class="import-run-section coverage-subsection">
+              <div class="breakdown-top">
+                <strong>行政区进度</strong>
+                <span class="badge">${browserSamplingCoverage.districts.length}</span>
+              </div>
+              <div class="coverage-grid coverage-grid--district">
+                ${browserSamplingCoverage.districts
+                  .slice(0, 8)
+                  .map(
+                    (districtItem) => `
+                      <article
+                        class="import-run-evidence coverage-card ${districtItem.districtId === state.districtFilter ? "is-related" : ""}"
+                        data-browser-coverage-district="${districtItem.districtId ?? ""}"
+                        data-browser-coverage-task-id="${districtItem.outstandingTask?.taskId ?? districtItem.highestPriorityTask?.taskId ?? ""}"
+                        data-community-id="${districtItem.outstandingTask?.communityId ?? districtItem.highestPriorityTask?.communityId ?? ""}"
+                        data-building-id="${districtItem.outstandingTask?.buildingId ?? districtItem.highestPriorityTask?.buildingId ?? ""}"
+                        data-floor-no="${districtItem.outstandingTask?.floorNo ?? districtItem.highestPriorityTask?.floorNo ?? ""}"
+                      >
+                        <div class="breakdown-top">
+                          <strong>${districtItem.districtName}</strong>
+                          <span class="trace-status ${districtItem.reviewTaskCount ? "needs_review" : districtItem.completionPct >= 100 ? "resolved" : districtItem.inProgressTaskCount ? "in_progress" : "needs_capture"}">
+                            ${districtItem.reviewTaskCount ? "待复核" : districtItem.completionPct >= 100 ? "已采够" : districtItem.inProgressTaskCount ? "补采中" : "待采样"}
+                          </span>
+                        </div>
+                        <p>${districtItem.taskCount} 个任务 · 已补 ${districtItem.currentCount}/${districtItem.targetCount || districtItem.currentCount || 0}</p>
+                        <div class="coverage-progress"><div class="coverage-progress-fill" style="width: ${districtItem.completionPct}%;"></div></div>
+                        <div class="comparison-strip">
+                          <span class="source-pill">完成 ${districtItem.completionPct}%</span>
+                          <span class="source-pill">高优 ${districtItem.priorityScore}</span>
+                          ${
+                            districtItem.latestCaptureAt
+                              ? `<span class="source-pill">最近 ${formatTimestamp(districtItem.latestCaptureAt)}</span>`
+                              : `<span class="source-pill">还没采样</span>`
+                          }
+                        </div>
+                        <small class="ranking-note">${
+                          districtItem.outstandingTask
+                            ? `${districtItem.outstandingTask.communityName ?? "待识别小区"}${districtItem.outstandingTask.buildingName ? ` · ${districtItem.outstandingTask.buildingName}` : ""}${districtItem.outstandingTask.floorNo != null ? ` · ${districtItem.outstandingTask.floorNo}层` : ""} · ${districtItem.outstandingTask.captureGoal}`
+                            : "当前没有可继续补采的任务。"
+                        }</small>
+                      </article>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </article>
+            <article class="import-run-section coverage-subsection">
+              <div class="breakdown-top">
+                <strong>小区采样进度</strong>
+                <span class="badge">${browserSamplingCoverage.communities.length}</span>
+              </div>
+              <div class="coverage-grid">
+                ${browserSamplingCoverage.communities
+                  .slice(0, 12)
+                  .map((communityItem, index) => {
+                    const primaryTask = communityItem.outstandingTask ?? communityItem.highestPriorityTask;
+                    const coverageState = communityItem.reviewTaskCount
+                      ? "needs_review"
+                      : communityItem.missingCount <= 0
+                        ? "resolved"
+                        : communityItem.inProgressTaskCount
+                          ? "in_progress"
+                          : "needs_capture";
+                    return `
+                      <article
+                        class="import-run-evidence coverage-card ${primaryTask?.taskId === state.selectedBrowserSamplingTaskId ? "is-related" : ""}"
+                        data-browser-coverage-community-id="${communityItem.communityId ?? ""}"
+                        data-browser-coverage-task-id="${primaryTask?.taskId ?? ""}"
+                        data-community-id="${primaryTask?.communityId ?? communityItem.communityId ?? ""}"
+                        data-building-id="${primaryTask?.buildingId ?? ""}"
+                        data-floor-no="${primaryTask?.floorNo ?? ""}"
+                      >
+                        <div class="breakdown-top">
+                          <strong>${index + 1}. ${communityItem.communityName}</strong>
+                          <span class="trace-status ${coverageState}">
+                            ${communityItem.reviewTaskCount ? "待复核" : communityItem.missingCount <= 0 ? "已采够" : communityItem.inProgressTaskCount ? "补采中" : "待采样"}
+                          </span>
+                        </div>
+                        <p>${communityItem.districtName} · ${communityItem.taskCount} 个任务 · 已补 ${communityItem.currentCount}/${communityItem.targetCount || communityItem.currentCount || 0}</p>
+                        <div class="coverage-progress"><div class="coverage-progress-fill" style="width: ${communityItem.completionPct}%;"></div></div>
+                        <div class="comparison-strip">
+                          <span class="source-pill">完成 ${communityItem.completionPct}%</span>
+                          <span class="source-pill">${communityItem.focusScope === "priority" ? "重点区" : "全市"}</span>
+                          ${
+                            communityItem.missingCount > 0
+                              ? `<span class="source-pill">还差 ${communityItem.missingCount}</span>`
+                              : `<span class="source-pill">样本已达标</span>`
+                          }
+                          ${
+                            communityItem.latestCaptureAttentionCount
+                              ? `<span class="source-pill">attention ${communityItem.latestCaptureAttentionCount}</span>`
+                              : ""
+                          }
+                        </div>
+                        <small class="ranking-note">${
+                          primaryTask
+                            ? `${primaryTask.taskTypeLabel} · ${browserSamplingCoverageLabel(primaryTask)} · ${primaryTask.captureGoal}`
+                            : "当前没有可继续补采的任务。"
+                        }</small>
+                      </article>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </article>
+          </div>
+        </article>
+      `
+    : `<p class="helper-text">${
+        (state.browserSamplingPackItems ?? []).length
+          ? "当前筛选窗口里没有可汇总的公开页采样任务。"
+          : "公开页面采样任务会在 staged 样本和任务包就绪后出现在这里。"
       }</p>`;
 
   const anchorWatchItems = operationsOverview?.anchorWatchlist ?? [];
@@ -7273,6 +9027,26 @@ function renderOperations() {
     });
   });
 
+  opsSummary.querySelectorAll("[data-refresh-metrics]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (button.disabled) {
+        return;
+      }
+      await refreshMetricsSnapshotRequest();
+    });
+  });
+
+  opsSummary.querySelectorAll("[data-refresh-metrics-postgres]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (button.disabled) {
+        return;
+      }
+      await refreshMetricsSnapshotRequest({ writePostgres: true });
+    });
+  });
+
   geoAssetRunList.querySelectorAll("[data-geo-run-id]").forEach((item) => {
     item.addEventListener("click", async () => {
       state.selectedGeoAssetRunId = item.dataset.geoRunId;
@@ -7296,11 +9070,32 @@ function renderOperations() {
         if (geoTaskId) {
           const task = (state.selectedGeoAssetRunDetail?.coverageTasks ?? []).find((taskItem) => taskItem.taskId === geoTaskId);
           if (task) {
-            await navigateToGeoTask(task);
+            await navigateToGeoTask(task, {
+              waypoint: {
+                source: "geo_task",
+                label: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}`,
+                detail: task.watchlistFloors?.[0]?.floorNo != null ? `${task.watchlistFloors[0].floorNo}层证据与几何补采任务` : "楼栋证据与几何补采任务"
+              }
+            });
             return;
           }
         }
-        await navigateToEvidenceTarget(item.dataset.communityId, item.dataset.buildingId, item.dataset.floorNo);
+        const source = item.classList.contains("coverage-card")
+          ? "coverage"
+          : item.closest("#anchorWatchlist")
+            ? "coverage"
+            : "queue";
+        const label = item.querySelector("strong")?.textContent?.trim() || "研究对象";
+        await navigateToEvidenceTarget(item.dataset.communityId, item.dataset.buildingId, item.dataset.floorNo, {
+          waypoint: {
+            source,
+            label,
+            detail:
+              source === "coverage"
+                ? "采样覆盖卡与对应证据"
+                : "运行队列与对应证据"
+          }
+        });
       });
     });
 
@@ -7363,6 +9158,33 @@ function renderOperations() {
       event.stopPropagation();
       const task = currentBrowserSamplingTask();
       await copyTextToClipboard(task?.targetQuery, "目标检索词已复制。");
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-workbench-copy-brief]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await copyTextToClipboard(browserSamplingInstructionText(currentBrowserSamplingTask()), "整包采样指令已复制。");
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-workbench-next-district], [data-browser-workbench-next-review], [data-browser-workbench-next-capture], [data-browser-workbench-task-id]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const taskId =
+        button.dataset.browserWorkbenchTaskId ||
+        button.dataset.browserWorkbenchNextDistrict ||
+        button.dataset.browserWorkbenchNextReview ||
+        button.dataset.browserWorkbenchNextCapture;
+      const task = (state.browserSamplingPackItems ?? []).find((item) => item.taskId === taskId);
+      if (!task) {
+        return;
+      }
+      await navigateToBrowserSamplingTask(task, {
+        resetDraft: false,
+        revealLatestCaptureRun: button.dataset.browserWorkbenchNextReview ? true : "auto"
+      });
+      render();
     });
   });
 
@@ -7430,6 +9252,47 @@ function renderOperations() {
       const attentionItems = currentBrowserCaptureRun()?.attention ?? [];
       const item = Number.isInteger(index) ? attentionItems[index] : null;
       await copyTextToClipboard(item?.rawText ?? "", "attention 原文已复制。");
+    });
+  });
+
+  browserSamplingCoverageBoard.querySelectorAll("[data-browser-coverage-district]").forEach((card) => {
+    card.addEventListener("click", async () => {
+      const districtId = card.dataset.browserCoverageDistrict;
+      await applyDistrictScope(districtId || "all");
+      const taskId = card.dataset.browserCoverageTaskId;
+      const task = taskId ? (state.browserSamplingPackItems ?? []).find((item) => item.taskId === taskId) : null;
+      if (task) {
+        await navigateToBrowserSamplingTask(task, { resetDraft: false });
+        render();
+        return;
+      }
+      if (taskId) {
+        selectBrowserSamplingTask(taskId, { resetDraft: false });
+      }
+      render();
+      if (card.dataset.communityId) {
+        await navigateToEvidenceTarget(card.dataset.communityId, card.dataset.buildingId || null, card.dataset.floorNo || null);
+      }
+      render();
+    });
+  });
+
+  browserSamplingCoverageBoard.querySelectorAll("[data-browser-coverage-community-id]").forEach((card) => {
+    card.addEventListener("click", async () => {
+      const taskId = card.dataset.browserCoverageTaskId;
+      const community = findCommunityById(card.dataset.communityId);
+      await applyDistrictScope(community?.districtId ?? state.districtFilter);
+      const task = taskId ? (state.browserSamplingPackItems ?? []).find((item) => item.taskId === taskId) : null;
+      if (task) {
+        await navigateToBrowserSamplingTask(task, { resetDraft: false });
+        render();
+        return;
+      }
+      if (taskId) {
+        selectBrowserSamplingTask(taskId, { resetDraft: false });
+      }
+      await navigateToEvidenceTarget(card.dataset.communityId, card.dataset.buildingId || null, card.dataset.floorNo || null);
+      render();
     });
   });
 
@@ -7560,7 +9423,10 @@ function renderOperations() {
   geoAssetRunDetail.querySelectorAll("[data-geo-export-work-orders-geojson]").forEach((button) => {
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
-      await exportWithFallback(
+      await runExportAction(
+        button,
+        "导出中…",
+        "工单 GeoJSON 已导出",
         "/api/export/geo-work-orders.geojson",
         buildGeoWorkOrderExportFilename("geojson"),
         buildGeoWorkOrderGeoJson,
@@ -7573,7 +9439,10 @@ function renderOperations() {
   geoAssetRunDetail.querySelectorAll("[data-geo-export-work-orders-csv]").forEach((button) => {
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
-      await exportWithFallback(
+      await runExportAction(
+        button,
+        "导出中…",
+        "工单 CSV 已导出",
         "/api/export/geo-work-orders.csv",
         buildGeoWorkOrderExportFilename("csv"),
         buildGeoWorkOrderCsv,
@@ -8472,8 +10341,10 @@ async function exportWithFallback(endpoint, filename, fallbackBuilder, mimeType,
     }
     const blob = await response.blob();
     downloadBlob(filename, blob);
+    return "server";
   } catch (error) {
     downloadFile(filename, fallbackBuilder(), mimeType);
+    return "fallback";
   }
 }
 

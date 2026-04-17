@@ -119,4 +119,16 @@ python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/
 ```
 
 它会自动填当前任务、提交、等待刷新，并检查新的 import / metrics run 是否真的生成。
-默认会使用隔离的 `atlas-smoke` 浏览器会话并跳到指定 Atlas 地址；如果你希望复用当前已经打开的 Atlas 页面，可以显式传 `--session default`。
+默认会复用 `atlas-smoke` 会话并以 headless 模式运行；如果你希望看到真实浏览器窗口，可以显式传 `--headed`。如果你希望复用当前已经打开的 Atlas 页面，可以显式传 `--session default`；如果你想强制新开一个干净会话，可以再加 `--fresh-session`。
+
+如果你想把 Atlas 研究台的地图、榜单、楼栋/楼层切换、采样覆盖看板和导出链路也一起回归一遍，可以再运行：
+
+```bash
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
+```
+
+这条完整回归现在还会额外检查：
+
+- 行政区覆盖卡片是否真的切换了筛选范围和执行台任务
+- 连续补样快捷台里的“下一个待采样 / 下一个同区任务”是否还能推进到下一条任务
+- `下一个待复核` 是否会自动展开最近一次 attention 回看面板

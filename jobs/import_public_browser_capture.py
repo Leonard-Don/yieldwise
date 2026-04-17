@@ -96,7 +96,7 @@ UNIT_PATTERNS = [
     re.compile(r"([A-Za-zＡ-Ｚａ-ｚ0-9]+单元)"),
 ]
 
-FLOOR_SLASH_PATTERN = re.compile(r"(\d{1,2}\s*/\s*\d{1,2})")
+FLOOR_FRACTION_PATTERN = re.compile(r"((?:高楼层|中楼层|低楼层|高层|中层|低层|\d{1,2}(?:\s*层)?))\s*/\s*(\d{1,2})(?:\s*层)?")
 FLOOR_LAYER_PATTERN = re.compile(r"(\d{1,2}层)")
 TOTAL_FLOOR_PATTERN = re.compile(r"(?:总高|总层高|总楼层|共)\s*(\d{1,2})\s*层")
 ROOM_PATTERN = re.compile(r"(\d)\s*室\s*(\d)\s*厅\s*(\d)\s*卫")
@@ -163,22 +163,32 @@ def detect_decoration(texts: list[str]) -> str:
     return ""
 
 
+def parse_floor_fraction(text: str) -> tuple[str, int] | None:
+    match = FLOOR_FRACTION_PATTERN.search(text)
+    if not match:
+        return None
+    floor_token = match.group(1).replace(" ", "")
+    total_floors = int(match.group(2))
+    if re.fullmatch(r"\d{1,2}(?:层)?", floor_token):
+        floor_no = int(re.search(r"\d{1,2}", floor_token).group(0))
+        return f"{floor_no}层", total_floors
+    return floor_token, total_floors
+
+
 def parse_floor_text(explicit_floor_text: str, texts: list[str], explicit_total: int | None) -> tuple[str, int | None]:
     if explicit_floor_text:
         text = explicit_floor_text
         total = explicit_total
-        if total is None:
-            slash_match = FLOOR_SLASH_PATTERN.search(explicit_floor_text)
-            if slash_match:
-                total = int(slash_match.group(1).split("/")[-1].strip())
+        fraction = parse_floor_fraction(explicit_floor_text)
+        if fraction:
+            floor_text, detected_total = fraction
+            return floor_text, total or detected_total
         return text, total
 
     for text in texts:
-        slash_match = FLOOR_SLASH_PATTERN.search(text)
-        if slash_match:
-            floor_text = slash_match.group(1).replace(" ", "")
-            total = int(floor_text.split("/")[-1])
-            return floor_text, total
+        fraction = parse_floor_fraction(text)
+        if fraction:
+            return fraction
 
     for text in texts:
         layer_match = FLOOR_LAYER_PATTERN.search(text)

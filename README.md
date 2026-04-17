@@ -12,7 +12,7 @@
 
 ## 现在包含什么
 
-- 上海区级热力示意图
+- 上海区级租售比地图
 - 数据库优先的区级 / 小区 / 楼栋查询链路
 - 显式空态、source readiness 和数据模式提示
 - provider readiness 卡片上的申请入口 / 文档 / 平台 / 接入说明动作
@@ -70,7 +70,7 @@ uvicorn api.main:app --reload --port 8000
 
 2. 浏览器打开 `http://127.0.0.1:8000`
 
-如果在启动前设置了 `AMAP_API_KEY`，页面会自动启用高德真地图；否则会回退到当前内置的 SVG 示意图。
+如果在启动前设置了 `AMAP_API_KEY`，页面会自动启用高德真地图；否则页面会保留真地图容器并提示你补齐高德配置。
 
 如果你的高德 Web 端应用启用了安全密钥，建议同时配置 `AMAP_SECURITY_JSCODE`，前端会在加载 JSAPI 前自动注入 `window._AMapSecurityConfig`。
 
@@ -344,6 +344,7 @@ python3 jobs/import_public_browser_capture.py \
 如果某次采样里出现了 `attention`：
 
 - 点击那次采样批次
+- 或者直接点连续补样快捷台里的 `下一个待复核`
 - 执行台会展开“attention 回看面板”
 - 直接看到哪一条 sale / rent 原文缺少楼栋、楼层、总层数、总价或月租
 - 可以一键把那条原文回填到对应草稿，再补字段后重新提交
@@ -363,7 +364,15 @@ python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/
 - 校验新的 import run / staged metrics run 已经落盘
 - 把浏览器快照写到 `output/playwright/`
 
-默认会使用隔离的 `atlas-smoke` 浏览器会话，并自动跳到当前 Atlas 地址；如果你想复用已经打开的 Atlas 页面，可以显式传 `--session default`。
+默认会复用 `atlas-smoke` 会话并以 headless 模式运行，不会再额外弹出一串浏览器图标；如果你想肉眼观察执行过程，可以加 `--headed`。如果你想复用已经打开的 Atlas 页面，可以显式传 `--session default`；如果你希望强制新开一个独立会话，可以再加 `--fresh-session`。
+
+如果你想顺手把整张 Atlas 研究台也做一次真实浏览器回归，而不只是验证采样提交流程，可以再跑：
+
+```bash
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
+```
+
+它会覆盖全局观测、行政区覆盖卡片、行政区筛选、采样覆盖看板联动、连续补样快捷台跳转、机会榜点击、楼栋/楼层粒度切换，以及所有导出接口是否还能正常返回。
 
 如果你想把今天要采的任务直接导出来，可以在页面右侧点“导出采样 CSV”，或者调用：
 
@@ -490,7 +499,7 @@ python3 jobs/load_import_run_to_postgres.py \
 2. 再用 `docs/import-authorized-data.md` 的模板接一批真实授权 listing 数据，跑通地址标准化和楼层证据。
 3. 用 `jobs/load_import_run_to_postgres.py` 把 listing 批次落进 PostgreSQL。
 4. 用 `jobs/import_geo_assets.py` 和 `jobs/load_geo_asset_run_to_postgres.py` 逐步补齐楼栋 footprint。
-5. 接入真实底图方案后，把当前 SVG 示意图替换成地图 SDK 图层。
+5. 继续提升真实底图质量，把重点区楼栋 footprint 与公开页采样证据做得更厚。
 6. 用楼层榜导出按钮把当前批次 / 基线窗口导出成 `KML` 或 `GeoJSON`，给内部分析或 Google Earth 巡检使用。
 7. 把 `jobs/refresh_metrics.py` 改成真实定时任务，并接上数据库写入。
 8. 等官方/API 凭证就位后，再把离线导入升级为真正的 provider adapter 在线拉取。

@@ -74,6 +74,8 @@ REQUIRED_SHARED_FIELDS = {
 
 REQUIRED_SALE_FIELDS = REQUIRED_SHARED_FIELDS | {"price_total_wan", "unit_price_yuan"}
 REQUIRED_RENT_FIELDS = REQUIRED_SHARED_FIELDS | {"monthly_rent"}
+FLOOR_FRACTION_PATTERN = re.compile(r"((?:高楼层|中楼层|低楼层|高层|中层|低层|\d{1,2}(?:\s*层)?))\s*/\s*(\d{1,2})(?:\s*层)?")
+TOTAL_FLOOR_TEXT_PATTERN = re.compile(r"(?:总高|总层高|总楼层|共)\s*(\d{1,2})\s*层")
 
 
 @dataclass(frozen=True)
@@ -174,17 +176,27 @@ def parse_floor_info(floor_text: str | None, total_floors: int | None) -> tuple[
     floor_no = None
     confidence = 0.55
 
-    if not total:
-        total_match = re.search(r"(\d{1,2})\s*层", text)
-        if total_match:
-            total = int(total_match.group(1))
-
-    direct_match = re.search(r"(\d{1,2})\s*/\s*(\d{1,2})", text)
-    if direct_match:
-        floor_no = int(direct_match.group(1))
-        total = int(direct_match.group(2))
-        confidence = 0.96
+    fraction_match = FLOOR_FRACTION_PATTERN.search(text)
+    if fraction_match:
+        floor_token = fraction_match.group(1).replace(" ", "")
+        total = int(fraction_match.group(2))
+        if re.fullmatch(r"\d{1,2}(?:层)?", floor_token):
+            floor_no = int(re.search(r"\d{1,2}", floor_token).group(0))
+            confidence = 0.96
+        elif floor_token in {"高楼层", "高层"}:
+            floor_no = max(1, round(total * 0.82))
+            confidence = 0.74
+        elif floor_token in {"中楼层", "中层"}:
+            floor_no = max(1, round(total * 0.55))
+            confidence = 0.74
+        elif floor_token in {"低楼层", "低层"}:
+            floor_no = max(1, round(total * 0.22))
+            confidence = 0.74
     else:
+        if not total:
+            total_match = TOTAL_FLOOR_TEXT_PATTERN.search(text)
+            if total_match:
+                total = int(total_match.group(1))
         layer_match = re.search(r"(\d{1,2})\s*层", text)
         if layer_match:
             floor_no = int(layer_match.group(1))

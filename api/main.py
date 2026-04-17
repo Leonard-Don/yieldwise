@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query, Response
@@ -52,6 +53,7 @@ from .service import (
     map_communities_payload,
     operations_payload,
     opportunities,
+    refresh_metrics_snapshot,
     summarize,
     system_strategy_payload,
     runtime_data_state,
@@ -261,6 +263,36 @@ def reference_runs() -> dict:
 @app.get("/api/metrics-runs")
 def metrics_runs() -> dict:
     return {"items": list_metrics_runs()}
+
+
+@app.post("/api/jobs/refresh-metrics")
+def refresh_metrics_job(payload: dict | None = Body(default=None)) -> dict:
+    payload = payload or {}
+    snapshot_date_raw = str(payload.get("snapshot_date") or payload.get("snapshotDate") or date.today().isoformat()).strip()
+    try:
+        snapshot_date = date.fromisoformat(snapshot_date_raw).isoformat()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="snapshot_date must be YYYY-MM-DD") from exc
+
+    batch_name = str(payload.get("batch_name") or payload.get("batchName") or f"staged-metrics-{snapshot_date}").strip()
+    if not batch_name:
+        raise HTTPException(status_code=400, detail="batch_name cannot be empty")
+
+    try:
+        return refresh_metrics_snapshot(
+            snapshot_date=snapshot_date,
+            batch_name=batch_name,
+            write_postgres=bool(payload.get("write_postgres") or payload.get("writePostgres")),
+            apply_schema=bool(payload.get("apply_schema") or payload.get("applySchema")),
+            dsn=str(payload.get("dsn") or "").strip() or None,
+            trigger_source="atlas-ui",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Metrics refresh failed: {exc}") from exc
 
 
 @app.get("/api/geo-assets/runs")
