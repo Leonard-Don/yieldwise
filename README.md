@@ -1,8 +1,66 @@
 # Shanghai Yield Atlas Internal Beta
 
-一个已经推进到“前端分析台 + FastAPI + PostgreSQL/PostGIS 建表稿 + 离线批次接入”的内部研究 Beta，用来承接“上海租售比地图”的真实数据优先版本。
+[![Validate](https://github.com/Leonard-Don/shanghai-yield-atlas/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/shanghai-yield-atlas/actions/workflows/validate.yml)
 
-这轮开始，系统运行约定已经改成：
+<p align="center">
+  <img src="docs/screenshots/atlas-workbench-overview.png" alt="Shanghai Yield Atlas workbench overview" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Shanghai Yield Atlas ops workbench" width="100%" />
+</p>
+
+一个面向内部研究的上海租售比 Atlas 工作台，把“地图钻取、批次接入、公开页补样、复核回看、几何补采、数据库主读切换”收进同一张研究台。
+
+## 这个仓库现在是什么
+
+- 一个可直接运行的前端研究台：支持小区、楼栋、楼层三级 drill-down
+- 一个 FastAPI 驱动的本地工作台：页面、接口和 staged/database 运行态保持一致
+- 一条 staged 优先的数据流水线：reference / import / geo / metrics 可逐批落盘
+- 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
+- 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
+
+## GitHub 首页速看
+
+| 模块 | 现在能做什么 |
+| --- | --- |
+| Map Surface | 行政区、小区、楼栋、楼层四级研究入口，支持高德真地图和 footprint drill-down |
+| Ops Workbench | 运行总览、批次与快照、运行细节、采样与质量都收成 panel/workbench 结构 |
+| Public Browser Sampling | 生成采样任务、录入公开页原文、提交 capture、处理 attention review queue |
+| Geo Asset QA | 看几何覆盖缺口、生成工单、追踪状态、导出 GeoJSON / CSV |
+| Runtime Modes | `staged` / `database` / `mock` 三种模式明确可见，不再偷偷 fallback |
+
+## 30 秒启动
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)。
+
+如果你只想先做一轮静态和浏览器侧校验，最短路径是：
+
+```bash
+python3 -m compileall api jobs scripts
+node --check app.js
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
+```
+
+## 仓库导览
+
+| 路径 | 用途 |
+| --- | --- |
+| `index.html` / `styles.css` / `app.js` | 当前 Atlas 研究台前端壳与交互逻辑 |
+| `api/` | FastAPI 接口、领域查询、runtime 状态和 review / relay contract |
+| `jobs/` | reference / import / geo / metrics / materialize 等离线任务 |
+| `scripts/` | browser smoke、full regression、本地联调辅助脚本 |
+| [`docs/api-contract.md`](docs/api-contract.md) | 页面与后端 contract、workflow / relay 字段说明 |
+| [`docs/import-public-browser-capture.md`](docs/import-public-browser-capture.md) | 公开页补样导入、review queue、回归脚本说明 |
+| [`docs/strategy.md`](docs/strategy.md) | 研究台定位、阶段路线与数据策略 |
+
+## 当前运行原则
+
+这轮开始，系统运行约定已经明确成：
 
 - 地图和详情接口优先读 PostgreSQL + PostGIS
 - 默认不再偷偷回退 demo 数据
@@ -10,45 +68,15 @@
 - 只有显式设置 `ATLAS_ENABLE_DEMO_MOCK=true` 时，才允许 mock fallback
 - provider adapter 统一拆成 `sale_rent_batch`、`dictionary_batch`、`geometry_batch` 三类
 
-## 现在包含什么
+## 当前能力概览
 
-- 上海区级租售比地图
-- 数据库优先的区级 / 小区 / 楼栋查询链路
-- 显式空态、source readiness 和数据模式提示
-- provider readiness 卡片上的申请入口 / 文档 / 平台 / 接入说明动作
-- provider readiness 的“部分凭证已就绪 / 缺少哪些变量”提示
-- 行政区 / 小区 / 楼栋 reference dictionary 导入链路
-- 上海全市小区主档 seed、社区锚点 enrichment 与真实经纬度挂图
-- 小区锚点待补榜、候选预锚点预览与人工确认写回闭环
-- `public-browser-sampling` 公开页面辅助采样 provider
-- 小区级机会打点与套利榜
-- 地图粒度切换到楼栋 / 楼层后的 footprint 面图分布
-- 后端 geo-assets 楼栋 / 楼层 footprint 接口与前端自动回退
-- 授权 GeoJSON 几何批次导入与楼栋 footprint 覆盖
-- geo-assets 批次详情、覆盖缺口面板与 `geo_run_id` 批次切换
-- 几何缺口任务队列、派工回写与几何任务历史
-- 几何补采工单生成、流转与工单历史
-- 几何补采工单按状态 / 责任人筛选与工作台导出
-- 几何批次相对基线的覆盖变化与 footprint 修正对比
-- 几何任务影响分、紧急补采提示和楼层榜关联缺口
-- 地图上的高影响几何缺口徽标与“几何补采优先级榜”
-- 几何补采工单 `GeoJSON / CSV` 导出
-- 楼层榜 `GeoJSON / KML` footprint 面图导出
-- 楼栋 × 楼层回报率表
-- 逐层机会带与机会评分拆解
-- 楼层样本明细与地址标准化队列
-- 同楼层跨批次收益历史
-- 持续套利楼层榜
-- 可选历史基线对比
-- 研究窗口感知的楼层榜
-- 授权 CSV 导入脚手架与楼层证据配对
-- 授权批次回写与 PostgreSQL 落库脚手架
-- 复核审计时间线与最近复核记录
-- 跨批次楼层证据对比与变化追踪
-- 数据采集 / 清洗 / 空间化链路
-- 核心表结构说明
-- `KML` 与 `GeoJSON` 导出草稿
-- 按当前批次 / 基线窗口导出的楼层榜空间图层
+- 地图前台：上海区级、小区级、楼栋级、楼层级联动研究面
+- 数据后场：reference、import、metrics、geo 四类 run 的查看、切换、写库和基线对比
+- 小区锚点：预锚点候选、人工确认、审计历史、主档写回
+- 公开页补样：任务包、capture submit、attention review queue、review relay、定向 smoke
+- 几何补采：缺口发现、影响分、工单流转、责任人筛选、GeoJSON / CSV 导出
+- 指标与榜单：机会榜、逐层机会带、研究窗口感知楼层榜、跨批次收益历史
+- 导出与复用：KML、GeoJSON、CSV 和 staged manifest / summary 输出
 
 ## 如何运行
 
