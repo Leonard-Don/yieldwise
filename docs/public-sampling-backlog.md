@@ -99,7 +99,7 @@
 
 ## 操作建议
 
-1. 先在工作台看 `公开页面采样执行台` 和 `attention 回看面板`。
+1. 先在工作台看 `公开页面采样执行台`、`全局待复核收件箱` 和 run 级 `review queue 回看面板`。
 2. 再把样本补到：
    - `data/public-snapshot/2026-04-12/public_browser_sampling_sale.csv`
    - `data/public-snapshot/2026-04-12/public_browser_sampling_rent.csv`

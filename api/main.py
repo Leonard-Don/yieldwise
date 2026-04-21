@@ -17,8 +17,11 @@ from .persistence import (
 from .service import (
     anchor_watchlist_payload,
     browser_capture_run_detail,
+    create_browser_review_current_task_fixture,
+    browser_review_inbox_payload,
     browser_sampling_pack_payload,
     list_browser_capture_runs,
+    restore_browser_review_fixture,
     submit_browser_sampling_capture,
     bootstrap_payload,
     bootstrap_local_database,
@@ -57,6 +60,8 @@ from .service import (
     summarize,
     system_strategy_payload,
     runtime_data_state,
+    update_browser_capture_review_queue,
+    update_browser_capture_review_queue_batch,
     update_geo_asset_task_review,
     update_geo_asset_work_order,
     update_import_queue_review,
@@ -247,12 +252,70 @@ def browser_capture_runs(limit: int = Query(default=10, ge=1, le=100)) -> dict:
     return {"items": list_browser_capture_runs(limit=limit)}
 
 
+@app.get("/api/browser-review-inbox")
+def browser_review_inbox(district: str | None = Query(default="all"), limit: int = Query(default=20, ge=1, le=200)) -> dict:
+    return browser_review_inbox_payload(district=district, limit=limit)
+
+
 @app.get("/api/browser-capture-runs/{run_id}")
 def browser_capture_run(run_id: str) -> dict:
     payload = browser_capture_run_detail(run_id)
     if not payload:
         raise HTTPException(status_code=404, detail="Browser capture run not found")
     return payload
+
+
+@app.post("/api/browser-capture-runs/{run_id}/review-queue/batch")
+def review_browser_capture_queue_batch(run_id: str, payload: dict = Body(default={})) -> dict:
+    queue_ids = payload.get("queueIds") or []
+    try:
+        result = update_browser_capture_review_queue_batch(
+            run_id,
+            queue_ids,
+            status=payload.get("status", "resolved"),
+            resolution_notes=payload.get("resolutionNotes"),
+            review_owner=payload.get("reviewOwner", "atlas-ui"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Browser capture review queue batch not found")
+    return result
+
+
+@app.post("/api/browser-capture-runs/{run_id}/review-queue/{queue_id}")
+def review_browser_capture_queue_item(run_id: str, queue_id: str, payload: dict = Body(default={})) -> dict:
+    try:
+        result = update_browser_capture_review_queue(
+            run_id,
+            queue_id,
+            status=payload.get("status", "resolved"),
+            resolution_notes=payload.get("resolutionNotes"),
+            review_owner=payload.get("reviewOwner", "atlas-ui"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Browser capture review queue item not found")
+    return result
+
+
+@app.post("/api/dev/browser-review-fixtures/review-current-task")
+def create_review_current_task_fixture() -> dict:
+    try:
+        return create_browser_review_current_task_fixture()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/dev/browser-review-fixtures/{fixture_id}")
+def restore_review_fixture(fixture_id: str) -> dict:
+    try:
+        return restore_browser_review_fixture(fixture_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/reference-runs")

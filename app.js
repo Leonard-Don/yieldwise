@@ -721,7 +721,18 @@ const state = {
   floorWatchlistItems: [],
   floorWatchlistLoading: false,
   browserSamplingPackItems: [],
+  browserReviewInboxItems: [],
+  browserReviewInboxSummary: {
+    pendingQueueCount: 0,
+    pendingTaskCount: 0,
+    pendingDistrictCount: 0,
+    oldestPendingAt: null,
+    latestPendingAt: null,
+  },
   mobileInspectorPanel: "detail",
+  operationsHistoryTab: "reference",
+  operationsDetailTab: "geo",
+  operationsQualityTab: "workbench",
   selectedBrowserSamplingTaskId: null,
   selectedCommunityDetail: null,
   selectedBuildingDetail: null,
@@ -730,6 +741,8 @@ const state = {
   selectedGeoAssetRunDetail: null,
   selectedBrowserCaptureRunId: null,
   selectedBrowserCaptureRunDetail: null,
+  selectedBrowserCaptureReviewQueueId: null,
+  selectedBrowserCaptureReviewQueueIds: [],
   mapWaypoint: null,
   mapCommunities: [],
   buildingGeoFeatures: [],
@@ -744,6 +757,8 @@ const state = {
   busyMetricsRefreshMode: null,
   busyPersistRunId: null,
   busyReviewQueueId: null,
+  busyBrowserCaptureReviewQueueId: null,
+  busyBrowserCaptureReviewBatch: false,
   busyAnchorCommunityId: null,
   busyGeoPersistRunId: null,
   busyGeoTaskId: null,
@@ -752,6 +767,8 @@ const state = {
   busyBrowserSamplingSubmit: false,
   busyBrowserCaptureRunId: null,
   lastBrowserCaptureSubmission: null,
+  optimisticBrowserCaptureRunSummary: null,
+  lastBrowserCaptureReviewAction: null,
   anchorEditorCommunityId: null,
   browserCaptureDraft: {
     sale: {
@@ -1110,6 +1127,9 @@ async function loadOperationsOverview() {
       throw new Error(`Ops overview failed with ${response.status}`);
     }
     operationsOverview = await response.json();
+    if (state.optimisticBrowserCaptureRunSummary?.runId) {
+      upsertBrowserCaptureRunSummary(state.optimisticBrowserCaptureRunSummary);
+    }
   } catch (error) {
     operationsOverview = canUseDemoFallback() ? fallbackOperationsOverview : emptyOperationsOverview;
   }
@@ -1125,7 +1145,12 @@ async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
   ) {
     state.selectedBrowserCaptureRunId = null;
     state.selectedBrowserCaptureRunDetail = null;
+    state.selectedBrowserCaptureReviewQueueId = null;
   }
+  // Render immediately after ops overview refresh so recent run lists do not lag
+  // behind slower import/floor detail hydration.
+  render();
+  scheduleUiHydrationRetry();
   await Promise.all([
     loadSelectedImportRunDetail({ reloadFloorWatchlist: false }),
     loadFloorWatchlist()
@@ -1159,7 +1184,7 @@ function ensureImportRunSelection() {
       !selectedRun ||
       !baselineRun ||
       baselineRun.runId === selectedRun.runId ||
-      (baselineRun.createdAt || "") >= (selectedRun.createdAt || "")
+      !createdAtIsBefore(baselineRun, selectedRun)
     ) {
       state.selectedBaselineRunId = null;
     }
@@ -1186,7 +1211,7 @@ function ensureGeoAssetRunSelection() {
       baselineRun.runId === selectedRun.runId ||
       baselineRun.providerId !== selectedRun.providerId ||
       baselineRun.assetType !== selectedRun.assetType ||
-      (baselineRun.createdAt || "") >= (selectedRun.createdAt || "")
+      !createdAtIsBefore(baselineRun, selectedRun)
     ) {
       state.selectedGeoBaselineRunId = null;
     }
@@ -1279,7 +1304,7 @@ function availableGeoBaselineRunsFor(runId) {
       item.runId !== runId &&
       item.providerId === selectedRun.providerId &&
       item.assetType === selectedRun.assetType &&
-      (item.createdAt || "") < (selectedRun.createdAt || "")
+      createdAtIsBefore(item, selectedRun)
   );
 }
 
@@ -1290,7 +1315,7 @@ function availableBaselineRunsFor(runId) {
     return [];
   }
   return importRuns.filter(
-    (item) => item.runId !== runId && (item.createdAt || "") < (selectedRun.createdAt || "")
+    (item) => item.runId !== runId && createdAtIsBefore(item, selectedRun)
   );
 }
 
@@ -1564,7 +1589,12 @@ function createAmapInstance() {
   }
 }
 
-async function refreshData() {
+async function refreshData(
+  {
+    backgroundHydration = false,
+    preserveBrowserSamplingTaskId = state.selectedBrowserSamplingTaskId,
+  } = {}
+) {
   const requestId = ++mapRequestId;
   const query = buildExportQuery();
   const communityQuery = new URLSearchParams();
@@ -1573,22 +1603,24 @@ async function refreshData() {
   communityQuery.set("focus_scope", "all");
 
   try {
-    const [mapResponse, communityResponse, opportunitiesResponse, browserPackResponse] = await Promise.all([
+    const [mapResponse, communityResponse, opportunitiesResponse, browserPackResponse, browserReviewInboxResponse] = await Promise.all([
       fetch(`/api/map/districts?${query}`, { headers: { Accept: "application/json" } }),
       fetch(`/api/map/communities?${communityQuery.toString()}`, { headers: { Accept: "application/json" } }),
       fetch(`/api/opportunities?${query}`, { headers: { Accept: "application/json" } }),
-      fetch(`/api/browser-sampling-pack?${query}`, { headers: { Accept: "application/json" } })
+      fetch(`/api/browser-sampling-pack?${query}`, { headers: { Accept: "application/json" } }),
+      fetch("/api/browser-review-inbox?limit=40", { headers: { Accept: "application/json" } }),
     ]);
 
-    if (!mapResponse.ok || !communityResponse.ok || !opportunitiesResponse.ok || !browserPackResponse.ok) {
+    if (!mapResponse.ok || !communityResponse.ok || !opportunitiesResponse.ok || !browserPackResponse.ok || !browserReviewInboxResponse.ok) {
       throw new Error("API data refresh failed");
     }
 
-    const [mapPayload, communityPayload, opportunitiesPayload, browserPackPayload] = await Promise.all([
+    const [mapPayload, communityPayload, opportunitiesPayload, browserPackPayload, browserReviewInboxPayload] = await Promise.all([
       mapResponse.json(),
       communityResponse.json(),
       opportunitiesResponse.json(),
-      browserPackResponse.json()
+      browserPackResponse.json(),
+      browserReviewInboxResponse.json(),
     ]);
     if (requestId !== mapRequestId) {
       return;
@@ -1618,6 +1650,20 @@ async function refreshData() {
     state.summary = mapPayload.summary ?? null;
     state.opportunityItems = (opportunitiesPayload.items ?? []).map(hydrateCommunity);
     state.browserSamplingPackItems = browserPackPayload.items ?? [];
+    if (
+      preserveBrowserSamplingTaskId &&
+      (state.browserSamplingPackItems ?? []).some((item) => item?.taskId === preserveBrowserSamplingTaskId)
+    ) {
+      state.selectedBrowserSamplingTaskId = preserveBrowserSamplingTaskId;
+    }
+    state.browserReviewInboxItems = browserReviewInboxPayload.items ?? [];
+    state.browserReviewInboxSummary = browserReviewInboxPayload.summary ?? {
+      pendingQueueCount: 0,
+      pendingTaskCount: 0,
+      pendingDistrictCount: 0,
+      oldestPendingAt: null,
+      latestPendingAt: null,
+    };
     ensureBrowserSamplingTaskSelection();
     render();
     scheduleUiHydrationRetry();
@@ -1637,6 +1683,14 @@ async function refreshData() {
       : null;
     state.opportunityItems = canUseDemoFallback() ? getFallbackOpportunityItems() : [];
     state.browserSamplingPackItems = [];
+    state.browserReviewInboxItems = [];
+    state.browserReviewInboxSummary = {
+      pendingQueueCount: 0,
+      pendingTaskCount: 0,
+      pendingDistrictCount: 0,
+      oldestPendingAt: null,
+      latestPendingAt: null,
+    };
     ensureBrowserSamplingTaskSelection();
     render();
     scheduleUiHydrationRetry();
@@ -1645,6 +1699,17 @@ async function refreshData() {
 
   buildFilters();
   ensureValidSelection();
+  if (backgroundHydration) {
+    void Promise.allSettled([loadSelectedCommunityDetail(), loadFloorWatchlist()]).then(() => {
+      render();
+      scheduleUiHydrationRetry();
+      scheduleMapInitializationRetry();
+    });
+    render();
+    scheduleUiHydrationRetry();
+    scheduleMapInitializationRetry();
+    return;
+  }
   await loadSelectedCommunityDetail();
   await loadFloorWatchlist();
   render();
@@ -4085,7 +4150,14 @@ function focusAmapPosition(position, minZoom = 12) {
   amapState.map.setZoomAndCenter?.(zoom, position);
 }
 
-async function applyDistrictScope(districtId, { refresh = true } = {}) {
+async function applyDistrictScope(
+  districtId,
+  {
+    refresh = true,
+    backgroundHydration = false,
+    preserveBrowserSamplingTaskId = state.selectedBrowserSamplingTaskId,
+  } = {}
+) {
   const nextDistrictId = districtId || "all";
   const changed = state.districtFilter !== nextDistrictId;
   state.districtFilter = nextDistrictId;
@@ -4096,7 +4168,10 @@ async function applyDistrictScope(districtId, { refresh = true } = {}) {
     state.selectedDistrictId = nextDistrictId;
   }
   if (refresh && changed) {
-    await refreshData();
+    await refreshData({
+      backgroundHydration,
+      preserveBrowserSamplingTaskId,
+    });
   }
   return changed;
 }
@@ -4106,8 +4181,8 @@ function updateMapNote() {
     mapNote.innerHTML = `
       <strong>说明</strong>
       <p>${amapState.modeNote ?? "当前地图用于展示上海租售比机会分布。"}</p>
-      <p>当前没有数据库主读数据，所以这里仅保留真地图容器与加载说明，并等待高德底图与 staged 数据同步完成。</p>
-      <p>${runtimeConfig.hasPostgresDsn ? "本地库已经配置，但还没完成首轮 bootstrap。先跑 reference → import → geo → metrics。" : "下一步请先导入授权 / 官方批次，完成地址标准化与 PostgreSQL 落库；需要联调时也可以显式开启 demo mock。"}</p>
+      <p>当前还没有数据库主读数据，页面先保留真地图容器与 staged 说明。</p>
+      <p>${runtimeConfig.hasPostgresDsn ? "本地库已配置，下一步补首轮 bootstrap。" : "下一步先配置 DSN 或导入 staged 批次。"}</p>
     `;
     return;
   }
@@ -4144,20 +4219,6 @@ function updateMapNote() {
   const currentBatch = state.selectedImportRunDetail?.batchName ?? state.selectedImportRunDetail?.runId ?? "当前批次";
   const baselineBatch = state.selectedImportRunDetail?.comparison?.baselineBatchName ?? null;
   const isFloorWatchlistLoading = state.granularity === "floor" && state.floorWatchlistLoading;
-  const scopeText =
-    isFloorWatchlistLoading
-      ? `持续套利楼层带仍在计算中，当前先保留 ${getVisibleBuildingItems().length} 个楼栋面的上下文，并挂着 ${geoTaskItems.length} 个高影响几何缺口与 ${browserSamplingVisibleCount} 个采样任务标记。`
-      : state.granularity === "community"
-      ? `当前显示 ${visibleCount} 个小区点，适合做全市级热力筛选；同时挂着 ${geoTaskItems.length} 个高影响几何缺口和 ${browserSamplingVisibleCount} 个公开页采样缺口。`
-      : state.granularity === "building"
-      ? `当前显示 ${visibleCount} 个楼栋面，并叠加 ${geoTaskItems.length} 个高影响几何补采点与 ${browserSamplingVisibleCount} 个采样任务标记。`
-      : `当前显示 ${visibleCount} 个持续套利楼层面，并叠加 ${geoTaskItems.length} 个会影响楼层定位的几何缺口与 ${browserSamplingVisibleCount} 个采样任务标记。`;
-  const windowText =
-    isFloorWatchlistLoading
-      ? `研究窗口：${currentBatch}${baselineBatch ? ` vs ${baselineBatch}` : "（自动首批基线）"}，楼层榜正在异步刷新。`
-      : state.granularity === "floor"
-      ? `研究窗口：${currentBatch}${baselineBatch ? ` vs ${baselineBatch}` : "（自动首批基线）"}。`
-      : `当前粒度：${granularityLabel(state.granularity)}。`;
   const geometrySource =
     state.granularity === "building"
       ? state.buildingGeoFeatures.length
@@ -4176,33 +4237,40 @@ function updateMapNote() {
       : null;
   const geometryText =
     state.granularity === "community"
-      ? `小区层当前优先使用真实经纬度挂图：${activeMetricCount} 个有指标样本，${dictionaryOnlyCount} 个仅主档待补样本；全市主档里还有 ${unanchoredCommunityCount} 个小区待补坐标。`
+      ? `小区层使用真实经纬度挂图：${activeMetricCount} 个有指标样本，${unanchoredCommunityCount} 个待补坐标。`
       : geometrySource === "api"
-      ? `楼栋与楼层 footprint 当前优先来自后端 geo-assets 接口${geometryBatchName ? `（${geometryBatchName}）` : ""}，可继续替换成 AOI / 楼栋实测几何。`
-      : "楼栋与楼层 footprint 当前由前端本地推导，接入真实 geo-assets 后会自动切换。";
+      ? `楼栋与楼层 footprint 当前来自 geo-assets${geometryBatchName ? `（${geometryBatchName}）` : ""}。`
+      : "楼栋与楼层 footprint 当前由前端推导，接入真实 geo-assets 后会自动切换。";
   const taskText = topGeoTask
     ? `当前最该补的几何缺口是 ${topGeoTask.communityName ?? "待识别小区"} · ${topGeoTask.buildingName ?? "待识别楼栋"}，${topGeoTask.impactLabel}。`
     : "当前筛选窗口下没有高影响几何缺口。";
   const samplingText = topBrowserSamplingTask
-    ? `当前还有 ${browserSamplingOpenTasks.length} 个公开页采样缺口${browserSamplingReviewCount ? `，其中 ${browserSamplingReviewCount} 个待复核` : ""}；最紧急的是 ${topBrowserSamplingTask.communityName ?? "待识别小区"}${topBrowserSamplingTask.buildingName ? ` · ${topBrowserSamplingTask.buildingName}` : ""}${topBrowserSamplingTask.floorNo != null ? ` · ${topBrowserSamplingTask.floorNo}层` : ""}，${browserSamplingCoverageLabel(topBrowserSamplingTask)}。`
+    ? `补样优先 ${topBrowserSamplingTask.communityName ?? "待识别小区"}${topBrowserSamplingTask.buildingName ? ` · ${topBrowserSamplingTask.buildingName}` : ""}${topBrowserSamplingTask.floorNo != null ? ` · ${topBrowserSamplingTask.floorNo}层` : ""}，${browserSamplingCoverageLabel(topBrowserSamplingTask)}。`
     : "当前筛选窗口下没有公开页采样缺口。";
   const waypointText = waypoint
-    ? `刚刚从${waypoint.sourceLabel ?? "研究台"}跳转到了 ${waypoint.label}${waypoint.detail ? `，当前正在联动 ${waypoint.detail}` : ""}。`
+    ? `当前焦点 ${waypoint.label}${waypoint.detail ? `，${waypoint.detail}` : ""}。`
     : null;
   const previewText = selectedPreview
-    ? `当前选中的 ${selectedCommunity?.name ?? "小区"} 还没正式写回主档坐标，地图正在用候选预锚点 ${selectedPreview.anchorName ?? "待确认候选"} 做人工判断参考。`
-    : `当前没有处于预锚点评估中的小区；当前批次仍有 ${Number(opsSummaryData.pendingAnchorCount ?? unanchoredCommunityCount)} 个小区待确认锚点${latestAnchorReviewAt ? `，最近一次确认在 ${formatTimestamp(latestAnchorReviewAt)}` : ""}。`;
-
+    ? `${selectedCommunity?.name ?? "当前小区"} 正在使用候选锚点 ${selectedPreview.anchorName ?? "待确认候选"} 作为人工判断参考。`
+    : `当前仍有 ${Number(opsSummaryData.pendingAnchorCount ?? unanchoredCommunityCount)} 个小区待确认锚点${latestAnchorReviewAt ? `，最近确认 ${formatTimestamp(latestAnchorReviewAt)}` : ""}。`;
+  const compactScopeText =
+    isFloorWatchlistLoading
+      ? `楼层机会带仍在刷新，先保留 ${getVisibleBuildingItems().length} 个楼栋上下文，并同步 ${geoTaskItems.length} 个几何缺口与 ${browserSamplingVisibleCount} 个采样任务。`
+      : state.granularity === "community"
+      ? `当前显示 ${visibleCount} 个小区点；高影响几何缺口 ${geoTaskItems.length} 个，公开页采样缺口 ${browserSamplingVisibleCount} 个。`
+      : state.granularity === "building"
+      ? `当前显示 ${visibleCount} 个楼栋面；几何补采 ${geoTaskItems.length} 个，采样任务 ${browserSamplingVisibleCount} 个。`
+      : `当前显示 ${visibleCount} 个楼层面；会影响逐层定位的几何缺口 ${geoTaskItems.length} 个，采样任务 ${browserSamplingVisibleCount} 个。`;
+  const compactWindowText =
+    state.granularity === "floor"
+      ? `研究窗口 ${currentBatch}${baselineBatch ? ` 对比 ${baselineBatch}` : ""}。`
+      : `当前粒度 ${granularityLabel(state.granularity)}；${activeMetricCount} 个小区已有指标样本，${unanchoredCommunityCount} 个待补坐标。`;
+  const compactFocusText = waypointText ?? (topBrowserSamplingTask ? samplingText : topGeoTask ? taskText : previewText);
   mapNote.innerHTML = `
     <strong>说明</strong>
     <p>${baseNote}</p>
-    <p>${scopeText}</p>
-    <p>${windowText}</p>
-    <p>${geometryText}</p>
-    <p>${samplingText}</p>
-    ${waypointText ? `<p>${waypointText}</p>` : ""}
-    <p>${previewText}</p>
-    <p>${taskText}</p>
+    <p>${compactScopeText}</p>
+    <p>${compactWindowText} ${geometryText} ${compactFocusText}</p>
   `;
 }
 
@@ -4651,6 +4719,19 @@ function formatTimestamp(value) {
   return value.replace("T", " ").slice(0, 16);
 }
 
+function comparableTimestamp(value) {
+  const timestamp = Date.parse(value ?? "");
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+}
+
+function compareCreatedAtDesc(left, right) {
+  return comparableTimestamp(right?.createdAt) - comparableTimestamp(left?.createdAt);
+}
+
+function createdAtIsBefore(left, right) {
+  return comparableTimestamp(left?.createdAt) < comparableTimestamp(right?.createdAt);
+}
+
 function metricsRefreshStatusTone(status) {
   return {
     completed: "resolved",
@@ -4881,7 +4962,7 @@ function getBrowserSamplingTaskMaps() {
 
 function browserSamplingBadgeCounter(task) {
   const stateLabel = browserSamplingCoverageState(task);
-  const reviewCount = Number(task?.latestCaptureAttentionCount ?? 0);
+  const reviewCount = browserCapturePendingAttentionCount(task);
   const missingCount = browserSamplingMissingCount(task);
   return String(
     stateLabel === "needs_review" ? reviewCount || 1 : missingCount > 9 ? "9+" : Math.max(missingCount, 1)
@@ -4945,9 +5026,28 @@ function renderAmapInfoCard({ kicker = "", title = "", subtitle = "", stats = []
   `;
 }
 
-async function navigateToBrowserSamplingTask(task, { resetDraft = false, waypoint = null, revealLatestCaptureRun = "auto" } = {}) {
+async function navigateToBrowserSamplingTask(
+  task,
+  {
+    resetDraft = false,
+    waypoint = null,
+    revealLatestCaptureRun = "auto",
+    preferredReviewRunId = null,
+    preferredReviewQueueId = null,
+    syncDistrictScope = true,
+  } = {}
+) {
   if (!task?.taskId) {
     return;
+  }
+  if (syncDistrictScope && task?.districtId && task.districtId !== state.districtFilter) {
+    await applyDistrictScope(task.districtId, {
+      backgroundHydration: true,
+      preserveBrowserSamplingTaskId: task.taskId,
+    });
+  }
+  if (!(state.browserSamplingPackItems ?? []).some((item) => item.taskId === task.taskId)) {
+    upsertBrowserSamplingTask(task, { pinSelection: false });
   }
   selectBrowserSamplingTask(task.taskId, { resetDraft });
   await navigateToEvidenceTarget(task.communityId, task.buildingId || null, task.floorNo || null, {
@@ -4959,11 +5059,14 @@ async function navigateToBrowserSamplingTask(task, { resetDraft = false, waypoin
         detail: "公开页采样执行台与对应证据"
       }
   });
+  const reviewRunId = preferredReviewRunId ?? task.pendingReviewRunId ?? task.latestCaptureRunId ?? null;
   const shouldRevealAttentionRun =
-    Boolean(task.latestCaptureRunId) &&
-    (revealLatestCaptureRun === true || (revealLatestCaptureRun === "auto" && Number(task.latestCaptureAttentionCount ?? 0) > 0));
+    Boolean(reviewRunId) &&
+    (revealLatestCaptureRun === true || (revealLatestCaptureRun === "auto" && browserCapturePendingAttentionCount(task) > 0));
   if (shouldRevealAttentionRun) {
-    await loadSelectedBrowserCaptureRunDetail(task.latestCaptureRunId);
+    await loadSelectedBrowserCaptureRunDetail(reviewRunId, {
+      preferredQueueId: preferredReviewQueueId ?? task.pendingReviewQueueId ?? null,
+    });
   }
 }
 
@@ -4977,7 +5080,7 @@ function getBrowserCaptureRunItems(limit = 6, { taskId = null, districtId = null
     .filter((run) => !districtId || districtId === "all" || run.districtId === districtId)
     .filter((run) => !taskId || run.taskId === taskId)
     .slice()
-    .sort((left, right) => String(right?.createdAt ?? "").localeCompare(String(left?.createdAt ?? "")));
+    .sort(compareCreatedAtDesc);
   return runs.slice(0, limit);
 }
 
@@ -4989,12 +5092,284 @@ function currentBrowserCaptureRun() {
   return state.selectedBrowserCaptureRunDetail?.runId === selectedRunId ? state.selectedBrowserCaptureRunDetail : null;
 }
 
-function currentBrowserCaptureSubmission() {
-  const submission = state.lastBrowserCaptureSubmission;
-  if (!submission?.taskId) {
+function browserCapturePendingAttentionCount(target) {
+  return Number(target?.pendingAttentionCount ?? target?.reviewSummary?.pendingCount ?? 0);
+}
+
+function browserCaptureResolvedCount(target) {
+  return Number(target?.reviewSummary?.resolvedCount ?? 0);
+}
+
+function browserCaptureWaivedCount(target) {
+  return Number(target?.reviewSummary?.waivedCount ?? 0);
+}
+
+function browserCaptureSupersededCount(target) {
+  return Number(target?.reviewSummary?.supersededCount ?? 0);
+}
+
+function currentBrowserCaptureReviewQueue() {
+  return currentBrowserCaptureRun()?.reviewQueue ?? [];
+}
+
+function currentPendingBrowserCaptureReviewItems() {
+  return currentBrowserCaptureReviewQueue().filter((item) => String(item?.status ?? "pending") === "pending");
+}
+
+function syncBrowserCaptureReviewBatchSelection(reviewQueue = currentBrowserCaptureReviewQueue()) {
+  const pendingQueueIds = new Set(
+    (reviewQueue ?? [])
+      .filter((item) => String(item?.status ?? "pending") === "pending")
+      .map((item) => item?.queueId)
+      .filter(Boolean)
+  );
+  const nextSelection = (state.selectedBrowserCaptureReviewQueueIds ?? []).filter((queueId) => pendingQueueIds.has(queueId));
+  if (nextSelection.length !== (state.selectedBrowserCaptureReviewQueueIds ?? []).length) {
+    state.selectedBrowserCaptureReviewQueueIds = nextSelection;
+  }
+  return nextSelection;
+}
+
+function clearBrowserCaptureReviewBatchSelection() {
+  state.selectedBrowserCaptureReviewQueueIds = [];
+}
+
+function currentBrowserCaptureReviewBatchSelection(reviewQueue = currentBrowserCaptureReviewQueue()) {
+  return syncBrowserCaptureReviewBatchSelection(reviewQueue).slice();
+}
+
+function toggleBrowserCaptureReviewBatchSelection(queueId, selected = null, reviewQueue = currentBrowserCaptureReviewQueue()) {
+  const normalizedQueueId = String(queueId || "").trim();
+  if (!normalizedQueueId) {
+    return currentBrowserCaptureReviewBatchSelection(reviewQueue);
+  }
+  const pendingQueueIds = new Set(
+    (reviewQueue ?? [])
+      .filter((item) => String(item?.status ?? "pending") === "pending")
+      .map((item) => item?.queueId)
+      .filter(Boolean)
+  );
+  if (!pendingQueueIds.has(normalizedQueueId)) {
+    return currentBrowserCaptureReviewBatchSelection(reviewQueue);
+  }
+  const selection = new Set(currentBrowserCaptureReviewBatchSelection(reviewQueue));
+  const shouldSelect = selected == null ? !selection.has(normalizedQueueId) : Boolean(selected);
+  if (shouldSelect) {
+    selection.add(normalizedQueueId);
+  } else {
+    selection.delete(normalizedQueueId);
+  }
+  state.selectedBrowserCaptureReviewQueueIds = Array.from(selection);
+  return state.selectedBrowserCaptureReviewQueueIds.slice();
+}
+
+function selectAllBrowserCaptureReviewBatchItems(reviewQueue = currentBrowserCaptureReviewQueue()) {
+  state.selectedBrowserCaptureReviewQueueIds = (reviewQueue ?? [])
+    .filter((item) => String(item?.status ?? "pending") === "pending")
+    .map((item) => item?.queueId)
+    .filter(Boolean);
+  return state.selectedBrowserCaptureReviewQueueIds.slice();
+}
+
+function currentBrowserReviewInboxItemId() {
+  const runId = currentBrowserCaptureRun()?.runId ?? null;
+  const queueId = state.selectedBrowserCaptureReviewQueueId ?? null;
+  return runId && queueId ? `${runId}:${queueId}` : null;
+}
+
+function browserReviewInboxSummaryFallback() {
+  return {
+    pendingQueueCount: 0,
+    pendingTaskCount: 0,
+    pendingDistrictCount: 0,
+    oldestPendingAt: null,
+    latestPendingAt: null,
+  };
+}
+
+function browserReviewInboxItems({ districtId = null, preferDistrict = false } = {}) {
+  const items = state.browserReviewInboxItems ?? [];
+  if (!districtId || districtId === "all") {
+    return items.slice();
+  }
+  const sameDistrictItems = items.filter((item) => item?.districtId === districtId);
+  if (preferDistrict && sameDistrictItems.length) {
+    return sameDistrictItems;
+  }
+  return preferDistrict ? items.slice() : sameDistrictItems;
+}
+
+function browserReviewInboxTaskSnapshot(item) {
+  if (!item) {
     return null;
   }
-  return submission.taskId === state.selectedBrowserSamplingTaskId ? submission : null;
+  return {
+    ...(item.task ?? {}),
+    taskId: item.taskId ?? item.task?.taskId ?? null,
+    taskType: item.taskType ?? item.task?.taskType ?? null,
+    taskTypeLabel: item.taskTypeLabel ?? item.task?.taskTypeLabel ?? "公开页采样",
+    targetGranularity: item.targetGranularity ?? item.task?.targetGranularity ?? null,
+    focusScope: item.focusScope ?? item.task?.focusScope ?? null,
+    priorityScore: item.priorityScore ?? item.task?.priorityScore ?? 0,
+    priorityLabel: item.priorityLabel ?? item.task?.priorityLabel ?? "公开页采样",
+    districtId: item.districtId ?? item.task?.districtId ?? null,
+    districtName: item.districtName ?? item.task?.districtName ?? null,
+    communityId: item.communityId ?? item.task?.communityId ?? null,
+    communityName: item.communityName ?? item.task?.communityName ?? null,
+    buildingId: item.buildingId ?? item.task?.buildingId ?? null,
+    buildingName: item.buildingName ?? item.task?.buildingName ?? null,
+    floorNo: item.floorNo ?? item.task?.floorNo ?? null,
+    pendingReviewRunId: item.runId ?? item.task?.pendingReviewRunId ?? null,
+    pendingReviewQueueId: item.queueId ?? item.task?.pendingReviewQueueId ?? null,
+    pendingAttentionCount: item.taskPendingAttentionCount ?? item.task?.pendingAttentionCount ?? 1,
+    taskLifecycleStatus: "needs_review",
+    taskLifecycleLabel: "已采待复核",
+  };
+}
+
+function getBrowserReviewInboxQueue(task = currentBrowserSamplingTask(), { excludeCurrent = false } = {}) {
+  const districtId = task?.districtId ?? (state.districtFilter !== "all" ? state.districtFilter : null);
+  const allItems = state.browserReviewInboxItems ?? [];
+  const districtItems = browserReviewInboxItems({ districtId });
+  let preferredItems = browserReviewInboxItems({ districtId, preferDistrict: true });
+  const currentInboxItemId = currentBrowserReviewInboxItemId();
+  if (excludeCurrent && currentInboxItemId) {
+    preferredItems = preferredItems.filter((item) => item.inboxItemId !== currentInboxItemId);
+  }
+  if (!preferredItems.length && excludeCurrent && currentInboxItemId) {
+    preferredItems = allItems.filter((item) => item.inboxItemId !== currentInboxItemId);
+  }
+  if (!preferredItems.length) {
+    preferredItems = excludeCurrent && currentInboxItemId ? allItems.filter((item) => item.inboxItemId !== currentInboxItemId) : allItems.slice();
+  }
+  return {
+    allItems,
+    districtItems,
+    previewItems: browserReviewInboxItems({ districtId, preferDistrict: true }).slice(0, 4),
+    nextItem: preferredItems[0] ?? null,
+  };
+}
+
+async function navigateToBrowserReviewInboxItem(item, { resetDraft = false } = {}) {
+  if (!item?.taskId) {
+    return;
+  }
+  const task = browserReviewInboxTaskSnapshot(item);
+  await navigateToBrowserSamplingTask(task, {
+    resetDraft,
+    revealLatestCaptureRun: true,
+    preferredReviewRunId: item.runId ?? null,
+    preferredReviewQueueId: item.queueId ?? null,
+    syncDistrictScope: true,
+  });
+}
+
+function currentBrowserCaptureSubmission() {
+  const submission = state.lastBrowserCaptureSubmission;
+  if (!submission?.taskId || submission.status !== "success") {
+    return null;
+  }
+  return submission;
+}
+
+function currentBrowserCaptureReviewAction() {
+  const action = state.lastBrowserCaptureReviewAction;
+  if (!action?.runId || action.status !== "success") {
+    return null;
+  }
+  return action;
+}
+
+function browserSamplingTaskLabel(task) {
+  if (!task) {
+    return "当前任务";
+  }
+  return `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}`;
+}
+
+function browserSamplingTaskStatusLabel(status) {
+  return {
+    resolved: "已采够",
+    in_progress: "补采中",
+    needs_review: "待复核",
+    needs_capture: "待采样"
+  }[status] ?? "状态待补";
+}
+
+function browserSamplingWorkflowActionLabel(action) {
+  return {
+    review_current_capture: "回看修正",
+    advance_next_capture: "自动接力",
+    stay_current: "留在当前"
+  }[action] ?? "工作流";
+}
+
+function browserSamplingWorkflowReasonLabel(reason) {
+  return {
+    attention_detected: "这次采样出现 attention，优先留在当前任务修正原文。",
+    same_district_queue_available: "当前任务已写入成功，继续优先接力同区待采样任务。",
+    global_queue_available: "当前区内没有更合适的待采样任务，已退到全局下一条。",
+    no_pending_task: "当前没有更多待采样任务，保留在当前任务方便继续检查结果。"
+  }[reason] ?? "当前工作流已按默认接力策略处理。";
+}
+
+function browserSamplingPostSubmitResolutionLabel(resolution) {
+  return {
+    workflow_task: "来源 后端指定",
+    workflow_task_missing_snapshot: "来源 后端缺快照",
+    fallback_queue_task: "来源 前端兜底队列",
+    fallback_source_task: "来源 前端留在当前",
+  }[resolution] ?? "来源 未知";
+}
+
+function browserSamplingProgressLabel(progress) {
+  if (!progress) {
+    return "进度待补";
+  }
+  return `进度 ${Number(progress.beforeCount ?? 0)} → ${Number(progress.afterCount ?? 0)}/${Number(progress.targetCount ?? 0)}`;
+}
+
+function browserCaptureReviewStatusLabel(status) {
+  return {
+    pending: "待处理",
+    resolved: "已修正",
+    waived: "已豁免",
+    superseded: "已接力",
+  }[status] ?? "状态待补";
+}
+
+function browserCaptureReviewActionLabel(action) {
+  return {
+    review_current_run: "继续本批次",
+    review_current_task: "继续当前任务",
+    advance_next_review: "接力下一条",
+    stay_current: "留在当前",
+  }[action] ?? "复核接力";
+}
+
+function browserCaptureReviewReasonLabel(reason) {
+  return {
+    current_run_pending_remaining: "当前批次还有未处理 attention，继续留在本批次逐条处理。",
+    current_task_pending_remaining: "当前任务还有其他未清 attention，继续停留在当前任务。",
+    same_district_review_available: "当前批次已清空，已优先接力到同区下一条待复核任务。",
+    global_review_available: "当前区内没有待复核任务，已退到全局下一条。",
+    review_queue_cleared: "当前没有更多待复核任务，保留在当前任务方便继续检查。",
+  }[reason] ?? "当前复核动作已按默认接力策略处理。";
+}
+
+function browserCaptureReviewResolutionLabel(resolution) {
+  return {
+    workflow_item: "来源 后端指定",
+    workflow_identifiers: "来源 后端标识",
+    fallback_current_run: "来源 前端留在本批次",
+    fallback_current_task: "来源 前端留在当前任务",
+    fallback_next_review: "来源 前端兜底收件箱",
+    fallback_source_task: "来源 前端留在当前",
+  }[resolution] ?? "来源 未知";
+}
+
+function browserSamplingCaptureCandidateState(task) {
+  return ["needs_capture", "in_progress"].includes(browserSamplingCoverageState(task));
 }
 
 function getBrowserSamplingWorkbenchQueue(task = currentBrowserSamplingTask()) {
@@ -5003,17 +5378,315 @@ function getBrowserSamplingWorkbenchQueue(task = currentBrowserSamplingTask()) {
     .filter((item) => browserSamplingCoverageState(item) !== "resolved")
     .slice()
     .sort(compareBrowserSamplingMapTask);
-  const districtTasks = task?.districtId
+  const sameDistrictOpenTasks = task?.districtId
     ? openTasks.filter((item) => item.districtId === task.districtId)
-    : openTasks;
-  const taskPool = districtTasks.length ? districtTasks : openTasks;
+    : [];
+  const captureTasks = openTasks.filter((item) => browserSamplingCaptureCandidateState(item));
+  const sameDistrictCaptureTasks = sameDistrictOpenTasks.filter((item) => browserSamplingCaptureCandidateState(item));
+  const previewTasks = (sameDistrictOpenTasks.length ? sameDistrictOpenTasks : openTasks).slice(0, 4);
+  const taskPool = sameDistrictOpenTasks.length ? sameDistrictOpenTasks : openTasks;
+  const reviewInbox = getBrowserReviewInboxQueue(task, { excludeCurrent: true });
+  const nextReviewItem = reviewInbox.nextItem ?? null;
+  const nextReviewTask = nextReviewItem ? browserReviewInboxTaskSnapshot(nextReviewItem) : null;
   return {
     districtTasks: taskPool,
-    nextDistrictTask: taskPool[0] ?? null,
-    nextReviewTask: taskPool.find((item) => browserSamplingCoverageState(item) === "needs_review") ?? null,
-    nextCaptureTask:
-      taskPool.find((item) => ["needs_capture", "in_progress"].includes(browserSamplingCoverageState(item))) ?? null,
-    previewTasks: taskPool.slice(0, 4)
+    nextDistrictTask: sameDistrictCaptureTasks[0] ?? captureTasks[0] ?? sameDistrictOpenTasks[0] ?? openTasks[0] ?? null,
+    nextReviewTask,
+    nextReviewItem,
+    nextCaptureTask: sameDistrictCaptureTasks[0] ?? captureTasks[0] ?? null,
+    previewTasks,
+    reviewPreviewItems: reviewInbox.previewItems,
+    reviewDistrictCount: reviewInbox.districtItems.length,
+    reviewTotalCount: reviewInbox.allItems.length,
+  };
+}
+
+function findPostSubmitBrowserSamplingTask(sourceTask) {
+  const sourceTaskId = sourceTask?.taskId ?? null;
+  const sourceDistrictId = sourceTask?.districtId ?? null;
+  const candidateTasks = (state.browserSamplingPackItems ?? [])
+    .filter((item) => item?.taskId && item.taskId !== sourceTaskId && browserSamplingCaptureCandidateState(item))
+    .slice()
+    .sort(compareBrowserSamplingMapTask);
+  const sameDistrictTasks = sourceDistrictId
+    ? candidateTasks.filter((item) => item.districtId === sourceDistrictId)
+    : [];
+  return sameDistrictTasks[0] ?? candidateTasks[0] ?? null;
+}
+
+function browserSamplingTaskById(taskId) {
+  if (!taskId) {
+    return null;
+  }
+  return (state.browserSamplingPackItems ?? []).find((item) => item.taskId === taskId) ?? null;
+}
+
+function browserReviewInboxItemByTarget({ inboxItemId = null, runId = null, queueId = null, taskId = null } = {}) {
+  const items = state.browserReviewInboxItems ?? [];
+  if (inboxItemId) {
+    const directMatch = items.find((item) => item?.inboxItemId === inboxItemId);
+    if (directMatch) {
+      return directMatch;
+    }
+  }
+  if (runId && queueId) {
+    const runQueueMatch = items.find((item) => item?.runId === runId && item?.queueId === queueId);
+    if (runQueueMatch) {
+      return runQueueMatch;
+    }
+  }
+  if (taskId) {
+    return items.find((item) => item?.taskId === taskId) ?? null;
+  }
+  return null;
+}
+
+function buildBrowserCaptureReviewWorkflowLocalItem(runId, queueItem, task) {
+  if (!runId || !queueItem?.queueId || !task?.taskId) {
+    return null;
+  }
+  return {
+    inboxItemId: `${runId}:${queueItem.queueId}`,
+    runId,
+    queueId: queueItem.queueId,
+    taskId: task.taskId,
+    task: task,
+    taskLabel: browserSamplingTaskLabel(task),
+    districtId: task.districtId ?? null,
+    districtName: task.districtName ?? null,
+    communityId: task.communityId ?? null,
+    communityName: task.communityName ?? null,
+    buildingId: task.buildingId ?? null,
+    buildingName: task.buildingName ?? null,
+    floorNo: task.floorNo ?? null,
+    taskPendingAttentionCount: browserCapturePendingAttentionCount(task),
+    businessType: queueItem.businessType ?? null,
+    businessTypeLabel: queueItem.businessTypeLabel ?? null,
+    sourceListingId: queueItem.sourceListingId ?? null,
+    attention: Array.isArray(queueItem.attention) ? queueItem.attention : [],
+  };
+}
+
+function resolveBrowserCaptureReviewWorkflowTarget(
+  {
+    workflow = {},
+    workflowAction = "stay_current",
+    runId = null,
+    sourceTask = null,
+    refreshedSourceTask = null,
+    refreshedCurrentRun = null,
+  } = {}
+) {
+  const workflowItem = workflow?.item ?? null;
+  const workflowRunId = workflow?.runId ?? workflowItem?.runId ?? null;
+  const workflowQueueId = workflow?.queueId ?? workflowItem?.queueId ?? null;
+  const workflowTaskId = workflow?.taskId ?? workflowItem?.taskId ?? workflow?.task?.taskId ?? null;
+  const matchedWorkflowItem = browserReviewInboxItemByTarget({
+    inboxItemId: workflowItem?.inboxItemId ?? null,
+    runId: workflowRunId,
+    queueId: workflowQueueId,
+    taskId: workflowTaskId,
+  });
+  const resolvedWorkflowItem = matchedWorkflowItem ?? (workflowItem?.taskId ? workflowItem : null);
+  const resolvedWorkflowTask =
+    browserReviewInboxTaskSnapshot(resolvedWorkflowItem) ??
+    browserSamplingTaskById(workflowTaskId) ??
+    workflow?.task ??
+    refreshedSourceTask ??
+    sourceTask ??
+    null;
+  if (resolvedWorkflowItem?.taskId) {
+    return {
+      item: resolvedWorkflowItem,
+      task: resolvedWorkflowTask,
+      workflowRunId: workflowRunId ?? resolvedWorkflowItem.runId ?? null,
+      workflowQueueId: workflowQueueId ?? resolvedWorkflowItem.queueId ?? null,
+      workflowTaskId: workflowTaskId ?? resolvedWorkflowItem.taskId ?? resolvedWorkflowTask?.taskId ?? null,
+      workflowItemProvided: Boolean(workflowItem),
+      resolution: "workflow_item",
+    };
+  }
+  if ((workflowRunId || workflowQueueId || workflowTaskId) && resolvedWorkflowTask?.taskId) {
+    return {
+      item: {
+        inboxItemId:
+          workflowRunId && workflowQueueId
+            ? `${workflowRunId}:${workflowQueueId}`
+            : `${resolvedWorkflowTask.taskId}:${workflowQueueId ?? "review-target"}`,
+        runId: workflowRunId ?? resolvedWorkflowTask.pendingReviewRunId ?? null,
+        queueId: workflowQueueId ?? resolvedWorkflowTask.pendingReviewQueueId ?? null,
+        taskId: resolvedWorkflowTask.taskId,
+        task: resolvedWorkflowTask,
+        taskLabel: browserSamplingTaskLabel(resolvedWorkflowTask),
+      },
+      task: resolvedWorkflowTask,
+      workflowRunId: workflowRunId ?? resolvedWorkflowTask.pendingReviewRunId ?? null,
+      workflowQueueId: workflowQueueId ?? resolvedWorkflowTask.pendingReviewQueueId ?? null,
+      workflowTaskId: workflowTaskId ?? resolvedWorkflowTask.taskId ?? null,
+      workflowItemProvided: Boolean(workflowItem),
+      resolution: "workflow_identifiers",
+    };
+  }
+  if (workflowAction === "review_current_run") {
+    const pendingQueueItem = (refreshedCurrentRun?.reviewQueue ?? []).find((item) => String(item?.status ?? "pending") === "pending");
+    const localItem = buildBrowserCaptureReviewWorkflowLocalItem(runId, pendingQueueItem, refreshedSourceTask ?? sourceTask);
+    if (localItem) {
+      return {
+        item: localItem,
+        task: browserReviewInboxTaskSnapshot(localItem),
+        workflowRunId: localItem.runId,
+        workflowQueueId: localItem.queueId,
+        workflowTaskId: localItem.taskId,
+        workflowItemProvided: false,
+        resolution: "fallback_current_run",
+      };
+    }
+  }
+  if (workflowAction === "review_current_task") {
+    const currentTaskItem = browserReviewInboxItemByTarget({
+      runId: refreshedSourceTask?.pendingReviewRunId ?? null,
+      queueId: refreshedSourceTask?.pendingReviewQueueId ?? null,
+      taskId: refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+    });
+    if (currentTaskItem?.taskId) {
+      return {
+        item: currentTaskItem,
+        task: browserReviewInboxTaskSnapshot(currentTaskItem),
+        workflowRunId: currentTaskItem.runId ?? null,
+        workflowQueueId: currentTaskItem.queueId ?? null,
+        workflowTaskId: currentTaskItem.taskId ?? null,
+        workflowItemProvided: false,
+        resolution: "fallback_current_task",
+      };
+    }
+  }
+  if (workflowAction === "advance_next_review") {
+    const nextReviewItem = getBrowserReviewInboxQueue(refreshedSourceTask ?? sourceTask, { excludeCurrent: true }).nextItem;
+    if (nextReviewItem?.taskId) {
+      return {
+        item: nextReviewItem,
+        task: browserReviewInboxTaskSnapshot(nextReviewItem),
+        workflowRunId: nextReviewItem.runId ?? null,
+        workflowQueueId: nextReviewItem.queueId ?? null,
+        workflowTaskId: nextReviewItem.taskId ?? null,
+        workflowItemProvided: false,
+        resolution: "fallback_next_review",
+      };
+    }
+  }
+  return {
+    item: null,
+    task: refreshedSourceTask ?? sourceTask ?? null,
+    workflowRunId: workflowRunId ?? null,
+    workflowQueueId: workflowQueueId ?? null,
+    workflowTaskId: workflowTaskId ?? refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+    workflowItemProvided: false,
+    resolution: "fallback_source_task",
+  };
+}
+
+function resolvePostSubmitBrowserSamplingTask(
+  {
+    workflow = {},
+    workflowAction = "stay_current",
+    sourceTask = null,
+    refreshedSourceTask = null,
+  } = {}
+) {
+  const workflowTaskId = workflow?.taskId ?? workflow?.task?.taskId ?? null;
+  const workflowTask = browserSamplingTaskById(workflowTaskId) ?? workflow?.task ?? null;
+  if (workflowTask?.taskId) {
+    return {
+      task: workflowTask,
+      workflowTaskId: workflowTask.taskId ?? workflowTaskId ?? null,
+      workflowTaskProvided: true,
+      resolution: "workflow_task",
+    };
+  }
+  if (workflowTaskId) {
+    return {
+      task: refreshedSourceTask ?? sourceTask ?? null,
+      workflowTaskId,
+      workflowTaskProvided: true,
+      resolution: "workflow_task_missing_snapshot",
+    };
+  }
+  if (workflowAction === "advance_next_capture") {
+    const fallbackTask = findPostSubmitBrowserSamplingTask(refreshedSourceTask ?? sourceTask);
+    if (fallbackTask?.taskId) {
+      return {
+        task: fallbackTask,
+        workflowTaskId: null,
+        workflowTaskProvided: false,
+        resolution: "fallback_queue_task",
+      };
+    }
+  }
+  return {
+    task: refreshedSourceTask ?? sourceTask ?? null,
+    workflowTaskId: null,
+    workflowTaskProvided: false,
+    resolution: "fallback_source_task",
+  };
+}
+
+function applyBrowserSamplingTaskProgress(taskSnapshot, taskProgress) {
+  if (!taskSnapshot || !taskProgress) {
+    return taskSnapshot;
+  }
+  const nextSnapshot = { ...taskSnapshot };
+  const afterCount = Number(taskProgress.afterCount ?? browserSamplingCurrentCount(taskSnapshot));
+  const targetCount = Number(taskProgress.targetCount ?? browserSamplingTargetCount(taskSnapshot));
+  const missingCount = Number(taskProgress.missingCount ?? Math.max(targetCount - afterCount, 0));
+  if (nextSnapshot.targetGranularity === "floor") {
+    nextSnapshot.currentPairCount = afterCount;
+    nextSnapshot.targetPairCount = targetCount;
+    nextSnapshot.missingPairCount = missingCount;
+  }
+  nextSnapshot.currentSampleSize = afterCount;
+  nextSnapshot.targetSampleSize = targetCount;
+  nextSnapshot.missingSampleCount = missingCount;
+  return nextSnapshot;
+}
+
+function buildBrowserCaptureSubmission(task, body, optimisticRun, optimisticTask) {
+  const workflow = body?.workflow ?? {};
+  const taskProgress = body?.taskProgress ?? {};
+  const taskLabel = browserSamplingTaskLabel(task);
+  const workflowAction = workflow.action ?? (Number(optimisticRun?.attentionCount ?? 0) > 0 ? "review_current_capture" : "stay_current");
+  const resolvedPostSubmitTask = resolvePostSubmitBrowserSamplingTask({
+    workflow,
+    workflowAction,
+    sourceTask: task,
+    refreshedSourceTask: optimisticTask ?? task,
+  });
+  return {
+    status: "success",
+    taskId: task?.taskId ?? null,
+    taskLabel,
+    taskProgress: {
+      beforeCount: Number(taskProgress.beforeCount ?? browserSamplingCurrentCount(task)),
+      afterCount: Number(taskProgress.afterCount ?? browserSamplingCurrentCount(optimisticTask ?? task)),
+      targetCount: Number(taskProgress.targetCount ?? browserSamplingTargetCount(optimisticTask ?? task)),
+      missingCount: Number(taskProgress.missingCount ?? browserSamplingMissingCount(optimisticTask ?? task)),
+      status: taskProgress.status ?? browserSamplingCoverageState(optimisticTask ?? task),
+    },
+    workflowAction,
+    workflowReason: workflow.reason ?? (Number(optimisticRun?.attentionCount ?? 0) > 0 ? "attention_detected" : "no_pending_task"),
+    workflowTaskId: resolvedPostSubmitTask.workflowTaskId,
+    workflowTaskProvided: resolvedPostSubmitTask.workflowTaskProvided,
+    postSubmitTaskResolution: resolvedPostSubmitTask.resolution,
+    postSubmitTaskId: resolvedPostSubmitTask.task?.taskId ?? task?.taskId ?? null,
+    postSubmitTaskLabel: browserSamplingTaskLabel(resolvedPostSubmitTask.task ?? task),
+    captureRunId: body.captureRunId ?? null,
+    importRunId: body.importRunId ?? null,
+    metricsRunId: body.metricsRun?.runId ?? null,
+    createdAt: optimisticRun.createdAt ?? new Date().toISOString(),
+    attentionCount: Number(optimisticRun.attentionCount ?? 0),
+    reviewPendingCount: browserCapturePendingAttentionCount(optimisticRun),
+    reviewInboxPendingCount: Number(body?.reviewInboxSummary?.pendingQueueCount ?? state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
+    metricsBatchName: body.metricsRun?.batchName ?? null,
+    autoFilledChannels: [],
   };
 }
 
@@ -5034,12 +5707,12 @@ function browserSamplingInstructionText(task) {
     .join("\n");
 }
 
-function browserCaptureLifecycleStatus(attentionCount) {
-  return Number(attentionCount || 0) > 0 ? "needs_review" : "captured";
+function browserCaptureLifecycleStatus(pendingAttentionCount) {
+  return Number(pendingAttentionCount || 0) > 0 ? "needs_review" : "captured";
 }
 
-function browserCaptureLifecycleLabel(attentionCount) {
-  return Number(attentionCount || 0) > 0 ? "已采待复核" : "已采仍需补采";
+function browserCaptureLifecycleLabel(pendingAttentionCount) {
+  return Number(pendingAttentionCount || 0) > 0 ? "已采待复核" : "已采仍需补采";
 }
 
 function browserSamplingTargetCount(task) {
@@ -5069,8 +5742,8 @@ function browserSamplingMissingCount(task) {
 }
 
 function browserSamplingCoverageState(task) {
-  const attentionCount = Number(task?.latestCaptureAttentionCount ?? 0);
-  if (attentionCount > 0) {
+  const pendingAttentionCount = browserCapturePendingAttentionCount(task);
+  if (pendingAttentionCount > 0) {
     return "needs_review";
   }
   if (browserSamplingMissingCount(task) <= 0 && browserSamplingTargetCount(task) > 0) {
@@ -5083,12 +5756,7 @@ function browserSamplingCoverageState(task) {
 }
 
 function browserSamplingCoverageLabel(task) {
-  return {
-    resolved: "已采够",
-    in_progress: "补采中",
-    needs_review: "待复核",
-    needs_capture: "待采样"
-  }[browserSamplingCoverageState(task)];
+  return browserSamplingTaskStatusLabel(browserSamplingCoverageState(task));
 }
 
 function browserSamplingCoverageProgress(task) {
@@ -5132,7 +5800,7 @@ function browserSamplingCoveragePayload() {
     districtEntry.currentCount += Math.min(browserSamplingCurrentCount(task), browserSamplingTargetCount(task) || browserSamplingCurrentCount(task));
     districtEntry.missingCount += browserSamplingMissingCount(task);
     districtEntry.priorityScore = Math.max(districtEntry.priorityScore, Number(task.priorityScore ?? 0));
-    if (!districtEntry.latestCaptureAt || String(task.latestCaptureAt ?? "") > String(districtEntry.latestCaptureAt ?? "")) {
+    if (comparableTimestamp(task.latestCaptureAt) > comparableTimestamp(districtEntry.latestCaptureAt)) {
       districtEntry.latestCaptureAt = task.latestCaptureAt ?? districtEntry.latestCaptureAt;
     }
     if (compareBrowserSamplingTask(task, districtEntry.highestPriorityTask) < 0) {
@@ -5176,7 +5844,7 @@ function browserSamplingCoveragePayload() {
         currentCount: 0,
         missingCount: 0,
         latestCaptureAt: null,
-        latestCaptureAttentionCount: 0,
+        pendingAttentionCount: 0,
         highestPriorityTask: task,
         outstandingTask: task,
         taskItems: []
@@ -5187,8 +5855,8 @@ function browserSamplingCoveragePayload() {
     communityEntry.currentCount += Math.min(browserSamplingCurrentCount(task), browserSamplingTargetCount(task) || browserSamplingCurrentCount(task));
     communityEntry.missingCount += browserSamplingMissingCount(task);
     communityEntry.taskItems.push(task);
-    communityEntry.latestCaptureAttentionCount += Number(task.latestCaptureAttentionCount ?? 0);
-    if (!communityEntry.latestCaptureAt || String(task.latestCaptureAt ?? "") > String(communityEntry.latestCaptureAt ?? "")) {
+    communityEntry.pendingAttentionCount += browserCapturePendingAttentionCount(task);
+    if (comparableTimestamp(task.latestCaptureAt) > comparableTimestamp(communityEntry.latestCaptureAt)) {
       communityEntry.latestCaptureAt = task.latestCaptureAt ?? communityEntry.latestCaptureAt;
     }
     if (compareBrowserSamplingTask(task, communityEntry.highestPriorityTask) < 0) {
@@ -5265,9 +5933,10 @@ function browserSamplingCoveragePayload() {
 
 function buildOptimisticBrowserCaptureRun(task, body) {
   const summary = body?.summary ?? {};
-  const createdAt = new Date().toISOString();
   const attentionCount = Number(summary.attention_count ?? (body?.attention ?? []).length ?? 0);
+  const pendingAttentionCount = Number(body?.reviewSummary?.pendingCount ?? attentionCount);
   const taskSnapshot = body?.task ?? task ?? {};
+  const createdAt = taskSnapshot?.latestCaptureAt ?? new Date().toISOString();
   return {
     runId: body?.captureRunId ?? null,
     providerId: "public-browser-sampling",
@@ -5287,11 +5956,20 @@ function buildOptimisticBrowserCaptureRun(task, body) {
     rentCaptureCount: Number(summary.rent_capture_count ?? 0),
     attentionCount,
     attentionPreview: Array.isArray(body?.attention) ? body.attention : [],
+    pendingAttentionCount,
+    pendingReviewQueueId: body?.task?.pendingReviewQueueId ?? null,
+    pendingAttentionPreview: Array.isArray(body?.task?.pendingAttentionPreview) ? body.task.pendingAttentionPreview : Array.isArray(body?.attention) ? body.attention : [],
+    reviewSummary: body?.reviewSummary ?? {
+      pendingCount: pendingAttentionCount,
+      resolvedCount: 0,
+      waivedCount: 0,
+      supersededCount: 0,
+    },
     importRunId: body?.importRunId ?? null,
     metricsRunId: body?.metricsRun?.runId ?? null,
     metricsBatchName: body?.metricsRun?.batchName ?? null,
-    taskLifecycleStatus: browserCaptureLifecycleStatus(attentionCount),
-    taskLifecycleLabel: browserCaptureLifecycleLabel(attentionCount),
+    taskLifecycleStatus: browserCaptureLifecycleStatus(pendingAttentionCount),
+    taskLifecycleLabel: browserCaptureLifecycleLabel(pendingAttentionCount),
   };
 }
 
@@ -5299,29 +5977,32 @@ function upsertBrowserCaptureRunSummary(runSummary) {
   if (!runSummary?.runId) {
     return;
   }
-  const nextRuns = [runSummary, ...(effectiveOperationsOverview().browserCaptureRuns ?? []).filter((item) => item.runId !== runSummary.runId)];
+  const previousRuns = effectiveOperationsOverview().browserCaptureRuns ?? [];
+  const nextRuns = [runSummary, ...previousRuns.filter((item) => item.runId !== runSummary.runId)].sort(compareCreatedAtDesc);
   const summary = effectiveOperationsOverview().summary ?? emptyOperationsOverview.summary;
-  const existing = (effectiveOperationsOverview().browserCaptureRuns ?? []).some((item) => item.runId === runSummary.runId);
+  const existing = previousRuns.some((item) => item.runId === runSummary.runId);
   operationsOverview = {
     ...effectiveOperationsOverview(),
     browserCaptureRuns: nextRuns,
     summary: {
       ...summary,
       browserCaptureRunCount: existing ? Number(summary.browserCaptureRunCount ?? nextRuns.length) : Number(summary.browserCaptureRunCount ?? 0) + 1,
-      latestBrowserCaptureAt: runSummary.createdAt ?? summary.latestBrowserCaptureAt ?? null,
-      browserCaptureAttentionCount: Number(summary.browserCaptureAttentionCount ?? 0) + Number(runSummary.attentionCount ?? 0),
+      latestBrowserCaptureAt: nextRuns[0]?.createdAt ?? summary.latestBrowserCaptureAt ?? null,
+      browserCaptureAttentionCount: nextRuns.reduce((count, item) => count + Number(item?.attentionCount ?? 0), 0),
     }
   };
 }
 
-function buildOptimisticBrowserSamplingTask(task, runSummary) {
+function buildOptimisticBrowserSamplingTask(task, runSummary, taskProgress = null) {
   if (!task?.taskId) {
     return null;
   }
   const attentionCount = Number(runSummary?.attentionCount ?? 0);
+  const pendingAttentionCount = browserCapturePendingAttentionCount(runSummary);
   const previousHistoryCount = Number(task.captureHistoryCount ?? 0);
+  const nextTask = applyBrowserSamplingTaskProgress(task, taskProgress) ?? { ...task };
   return {
-    ...task,
+    ...nextTask,
     captureHistoryCount: previousHistoryCount + (runSummary?.runId ? 1 : 0),
     latestCaptureAt: runSummary?.createdAt ?? task.latestCaptureAt ?? null,
     latestCaptureRunId: runSummary?.runId ?? task.latestCaptureRunId ?? null,
@@ -5329,8 +6010,12 @@ function buildOptimisticBrowserSamplingTask(task, runSummary) {
     latestCaptureMetricsRunId: runSummary?.metricsRunId ?? task.latestCaptureMetricsRunId ?? null,
     latestCaptureAttentionCount: attentionCount,
     latestCaptureAttentionPreview: runSummary?.attentionPreview ?? [],
-    taskLifecycleStatus: browserCaptureLifecycleStatus(attentionCount),
-    taskLifecycleLabel: browserCaptureLifecycleLabel(attentionCount),
+    pendingReviewRunId: pendingAttentionCount > 0 ? runSummary?.runId ?? task.pendingReviewRunId ?? null : null,
+    pendingReviewQueueId: pendingAttentionCount > 0 ? runSummary?.pendingReviewQueueId ?? task.pendingReviewQueueId ?? null : null,
+    pendingAttentionCount,
+    pendingAttentionPreview: runSummary?.pendingAttentionPreview ?? [],
+    taskLifecycleStatus: browserCaptureLifecycleStatus(pendingAttentionCount),
+    taskLifecycleLabel: browserCaptureLifecycleLabel(pendingAttentionCount),
   };
 }
 
@@ -5350,27 +6035,427 @@ function upsertBrowserSamplingTask(taskSnapshot, { pinSelection = true } = {}) {
   }
 }
 
+function updateLastBrowserCaptureSubmission(patch) {
+  if (!state.lastBrowserCaptureSubmission) {
+    return;
+  }
+  state.lastBrowserCaptureSubmission = {
+    ...state.lastBrowserCaptureSubmission,
+    ...patch
+  };
+}
+
+function setLastBrowserCaptureReviewAction(action) {
+  state.lastBrowserCaptureReviewAction = action;
+}
+
+function browserCaptureReviewSuccessMessage({ reviewMode = "single", reviewStatus = "resolved", affectedCount = 1, skippedCount = 0, outcome = "same_run" } = {}) {
+  const baseMessage =
+    reviewMode === "batch"
+      ? affectedCount > 0
+        ? `${reviewStatus === "waived" ? "已批量豁免" : "已批量标记已修正"} ${affectedCount} 条 attention。${skippedCount > 0 ? ` 跳过 ${skippedCount} 条无效或已处理项。` : ""}`
+        : `本次没有可更新的 pending 条目。${skippedCount > 0 ? ` 已跳过 ${skippedCount} 条无效或已处理项。` : ""}`
+      : reviewStatus === "waived"
+        ? "该条 attention 已标记豁免。"
+        : "该条 attention 已标记已修正。";
+  if (outcome === "current_task") {
+    return `${baseMessage} 当前批次已清空，继续处理当前任务的其他待复核 attention。`;
+  }
+  if (outcome === "next_review") {
+    return `${baseMessage} 当前批次已清空，已接力到下一条待复核任务。`;
+  }
+  if (outcome === "cleared") {
+    return `${baseMessage} 当前没有更多待复核 attention。`;
+  }
+  return baseMessage;
+}
+
+function browserCaptureReviewPrimaryQueueId(payload, fallbackQueueId = null) {
+  return (
+    payload?.queueItem?.queueId ??
+    payload?.updatedQueueItems?.[0]?.queueId ??
+    payload?.detail?.reviewQueue?.find((item) => String(item?.status ?? "pending") === "pending")?.queueId ??
+    fallbackQueueId ??
+    null
+  );
+}
+
+async function finalizeBrowserCaptureReviewAction(
+  runId,
+  payload,
+  {
+    sourceTask = currentBrowserSamplingTask(),
+    reviewStatus = "resolved",
+    reviewMode = "single",
+    selectedCount = 1,
+    affectedCount = reviewMode === "batch" ? 0 : 1,
+    skippedCount = 0,
+    queueId = null,
+  } = {}
+) {
+  await refreshData({
+    backgroundHydration: true,
+    preserveBrowserSamplingTaskId: sourceTask?.taskId ?? null,
+  });
+  void refreshOperationsWorkbench({ reloadFloor: true }).catch(() => {});
+
+  const workflowAction = payload?.workflow?.action ?? "stay_current";
+  const workflowReason = payload?.workflow?.reason ?? "review_queue_cleared";
+  const reviewInboxPendingCount = Number(payload?.reviewInboxSummary?.pendingQueueCount ?? state.browserReviewInboxSummary?.pendingQueueCount ?? 0);
+  const refreshedSourceTask =
+    (state.browserSamplingPackItems ?? []).find((item) => item.taskId === sourceTask?.taskId) ??
+    payload?.task ??
+    sourceTask;
+  const primaryQueueId = browserCaptureReviewPrimaryQueueId(payload, queueId);
+  const refreshedCurrentRun = await loadSelectedBrowserCaptureRunDetail(runId, {
+    preferredQueueId: payload?.detail?.reviewQueue?.find((item) => String(item?.status ?? "pending") === "pending")?.queueId ?? null,
+  });
+  const sameRunPendingItems = (refreshedCurrentRun?.reviewQueue ?? []).filter((item) => String(item?.status ?? "pending") === "pending");
+  const resolvedReviewTarget = resolveBrowserCaptureReviewWorkflowTarget({
+    workflow: payload?.workflow ?? {},
+    workflowAction,
+    runId,
+    sourceTask,
+    refreshedSourceTask,
+    refreshedCurrentRun,
+  });
+
+  if (workflowAction === "review_current_run" && (resolvedReviewTarget.item?.queueId || sameRunPendingItems.length)) {
+    const nextQueueId =
+      resolvedReviewTarget.workflowQueueId ??
+      resolvedReviewTarget.item?.queueId ??
+      sameRunPendingItems[0].queueId ??
+      null;
+    state.selectedBrowserCaptureReviewQueueId = nextQueueId;
+    const currentRunTask = resolvedReviewTarget.task ?? refreshedSourceTask ?? sourceTask;
+    if (currentRunTask?.taskId) {
+      upsertBrowserSamplingTask(currentRunTask, { pinSelection: true });
+      state.selectedBrowserSamplingTaskId = currentRunTask.taskId;
+    }
+    await loadSelectedBrowserCaptureRunDetail(runId, {
+      preferredQueueId: nextQueueId,
+    });
+    setLastBrowserCaptureReviewAction({
+      status: "success",
+      runId,
+      queueId: primaryQueueId,
+      action: workflowAction,
+      reason: workflowReason,
+      workflowRunId: resolvedReviewTarget.workflowRunId,
+      workflowQueueId: resolvedReviewTarget.workflowQueueId,
+      workflowTaskId: resolvedReviewTarget.workflowTaskId,
+      workflowItemProvided: resolvedReviewTarget.workflowItemProvided,
+      reviewResolution: resolvedReviewTarget.resolution,
+      postReviewTaskId: resolvedReviewTarget.task?.taskId ?? refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+      postReviewTaskLabel: browserSamplingTaskLabel(resolvedReviewTarget.task ?? refreshedSourceTask ?? sourceTask),
+      postReviewRunId: resolvedReviewTarget.item?.runId ?? resolvedReviewTarget.workflowRunId ?? null,
+      postReviewQueueId: resolvedReviewTarget.item?.queueId ?? resolvedReviewTarget.workflowQueueId ?? null,
+      pendingCount: sameRunPendingItems.length,
+      taskId: refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+      taskLabel: browserSamplingTaskLabel(refreshedSourceTask ?? sourceTask),
+      reviewStatus,
+      reviewMode,
+      selectedCount,
+      affectedCount,
+      skippedCount,
+      reviewInboxPendingCount,
+    });
+    state.opsMessage = browserCaptureReviewSuccessMessage({
+      reviewMode,
+      reviewStatus,
+      affectedCount,
+      skippedCount,
+      outcome: "same_run",
+    });
+    state.opsMessageTone = "success";
+    render();
+    return;
+  }
+
+  if (
+    workflowAction === "review_current_task" &&
+    (resolvedReviewTarget.item?.taskId || (resolvedReviewTarget.task?.taskId && (resolvedReviewTarget.workflowRunId || refreshedSourceTask?.pendingReviewRunId)))
+  ) {
+    const reviewTargetTask = resolvedReviewTarget.task ?? refreshedSourceTask ?? sourceTask ?? null;
+    const reviewTargetTaskId = reviewTargetTask?.taskId ?? null;
+    const reviewTargetRunId =
+      resolvedReviewTarget.item?.runId ??
+      resolvedReviewTarget.workflowRunId ??
+      refreshedSourceTask?.pendingReviewRunId ??
+      null;
+    const reviewTargetQueueId =
+      resolvedReviewTarget.item?.queueId ??
+      resolvedReviewTarget.workflowQueueId ??
+      refreshedSourceTask?.pendingReviewQueueId ??
+      null;
+    const currentTaskId = currentBrowserSamplingTask()?.taskId ?? null;
+    const canReuseCurrentTaskPanel =
+      Boolean(reviewTargetTaskId) &&
+      [currentTaskId, refreshedSourceTask?.taskId ?? null, sourceTask?.taskId ?? null].includes(reviewTargetTaskId);
+
+    if (canReuseCurrentTaskPanel) {
+      if (reviewTargetTask?.taskId) {
+        upsertBrowserSamplingTask(reviewTargetTask, { pinSelection: true });
+        state.selectedBrowserSamplingTaskId = reviewTargetTask.taskId;
+      }
+      if (reviewTargetRunId) {
+        await loadSelectedBrowserCaptureRunDetail(reviewTargetRunId, {
+          preferredQueueId: reviewTargetQueueId,
+        });
+      }
+    } else if (resolvedReviewTarget.item?.taskId) {
+      await navigateToBrowserReviewInboxItem(resolvedReviewTarget.item, { resetDraft: false });
+    } else {
+      await navigateToBrowserSamplingTask(resolvedReviewTarget.task ?? refreshedSourceTask, {
+        resetDraft: false,
+        revealLatestCaptureRun: true,
+        preferredReviewRunId: resolvedReviewTarget.workflowRunId ?? refreshedSourceTask?.pendingReviewRunId ?? null,
+        preferredReviewQueueId: resolvedReviewTarget.workflowQueueId ?? refreshedSourceTask?.pendingReviewQueueId ?? null,
+      });
+    }
+    setLastBrowserCaptureReviewAction({
+      status: "success",
+      runId,
+      queueId: primaryQueueId,
+      action: workflowAction,
+      reason: workflowReason,
+      workflowRunId: resolvedReviewTarget.workflowRunId,
+      workflowQueueId: resolvedReviewTarget.workflowQueueId,
+      workflowTaskId: resolvedReviewTarget.workflowTaskId,
+      workflowItemProvided: resolvedReviewTarget.workflowItemProvided,
+      reviewResolution: resolvedReviewTarget.resolution,
+      postReviewTaskId: resolvedReviewTarget.task?.taskId ?? refreshedSourceTask?.taskId ?? null,
+      postReviewTaskLabel: browserSamplingTaskLabel(resolvedReviewTarget.task ?? refreshedSourceTask),
+      postReviewRunId: resolvedReviewTarget.item?.runId ?? resolvedReviewTarget.workflowRunId ?? null,
+      postReviewQueueId: resolvedReviewTarget.item?.queueId ?? resolvedReviewTarget.workflowQueueId ?? null,
+      pendingCount: browserCapturePendingAttentionCount(resolvedReviewTarget.task ?? refreshedSourceTask),
+      taskId: refreshedSourceTask?.taskId ?? null,
+      taskLabel: browserSamplingTaskLabel(refreshedSourceTask),
+      reviewStatus,
+      reviewMode,
+      selectedCount,
+      affectedCount,
+      skippedCount,
+      reviewInboxPendingCount,
+    });
+    state.opsMessage = browserCaptureReviewSuccessMessage({
+      reviewMode,
+      reviewStatus,
+      affectedCount,
+      skippedCount,
+      outcome: "current_task",
+    });
+    state.opsMessageTone = "success";
+    render();
+    return;
+  }
+
+  if (workflowAction === "advance_next_review" && (resolvedReviewTarget.item?.taskId || resolvedReviewTarget.task?.taskId)) {
+    if (resolvedReviewTarget.item?.taskId) {
+      await navigateToBrowserReviewInboxItem(resolvedReviewTarget.item, { resetDraft: false });
+    } else {
+      await navigateToBrowserSamplingTask(resolvedReviewTarget.task, {
+        resetDraft: false,
+        revealLatestCaptureRun: true,
+        preferredReviewRunId: resolvedReviewTarget.workflowRunId ?? null,
+        preferredReviewQueueId: resolvedReviewTarget.workflowQueueId ?? null,
+      });
+    }
+    setLastBrowserCaptureReviewAction({
+      status: "success",
+      runId,
+      queueId: primaryQueueId,
+      action: workflowAction,
+      reason: workflowReason,
+      workflowRunId: resolvedReviewTarget.workflowRunId,
+      workflowQueueId: resolvedReviewTarget.workflowQueueId,
+      workflowTaskId: resolvedReviewTarget.workflowTaskId,
+      workflowItemProvided: resolvedReviewTarget.workflowItemProvided,
+      reviewResolution: resolvedReviewTarget.resolution,
+      postReviewTaskId: resolvedReviewTarget.task?.taskId ?? refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+      postReviewTaskLabel: browserSamplingTaskLabel(resolvedReviewTarget.task ?? refreshedSourceTask ?? sourceTask),
+      postReviewRunId: resolvedReviewTarget.item?.runId ?? resolvedReviewTarget.workflowRunId ?? null,
+      postReviewQueueId: resolvedReviewTarget.item?.queueId ?? resolvedReviewTarget.workflowQueueId ?? null,
+      pendingCount: reviewInboxPendingCount,
+      taskId: refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+      taskLabel: browserSamplingTaskLabel(refreshedSourceTask ?? sourceTask),
+      reviewStatus,
+      reviewMode,
+      selectedCount,
+      affectedCount,
+      skippedCount,
+      reviewInboxPendingCount,
+    });
+    state.opsMessage = browserCaptureReviewSuccessMessage({
+      reviewMode,
+      reviewStatus,
+      affectedCount,
+      skippedCount,
+      outcome: "next_review",
+    });
+    state.opsMessageTone = "success";
+    render();
+    return;
+  }
+
+  if (refreshedSourceTask?.taskId) {
+    upsertBrowserSamplingTask(refreshedSourceTask, { pinSelection: true });
+    state.selectedBrowserSamplingTaskId = refreshedSourceTask.taskId;
+    await navigateToBrowserSamplingTask(refreshedSourceTask, {
+      resetDraft: false,
+      revealLatestCaptureRun: false,
+    });
+  }
+  setLastBrowserCaptureReviewAction({
+    status: "success",
+    runId,
+    queueId: primaryQueueId,
+    action: workflowAction === "advance_next_review" ? "stay_current" : workflowAction,
+    reason: workflowAction === "advance_next_review" ? "review_queue_cleared" : workflowReason,
+    workflowRunId: resolvedReviewTarget.workflowRunId,
+    workflowQueueId: resolvedReviewTarget.workflowQueueId,
+    workflowTaskId: resolvedReviewTarget.workflowTaskId,
+    workflowItemProvided: resolvedReviewTarget.workflowItemProvided,
+    reviewResolution: resolvedReviewTarget.resolution,
+    postReviewTaskId: refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+    postReviewTaskLabel: browserSamplingTaskLabel(refreshedSourceTask ?? sourceTask),
+    postReviewRunId: null,
+    postReviewQueueId: null,
+    pendingCount: 0,
+    taskId: refreshedSourceTask?.taskId ?? sourceTask?.taskId ?? null,
+    taskLabel: browserSamplingTaskLabel(refreshedSourceTask ?? sourceTask),
+    reviewStatus,
+    reviewMode,
+    selectedCount,
+    affectedCount,
+    skippedCount,
+    reviewInboxPendingCount,
+  });
+  state.opsMessage = browserCaptureReviewSuccessMessage({
+    reviewMode,
+    reviewStatus,
+    affectedCount,
+    skippedCount,
+    outcome: "cleared",
+  });
+  state.opsMessageTone = "success";
+}
+
 async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask) {
-  const refreshResults = await Promise.allSettled([refreshData(), refreshOperationsWorkbench({ reloadFloor: true })]);
+  const refreshResults = await Promise.allSettled([
+    refreshData({
+      backgroundHydration: true,
+      preserveBrowserSamplingTaskId: task?.taskId ?? optimisticTask?.taskId ?? null,
+    }),
+  ]);
+  void refreshOperationsWorkbench({ reloadFloor: true }).catch(() => {});
   if (optimisticTask?.taskId && !(state.browserSamplingPackItems ?? []).some((item) => item.taskId === optimisticTask.taskId)) {
     upsertBrowserSamplingTask(optimisticTask, { pinSelection: true });
-  }
-  if (body?.captureRunId) {
-    await loadSelectedBrowserCaptureRunDetail(body.captureRunId);
-  }
-  if (task?.communityId) {
-    await navigateToEvidenceTarget(task.communityId, task.buildingId, task.floorNo);
   }
   const rejected = refreshResults.find((item) => item.status === "rejected");
   if (rejected) {
     throw rejected.reason instanceof Error ? rejected.reason : new Error("公开页面采样刷新失败。");
   }
+
+  const workflowAction = body?.workflow?.action ?? "stay_current";
+  const workflowReason = body?.workflow?.reason ?? "no_pending_task";
+  const refreshedSourceTask =
+    browserSamplingTaskById(task?.taskId) ??
+    optimisticTask ??
+    task;
+  const resolvedPostSubmitTask = resolvePostSubmitBrowserSamplingTask({
+    workflow: body?.workflow ?? {},
+    workflowAction,
+    sourceTask: task,
+    refreshedSourceTask,
+  });
+
+  if (workflowAction === "review_current_capture") {
+    const reviewTask = resolvedPostSubmitTask.task ?? refreshedSourceTask ?? task;
+    if (reviewTask?.taskId) {
+      await navigateToBrowserSamplingTask(reviewTask, {
+        resetDraft: false,
+        revealLatestCaptureRun: true
+      });
+    }
+    const reviewItems = currentPendingBrowserCaptureReviewItems();
+    const filledChannels = fillBrowserCaptureDraftFromAttentionByChannel(reviewItems);
+    updateLastBrowserCaptureSubmission({
+      workflowAction,
+      workflowReason,
+      workflowTaskId: resolvedPostSubmitTask.workflowTaskId,
+      workflowTaskProvided: resolvedPostSubmitTask.workflowTaskProvided,
+      postSubmitTaskResolution: resolvedPostSubmitTask.resolution,
+      postSubmitTaskId: reviewTask?.taskId ?? task?.taskId ?? null,
+      postSubmitTaskLabel: browserSamplingTaskLabel(reviewTask ?? task),
+      reviewPendingCount: browserCapturePendingAttentionCount(currentBrowserCaptureRun()),
+      reviewInboxPendingCount: Number(state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
+      autoFilledChannels: filledChannels,
+    });
+    render();
+    return;
+  }
+
+  if (workflowAction === "advance_next_capture") {
+    const nextTask = resolvedPostSubmitTask.task;
+    if (nextTask?.taskId) {
+      const shouldSwitchTask = currentBrowserSamplingTask()?.taskId !== nextTask.taskId;
+      if (shouldSwitchTask) {
+        selectBrowserSamplingTask(nextTask.taskId, {
+          resetDraft: true,
+        });
+      }
+      updateLastBrowserCaptureSubmission({
+        workflowAction,
+        workflowReason,
+        workflowTaskId: resolvedPostSubmitTask.workflowTaskId,
+        workflowTaskProvided: resolvedPostSubmitTask.workflowTaskProvided,
+        postSubmitTaskResolution: resolvedPostSubmitTask.resolution,
+        postSubmitTaskId: nextTask.taskId,
+        postSubmitTaskLabel: browserSamplingTaskLabel(nextTask),
+        reviewPendingCount: Number(body?.reviewSummary?.pendingCount ?? browserCapturePendingAttentionCount(optimisticTask)),
+        reviewInboxPendingCount: Number(state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
+        autoFilledChannels: [],
+      });
+      if (shouldSwitchTask) {
+        render();
+        await navigateToBrowserSamplingTask(nextTask, {
+          resetDraft: false,
+          revealLatestCaptureRun: false
+        });
+      }
+      render();
+      return;
+    }
+  }
+
+  if (refreshedSourceTask?.taskId) {
+    await navigateToBrowserSamplingTask(refreshedSourceTask, {
+      resetDraft: false,
+      revealLatestCaptureRun: false
+    });
+  }
+  updateLastBrowserCaptureSubmission({
+    workflowAction: "stay_current",
+    workflowReason: workflowAction === "advance_next_capture" ? "no_pending_task" : workflowReason,
+    workflowTaskId: resolvedPostSubmitTask.workflowTaskId,
+    workflowTaskProvided: resolvedPostSubmitTask.workflowTaskProvided,
+    postSubmitTaskResolution: resolvedPostSubmitTask.resolution,
+    postSubmitTaskId: refreshedSourceTask?.taskId ?? task?.taskId ?? null,
+    postSubmitTaskLabel: browserSamplingTaskLabel(refreshedSourceTask ?? task),
+    reviewPendingCount: browserCapturePendingAttentionCount(currentBrowserCaptureRun() ?? refreshedSourceTask ?? {}),
+    reviewInboxPendingCount: Number(state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
+    autoFilledChannels: [],
+  });
+  render();
 }
 
-async function loadSelectedBrowserCaptureRunDetail(runId) {
+async function loadSelectedBrowserCaptureRunDetail(runId, { preferredQueueId = null } = {}) {
   if (!runId) {
     state.selectedBrowserCaptureRunId = null;
     state.selectedBrowserCaptureRunDetail = null;
+    state.selectedBrowserCaptureReviewQueueId = null;
+    clearBrowserCaptureReviewBatchSelection();
     return null;
   }
   state.selectedBrowserCaptureRunId = runId;
@@ -5387,9 +6472,25 @@ async function loadSelectedBrowserCaptureRunDetail(runId) {
       throw new Error(body.detail || `公开页采样批次读取失败 (${response.status})`);
     }
     state.selectedBrowserCaptureRunDetail = body;
+    const reviewQueue = Array.isArray(body?.reviewQueue) ? body.reviewQueue : [];
+    const nextQueueId =
+      (preferredQueueId && reviewQueue.some((item) => item?.queueId === preferredQueueId) ? preferredQueueId : null) ??
+      reviewQueue.find((item) => String(item?.status ?? "pending") === "pending")?.queueId ??
+      reviewQueue[0]?.queueId ??
+      null;
+    const selectedQueueStillExists = reviewQueue.some((item) => item?.queueId === state.selectedBrowserCaptureReviewQueueId);
+    state.selectedBrowserCaptureReviewQueueId =
+      preferredQueueId && reviewQueue.some((item) => item?.queueId === preferredQueueId)
+        ? preferredQueueId
+        : selectedQueueStillExists
+          ? state.selectedBrowserCaptureReviewQueueId
+          : nextQueueId;
+    syncBrowserCaptureReviewBatchSelection(reviewQueue);
     return body;
   } catch (error) {
     state.selectedBrowserCaptureRunDetail = null;
+    state.selectedBrowserCaptureReviewQueueId = null;
+    clearBrowserCaptureReviewBatchSelection();
     state.opsMessage = error.message || "公开页采样批次读取失败。";
     state.opsMessageTone = "error";
     state.opsMessageContext = "sampling";
@@ -5423,6 +6524,8 @@ function ensureBrowserSamplingTaskSelection() {
     state.selectedBrowserSamplingTaskId = null;
     state.selectedBrowserCaptureRunId = null;
     state.selectedBrowserCaptureRunDetail = null;
+    state.selectedBrowserCaptureReviewQueueId = null;
+    clearBrowserCaptureReviewBatchSelection();
     resetBrowserCaptureDraft();
     return;
   }
@@ -5431,6 +6534,8 @@ function ensureBrowserSamplingTaskSelection() {
     state.selectedBrowserSamplingTaskId = tasks[0].taskId;
     state.selectedBrowserCaptureRunId = null;
     state.selectedBrowserCaptureRunDetail = null;
+    state.selectedBrowserCaptureReviewQueueId = null;
+    clearBrowserCaptureReviewBatchSelection();
     resetBrowserCaptureDraft();
   }
 }
@@ -5442,6 +6547,8 @@ function selectBrowserSamplingTask(taskId, { resetDraft = true } = {}) {
   state.selectedBrowserSamplingTaskId = taskId;
   state.selectedBrowserCaptureRunId = null;
   state.selectedBrowserCaptureRunDetail = null;
+  state.selectedBrowserCaptureReviewQueueId = null;
+  clearBrowserCaptureReviewBatchSelection();
   if (resetDraft) {
     resetBrowserCaptureDraft();
   }
@@ -5829,6 +6936,21 @@ function fillBrowserCaptureDraftFromAttention(item) {
   };
 }
 
+function fillBrowserCaptureDraftFromAttentionByChannel(items = []) {
+  const filledChannels = [];
+  const seenChannels = new Set();
+  items.forEach((item) => {
+    const channel = item?.businessType === "rent" ? "rent" : "sale";
+    if (seenChannels.has(channel)) {
+      return;
+    }
+    fillBrowserCaptureDraftFromAttention(item);
+    seenChannels.add(channel);
+    filledChannels.push(channel);
+  });
+  return filledChannels;
+}
+
 function buildBrowserCapturePayload(task) {
   const captures = ["sale", "rent"]
     .map((channel) => {
@@ -5897,16 +7019,9 @@ async function submitBrowserSamplingCapture(task) {
       state.selectedBaselineRunId = null;
     }
     const optimisticRun = buildOptimisticBrowserCaptureRun(task, body);
-    const optimisticTask = buildOptimisticBrowserSamplingTask(task, optimisticRun);
-    state.lastBrowserCaptureSubmission = {
-      status: "success",
-      taskId: task.taskId,
-      captureRunId: body.captureRunId ?? null,
-      importRunId: body.importRunId ?? null,
-      metricsRunId: body.metricsRun?.runId ?? null,
-      createdAt: optimisticRun.createdAt ?? new Date().toISOString(),
-      attentionCount: Number(optimisticRun.attentionCount ?? 0)
-    };
+    const optimisticTask = buildOptimisticBrowserSamplingTask(task, optimisticRun, body?.taskProgress ?? null);
+    state.lastBrowserCaptureSubmission = buildBrowserCaptureSubmission(task, body, optimisticRun, optimisticTask);
+    state.optimisticBrowserCaptureRunSummary = optimisticRun;
     state.selectedBrowserCaptureRunId = body.captureRunId ?? null;
     state.selectedBrowserCaptureRunDetail = null;
     upsertBrowserCaptureRunSummary(optimisticRun);
@@ -5935,6 +7050,133 @@ async function submitBrowserSamplingCapture(task) {
       state.busyBrowserSamplingSubmit = false;
       render();
     }
+  }
+}
+
+async function reviewBrowserCaptureQueueItem(runId, queueId, { status = "resolved", resolutionNotes = "" } = {}) {
+  if (!runId || !queueId) {
+    return;
+  }
+
+  state.busyBrowserCaptureReviewQueueId = queueId;
+  state.opsMessage = null;
+  state.opsMessageContext = "sampling";
+  render();
+
+  const sourceTask = currentBrowserSamplingTask();
+
+  try {
+    const response = await fetch(
+      `/api/browser-capture-runs/${encodeURIComponent(runId)}/review-queue/${encodeURIComponent(queueId)}`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+          resolutionNotes: resolutionNotes || undefined,
+          reviewOwner: "atlas-ui",
+        }),
+      }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `Browser capture review update failed with ${response.status}`);
+    }
+    await finalizeBrowserCaptureReviewAction(runId, payload, {
+      sourceTask,
+      reviewStatus: status,
+      reviewMode: "single",
+      selectedCount: 1,
+      affectedCount: 1,
+      skippedCount: 0,
+      queueId,
+    });
+  } catch (error) {
+    setLastBrowserCaptureReviewAction({
+      status: "error",
+      runId,
+      queueId,
+      message: error.message || "公开页采样复核失败。",
+      createdAt: new Date().toISOString(),
+    });
+    state.opsMessage = error.message || "公开页采样复核失败。";
+    state.opsMessageTone = "error";
+  } finally {
+    state.busyBrowserCaptureReviewQueueId = null;
+    render();
+  }
+}
+
+async function reviewBrowserCaptureQueueBatch(runId, queueIds, { status = "resolved", resolutionNotes = "" } = {}) {
+  const normalizedQueueIds = Array.from(
+    new Set(
+      (queueIds ?? [])
+        .map((queueId) => String(queueId || "").trim())
+        .filter(Boolean)
+    )
+  );
+  if (!runId || !normalizedQueueIds.length) {
+    return;
+  }
+
+  state.busyBrowserCaptureReviewBatch = true;
+  state.opsMessage = null;
+  state.opsMessageContext = "sampling";
+  render();
+
+  const sourceTask = currentBrowserSamplingTask();
+
+  try {
+    const response = await fetch(
+      `/api/browser-capture-runs/${encodeURIComponent(runId)}/review-queue/batch`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          queueIds: normalizedQueueIds,
+          status,
+          resolutionNotes: resolutionNotes || undefined,
+          reviewOwner: "atlas-ui",
+        }),
+      }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `Browser capture review batch update failed with ${response.status}`);
+    }
+
+    const affectedCount = Array.isArray(payload?.updatedQueueItems) ? payload.updatedQueueItems.length : 0;
+    const skippedCount = Array.isArray(payload?.skippedQueueItems) ? payload.skippedQueueItems.length : 0;
+    clearBrowserCaptureReviewBatchSelection();
+    await finalizeBrowserCaptureReviewAction(runId, payload, {
+      sourceTask,
+      reviewStatus: status,
+      reviewMode: "batch",
+      selectedCount: normalizedQueueIds.length,
+      affectedCount,
+      skippedCount,
+      queueId: normalizedQueueIds[0] ?? null,
+    });
+  } catch (error) {
+    setLastBrowserCaptureReviewAction({
+      status: "error",
+      runId,
+      queueId: normalizedQueueIds[0] ?? null,
+      message: error.message || "公开页采样批量复核失败。",
+      createdAt: new Date().toISOString(),
+      reviewMode: "batch",
+    });
+    state.opsMessage = error.message || "公开页采样批量复核失败。";
+    state.opsMessageTone = "error";
+  } finally {
+    state.busyBrowserCaptureReviewBatch = false;
+    render();
   }
 }
 
@@ -7037,8 +8279,10 @@ function renderRanking() {
                       <span class="source-pill">已采 ${item.captureHistoryCount} 次</span>
                       <span class="source-pill">最近 ${formatTimestamp(item.latestCaptureAt)}</span>
                       ${
-                        item.latestCaptureAttentionCount
-                          ? `<span class="source-pill">attention ${item.latestCaptureAttentionCount}</span>`
+                        browserCapturePendingAttentionCount(item)
+                          ? `<span class="source-pill">待复核 ${browserCapturePendingAttentionCount(item)}</span>`
+                          : item.latestCaptureAttentionCount
+                            ? `<span class="source-pill">raw attention ${item.latestCaptureAttentionCount}</span>`
                           : `<span class="source-pill">已并入 ${item.latestCaptureImportRunId ?? "最新批次"}</span>`
                       }
                     </div>
@@ -7313,6 +8557,18 @@ function renderOperations() {
   const selectedRunDetail = state.selectedImportRunDetail;
   const selectedGeoRunId = state.selectedGeoAssetRunId;
   const selectedGeoRunDetail = state.selectedGeoAssetRunDetail;
+  const operationsHistoryTabs = ["reference", "import", "metrics", "geo"];
+  const operationsDetailTabs = ["geo", "import", "sources"];
+  const operationsQualityTabs = ["workbench", "coverage", "queue", "anchor"];
+  if (!operationsHistoryTabs.includes(state.operationsHistoryTab)) {
+    state.operationsHistoryTab = "reference";
+  }
+  if (!operationsDetailTabs.includes(state.operationsDetailTab)) {
+    state.operationsDetailTab = "geo";
+  }
+  if (!operationsQualityTabs.includes(state.operationsQualityTab)) {
+    state.operationsQualityTab = "workbench";
+  }
   const referenceRuns = operationsOverview?.referenceRuns ?? [];
   const postgresReady = runtimeConfig.hasPostgresDsn;
   const postgresLabel = runtimeConfig.postgresDsnMasked ?? "未配置 POSTGRES_DSN";
@@ -7361,6 +8617,44 @@ function renderOperations() {
     : postgresReady && summary.databaseConnected
     ? "数据库已连通，但建议先完成本地 Bootstrap 再同步 metrics 表。"
     : "当前只刷新 staged metrics run，统一离线研究口径。";
+  const anchoredCommunityCount = Number(summary.anchoredCommunityCount ?? 0);
+  const cityCommunityCount = Number(summary.cityCommunityCount ?? 0);
+  const anchoredCommunityPct = cityCommunityCount
+    ? (anchoredCommunityCount / cityCommunityCount) * 100
+    : Number(summary.anchoredCommunityPct ?? 0);
+  const readySourceCount = Number(summary.readySourceCount ?? sourceHealth.length);
+  const sourceCount = Number(summary.sourceCount ?? sourceHealth.length);
+  const reviewQueueCount = Number(summary.reviewQueueCount ?? 0);
+  const browserCaptureRunCount = Number(summary.browserCaptureRunCount ?? 0);
+  const pendingAnchorCount = Number(summary.pendingAnchorCount ?? Math.max(cityCommunityCount - anchoredCommunityCount, 0));
+  const providerPendingCount = Math.max(sourceCount - readySourceCount, 0);
+  const samplingTaskCount = Number(state.browserSamplingPackItems?.length ?? 0);
+  const prioritySamplingCount = (state.browserSamplingPackItems ?? []).filter((item) => item.focusScope === "priority").length;
+  const geoOpenTaskCount = Number(summary.geoAssetOpenTaskCount ?? geoAssetRuns.reduce((sum, item) => sum + (item.openTaskCount ?? 0), 0));
+  const geoCriticalTaskCount = Number(summary.geoAssetCriticalTaskCount ?? selectedGeoRunDetail?.taskSummary?.criticalOpenTaskCount ?? 0);
+  const geoLinkedTaskCount = Number(summary.geoAssetWatchlistLinkedTaskCount ?? selectedGeoRunDetail?.taskSummary?.watchlistLinkedTaskCount ?? 0);
+  const importRunCount = Number(summary.importRunCount ?? importRuns.length);
+  const referenceRunCount = Number(summary.referenceRunCount ?? referenceRuns.length);
+  const metricsRunCount = Number(summary.metricsRunCount ?? metricsRuns.length);
+  const geoAssetRunCount = Number(summary.geoAssetRunCount ?? geoAssetRuns.length);
+  const latestBootstrapLabel = summary.latestBootstrapAt ? formatTimestamp(summary.latestBootstrapAt) : "暂无";
+  const latestAnchorLabel = summary.latestAnchorReviewAt ? formatTimestamp(summary.latestAnchorReviewAt) : "暂无";
+  const latestMetricsLabel = summary.latestMetricsRefreshAt ? formatTimestamp(summary.latestMetricsRefreshAt) : "待刷新";
+  const overviewStatusHint = `${dataModeHint}。`;
+  const bootstrapActionHint = postgresReady ? "先把本地库引导成可主读，再切数据库口径。" : "先配置 POSTGRES_DSN，再打开数据库主读。";
+  const metricsActionHint = canWriteMetricsToDatabase
+    ? "可只刷 staged，也可同步 PostgreSQL。"
+    : postgresReady && summary.databaseConnected
+    ? "先做 Bootstrap，再同步 metrics 表。"
+    : "当前只刷新 staged。";
+  const stagedMetricsSummary =
+    summary.activeDataMode === "database"
+      ? `${summary.databaseSaleListingCount ?? 0} sale / ${summary.databaseRentListingCount ?? 0} rent`
+      : `${metricsRunCount} 个 staged metrics run`;
+  const providerHint = providerPendingCount ? `待补凭证 ${providerPendingCount} 个。` : "链路已就绪。";
+  const coverageHint = pendingAnchorCount ? `待补锚点 ${pendingAnchorCount} 个。` : cityCommunityCount ? "已全部挂图。" : "等待首批锚点。";
+  const samplingHint = `${browserCaptureRunCount} 次公开页采样${prioritySamplingCount ? ` · 重点区 ${prioritySamplingCount}` : ""}`;
+  const batchHint = `批次 ${referenceRunCount}/${importRunCount}/${metricsRunCount}/${geoAssetRunCount}`;
 
   opsSummary.innerHTML = `
     ${
@@ -7368,140 +8662,103 @@ function renderOperations() {
         ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
         : ""
     }
-    <article class="metric mini">
-      <span class="metric-label">数据模式</span>
-      <strong>${dataModeLabel}</strong>
-      <small>${dataModeHint}</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">本地数据库</span>
-      <strong>${databaseStatusLabel}</strong>
-      <small>${databaseStatusHint}</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">最近引导</span>
-      <strong>${summary.latestBootstrapAt ? formatTimestamp(summary.latestBootstrapAt) : "暂无"}</strong>
-      <small>${postgresLabel}</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">Provider</span>
-      <strong>${summary.readySourceCount}/${summary.sourceCount}</strong>
-      <small>离线接入 / 凭证位 readiness</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">小区挂图</span>
-      <strong>${summary.anchoredCommunityCount ?? 0}/${summary.cityCommunityCount ?? 0}</strong>
-      <small>${Number(summary.anchoredCommunityPct ?? 0).toFixed(1)}% 已锚定</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">待补锚点</span>
-      <strong>${Math.max((summary.cityCommunityCount ?? 0) - (summary.anchoredCommunityCount ?? 0), 0)}</strong>
-      <small>优先补重点区与高价值小区</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">最近确认</span>
-      <strong>${summary.latestAnchorReviewAt ? formatTimestamp(summary.latestAnchorReviewAt) : "暂无"}</strong>
-      <small>${summary.pendingAnchorCount ?? 0} 个仍在预锚点评估中</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">采样任务</span>
-      <strong>${state.browserSamplingPackItems?.length ?? 0}</strong>
-      <small>${summary.browserCaptureRunCount ?? 0} 次公开页采样 · ${(state.browserSamplingPackItems ?? []).filter((item) => item.focusScope === "priority").length} 个重点区任务</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">归一均值</span>
-      <strong>${summary.avgNormalizationPct}%</strong>
-      <small>当前 staging 队列的归一完成率</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">待复核</span>
-      <strong>${summary.reviewQueueCount}</strong>
-      <small>重点盯单元和门牌</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">导入批次</span>
-      <strong>${summary.importRunCount ?? 0}</strong>
-      <small>staging 离线批次</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">主档批次</span>
-      <strong>${summary.referenceRunCount ?? referenceRuns.length}</strong>
-      <small>${summary.latestReferencePersistAt ? `最近写库 ${formatTimestamp(summary.latestReferencePersistAt)}` : "等待首轮 reference 落库"}</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">全市覆盖</span>
-      <strong>${Number(summary.cityCoveragePct ?? 0).toFixed(1)}%</strong>
-      <small>${summary.sampleFreshness ? `样本更新 ${formatTimestamp(summary.sampleFreshness)}` : "等待真实 listing 落库"}</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">几何批次</span>
-      <strong>${summary.geoAssetRunCount ?? geoAssetRuns.length}</strong>
-      <small>${summary.latestGeoPersistAt ? `最近写库 ${formatTimestamp(summary.latestGeoPersistAt)}` : `staging 覆盖 ${summary.geoAssetCoveragePct ?? 0}% / DB ${Number(summary.buildingCoveragePct ?? 0).toFixed(1)}%`}</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">几何待处理</span>
-      <strong>${summary.geoAssetOpenTaskCount ?? geoAssetRuns.reduce((sum, item) => sum + (item.openTaskCount ?? 0), 0)}</strong>
-      <small>缺口补采与未命中复核</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">几何紧急</span>
-      <strong>${summary.geoAssetCriticalTaskCount ?? selectedGeoRunDetail?.taskSummary?.criticalOpenTaskCount ?? 0}</strong>
-      <small>优先处理会影响楼层榜定位的任务</small>
-    </article>
-    <article class="metric mini">
-      <span class="metric-label">榜单关联</span>
-      <strong>${summary.geoAssetWatchlistLinkedTaskCount ?? selectedGeoRunDetail?.taskSummary?.watchlistLinkedTaskCount ?? 0}</strong>
-      <small>已挂到持续套利楼层榜的几何缺口</small>
-    </article>
-    <article class="metric mini metric-action">
-      <span class="metric-label">指标快照</span>
-      <strong>${summary.latestMetricsRefreshAt ? formatTimestamp(summary.latestMetricsRefreshAt) : "待刷新"}</strong>
-      <small>${
-        summary.activeDataMode === "database"
-          ? `${summary.databaseSaleListingCount ?? 0} sale / ${summary.databaseRentListingCount ?? 0} rent`
-          : `${summary.metricsRunCount ?? metricsRuns.length} 个 staged metrics run`
-      }</small>
-      <div class="comparison-strip">
-        <span class="source-pill">staged ${stagedMetricsLabel}</span>
-        <span class="source-pill">${postgresReady ? `db ${databaseMetricsLabel}` : "db 未配置"}</span>
+    <article class="ops-overview-hero">
+      <div class="ops-overview-head">
+        <span class="ops-overview-kicker">运行态势</span>
+        <strong>${dataModeLabel} · ${databaseStatusLabel}</strong>
+        <p>${overviewStatusHint}</p>
+        <div class="comparison-strip">
+          <span class="source-pill">Provider ${readySourceCount}/${sourceCount}</span>
+          <span class="source-pill">挂图 ${anchoredCommunityCount}/${cityCommunityCount}</span>
+          <span class="source-pill">待复核 ${reviewQueueCount}</span>
+          <span class="source-pill">采样任务 ${samplingTaskCount}</span>
+        </div>
       </div>
-      <small>${metricsStatusHint}</small>
-      <div class="metric-action-buttons">
-        <button
-          class="action compact primary"
-          data-refresh-metrics
-          ${state.busyMetricsRefresh ? "disabled" : ""}
-          title="生成一批新的 staged metrics run，统一当前研究口径。"
-        >
-          ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "staged" ? "刷新中..." : "刷新 staged"}
-        </button>
-        ${
-          postgresReady
-            ? `
-              <button
-                class="action compact"
-                data-refresh-metrics-postgres
-                ${state.busyMetricsRefresh || !canWriteMetricsToDatabase ? "disabled" : ""}
-                title="${
-                  canWriteMetricsToDatabase
-                    ? "基于同一轮快照同时写入 PostgreSQL metrics 表。"
-                    : "先完成本地 Bootstrap，让数据库具备可写的基础表与首轮数据。"
-                }"
-              >
-                ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "postgres" ? "写库中..." : "同步 PostgreSQL"}
-              </button>
-            `
-            : ""
-        }
+      <div class="ops-overview-stat-grid">
+        <article class="ops-overview-stat tone-live">
+          <span>最近指标快照</span>
+          <strong>${latestMetricsLabel}</strong>
+          <small>${stagedMetricsSummary}</small>
+        </article>
+        <article class="ops-overview-stat">
+          <span>最近引导</span>
+          <strong>${latestBootstrapLabel}</strong>
+          <small>${postgresLabel}</small>
+        </article>
       </div>
     </article>
-    <article class="metric mini metric-action">
-      <span class="metric-label">一键引导</span>
-      <strong>${postgresReady ? "reference → import → geo → metrics" : "等待 DSN"}</strong>
-      <small>${postgresReady ? "建议首次直接跑本地 bootstrap。" : "先配置 POSTGRES_DSN；当前也可以先用 staged metrics run 保持研究口径统一。"}</small>
-      <button class="action compact primary" data-database-bootstrap ${postgresReady ? "" : "disabled"}>
-        ${state.busyBootstrapDatabase ? "引导中..." : "本地 Bootstrap"}
-      </button>
+    <article class="ops-overview-card ops-overview-card--coverage">
+      <span class="ops-overview-kicker">地图覆盖</span>
+      <strong>${anchoredCommunityCount}/${cityCommunityCount}</strong>
+      <p>${anchoredCommunityPct.toFixed(1)}% 已锚定</p>
+      <small>${coverageHint} 最近确认 ${latestAnchorLabel}。</small>
+    </article>
+    <article class="ops-overview-card ops-overview-card--sampling">
+      <span class="ops-overview-kicker">采样与复核</span>
+      <strong>${reviewQueueCount}</strong>
+      <p>重点盯单元、门牌和 attention 队列</p>
+      <small>${samplingTaskCount} 个采样任务 · ${samplingHint}</small>
+    </article>
+    <article class="ops-overview-card ops-overview-card--geo">
+      <span class="ops-overview-kicker">几何补采</span>
+      <strong>${geoOpenTaskCount}</strong>
+      <p>缺口补采与未命中复核待处理</p>
+      <small>紧急 ${geoCriticalTaskCount} · 榜单关联 ${geoLinkedTaskCount}</small>
+    </article>
+    <article class="ops-overview-card ops-overview-card--pipeline">
+      <span class="ops-overview-kicker">数据链路</span>
+      <strong>${readySourceCount}/${sourceCount}</strong>
+      <p>provider readiness 与落地批次</p>
+      <small>${providerHint} ${batchHint}</small>
+    </article>
+    <article class="ops-overview-card ops-overview-card--action">
+      <div class="ops-overview-action-grid">
+        <section class="ops-overview-action-block">
+          <span class="ops-overview-kicker">引导</span>
+          <strong>${postgresReady ? "reference → import → geo → metrics" : "等待 DSN"}</strong>
+          <p>${bootstrapActionHint}</p>
+          <button class="action compact primary" data-database-bootstrap ${postgresReady ? "" : "disabled"}>
+            ${state.busyBootstrapDatabase ? "引导中..." : "本地 Bootstrap"}
+          </button>
+        </section>
+        <section class="ops-overview-action-block">
+          <span class="ops-overview-kicker">刷新</span>
+          <strong>${latestMetricsLabel}</strong>
+          <p>${metricsActionHint}</p>
+          <div class="comparison-strip">
+            <span class="source-pill">staged ${stagedMetricsLabel}</span>
+            <span class="source-pill">${postgresReady ? `db ${databaseMetricsLabel}` : "db 未配置"}</span>
+          </div>
+          <div class="metric-action-buttons ops-overview-button-row">
+            <button
+              class="action compact primary"
+              data-refresh-metrics
+              ${state.busyMetricsRefresh ? "disabled" : ""}
+              title="生成一批新的 staged metrics run，统一当前研究口径。"
+            >
+              ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "staged" ? "刷新中..." : "刷新 staged"}
+            </button>
+            ${
+              postgresReady
+                ? `
+                  <button
+                    class="action compact"
+                    data-refresh-metrics-postgres
+                    ${state.busyMetricsRefresh || !canWriteMetricsToDatabase ? "disabled" : ""}
+                    title="${
+                      canWriteMetricsToDatabase
+                        ? "基于同一轮快照同时写入 PostgreSQL metrics 表。"
+                        : "先完成本地 Bootstrap，让数据库具备可写的基础表与首轮数据。"
+                    }"
+                  >
+                    ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "postgres" ? "写库中..." : "同步 PostgreSQL"}
+                  </button>
+                `
+                : ""
+            }
+          </div>
+        </section>
+      </div>
     </article>
   `;
 
@@ -7728,7 +8985,7 @@ function renderOperations() {
       ${
         selectedGeoRunDetail.comparison
           ? `
-            <article class="import-run-section">
+            <article class="import-run-section" data-browser-capture-current-task-runs="true">
               <div class="breakdown-top">
                 <strong>相对基线几何批次的变化</strong>
                 <span class="badge">${selectedGeoRunDetail.comparison.baselineBatchName}</span>
@@ -8256,7 +9513,7 @@ function renderOperations() {
       ${
         selectedRunDetail.comparison
           ? `
-            <article class="import-run-section">
+            <article class="import-run-section" data-browser-capture-recent-runs="true">
               <div class="breakdown-top">
                 <strong>相对基线批次的变化</strong>
                 <span class="badge">${selectedRunDetail.comparison.baselineBatchName}</span>
@@ -8394,6 +9651,10 @@ function renderOperations() {
   const selectedSamplingTask = currentBrowserSamplingTask();
   const selectedCaptureRunDetail = currentBrowserCaptureRun();
   const currentCaptureSubmission = currentBrowserCaptureSubmission();
+  const currentReviewAction = currentBrowserCaptureReviewAction();
+  const pendingReviewItems = (selectedCaptureRunDetail?.reviewQueue ?? []).filter((item) => String(item?.status ?? "pending") === "pending");
+  const selectedReviewQueueIds = currentBrowserCaptureReviewBatchSelection(selectedCaptureRunDetail?.reviewQueue ?? []);
+  const reviewHistoryItems = (selectedCaptureRunDetail?.reviewQueue ?? []).filter((item) => String(item?.status ?? "pending") !== "pending");
   const taskCaptureRuns = selectedSamplingTask
     ? getBrowserCaptureRunItems(4, {
         taskId: selectedSamplingTask.taskId,
@@ -8405,6 +9666,10 @@ function renderOperations() {
   });
   const browserSamplingCoverage = browserSamplingCoveragePayload();
   const workbenchQueue = getBrowserSamplingWorkbenchQueue(selectedSamplingTask);
+  const reviewInboxQueue = getBrowserReviewInboxQueue(selectedSamplingTask);
+  const reviewInboxSummary = state.browserReviewInboxSummary ?? browserReviewInboxSummaryFallback();
+  const currentReviewInboxItemId = currentBrowserReviewInboxItemId();
+  const reviewBatchBusy = state.busyBrowserCaptureReviewBatch || Boolean(state.busyBrowserCaptureReviewQueueId);
 
   browserSamplingWorkbench.innerHTML = selectedSamplingTask
     ? `
@@ -8476,7 +9741,7 @@ function renderOperations() {
           currentCaptureSubmission
             ? `
               <article
-                class="ops-feedback success browser-capture-result"
+                class="ops-feedback success browser-capture-result browser-post-submit-relay"
                 data-browser-capture-result="success"
                 data-browser-capture-result-task-id="${currentCaptureSubmission.taskId}"
                 data-browser-capture-result-import-run-id="${currentCaptureSubmission.importRunId ?? ""}"
@@ -8484,8 +9749,91 @@ function renderOperations() {
                 data-browser-capture-result-metrics-run-id="${currentCaptureSubmission.metricsRunId ?? ""}"
                 data-browser-capture-result-created-at="${currentCaptureSubmission.createdAt ?? ""}"
                 data-browser-capture-result-attention-count="${currentCaptureSubmission.attentionCount ?? 0}"
+                data-browser-post-submit-action="${currentCaptureSubmission.workflowAction ?? "stay_current"}"
+                data-browser-post-submit-task-id="${currentCaptureSubmission.postSubmitTaskId ?? currentCaptureSubmission.taskId ?? ""}"
+                data-browser-post-submit-workflow-task-id="${currentCaptureSubmission.workflowTaskId ?? ""}"
+                data-browser-post-submit-workflow-task-provided="${currentCaptureSubmission.workflowTaskProvided ? "true" : "false"}"
+                data-browser-post-submit-resolution="${currentCaptureSubmission.postSubmitTaskResolution ?? ""}"
+                data-browser-post-submit-attention-count="${currentCaptureSubmission.attentionCount ?? 0}"
+                data-browser-post-submit-source-task-id="${currentCaptureSubmission.taskId ?? ""}"
+                data-browser-post-submit-reason="${currentCaptureSubmission.workflowReason ?? ""}"
+                data-browser-post-submit-status="${currentCaptureSubmission.taskProgress?.status ?? ""}"
               >
-                最近一次写入：${currentCaptureSubmission.importRunId ?? currentCaptureSubmission.captureRunId ?? "已提交"}${currentCaptureSubmission.metricsRunId ? ` · metrics ${currentCaptureSubmission.metricsRunId}` : ""}${currentCaptureSubmission.attentionCount ? ` · attention ${currentCaptureSubmission.attentionCount}` : " · attention 0"}
+                <div class="breakdown-top">
+                  <strong>采样接力条</strong>
+                  <span class="badge">${browserSamplingWorkflowActionLabel(currentCaptureSubmission.workflowAction)}</span>
+                </div>
+                <p>
+                  已写入 ${currentCaptureSubmission.taskLabel ?? "当前任务"} ·
+                  ${currentCaptureSubmission.importRunId ?? currentCaptureSubmission.captureRunId ?? "已提交"}
+                  ${currentCaptureSubmission.metricsRunId ? ` · metrics ${currentCaptureSubmission.metricsRunId}` : ""}
+                  ${currentCaptureSubmission.attentionCount ? ` · raw attention ${currentCaptureSubmission.attentionCount}` : " · raw attention 0"}
+                </p>
+                <div class="comparison-strip">
+                  <span class="source-pill">${browserSamplingProgressLabel(currentCaptureSubmission.taskProgress)}</span>
+                  <span class="source-pill">${browserSamplingTaskStatusLabel(currentCaptureSubmission.taskProgress?.status)}</span>
+                  <span class="source-pill">待复核 ${currentCaptureSubmission.reviewPendingCount ?? 0}</span>
+                  <span class="source-pill">收件箱 ${currentCaptureSubmission.reviewInboxPendingCount ?? reviewInboxSummary.pendingQueueCount ?? 0}</span>
+                  <span class="source-pill">当前接力 ${currentCaptureSubmission.postSubmitTaskLabel ?? currentCaptureSubmission.taskLabel ?? "当前任务"}</span>
+                  <span class="source-pill">${browserSamplingPostSubmitResolutionLabel(currentCaptureSubmission.postSubmitTaskResolution)}</span>
+                  ${
+                    (currentCaptureSubmission.autoFilledChannels ?? []).length
+                      ? `<span class="source-pill">已预填 ${(currentCaptureSubmission.autoFilledChannels ?? [])
+                          .map((channel) => (channel === "rent" ? "Rent" : "Sale"))
+                          .join(" / ")}</span>`
+                      : ""
+                  }
+                </div>
+                <small>${browserSamplingWorkflowReasonLabel(currentCaptureSubmission.workflowReason)}</small>
+              </article>
+            `
+            : ""
+        }
+        ${
+          currentReviewAction
+            ? `
+              <article
+                class="ops-feedback success browser-capture-result browser-post-submit-relay browser-review-relay"
+                data-browser-review-action="${currentReviewAction.action ?? "stay_current"}"
+                data-browser-review-run-id="${currentReviewAction.runId ?? ""}"
+                data-browser-review-queue-id="${currentReviewAction.queueId ?? ""}"
+                data-browser-review-workflow-run-id="${currentReviewAction.workflowRunId ?? ""}"
+                data-browser-review-workflow-queue-id="${currentReviewAction.workflowQueueId ?? ""}"
+                data-browser-review-workflow-task-id="${currentReviewAction.workflowTaskId ?? ""}"
+                data-browser-review-workflow-item-provided="${currentReviewAction.workflowItemProvided ? "true" : "false"}"
+                data-browser-review-resolution="${currentReviewAction.reviewResolution ?? ""}"
+                data-browser-review-reason="${currentReviewAction.reason ?? ""}"
+                data-browser-review-target-task-id="${currentReviewAction.postReviewTaskId ?? ""}"
+                data-browser-review-target-run-id="${currentReviewAction.postReviewRunId ?? ""}"
+                data-browser-review-target-queue-id="${currentReviewAction.postReviewQueueId ?? ""}"
+                data-browser-review-pending-count="${currentReviewAction.pendingCount ?? 0}"
+                data-browser-review-batch-affected-count="${currentReviewAction.reviewMode === "batch" ? currentReviewAction.affectedCount ?? 0 : 0}"
+                data-browser-review-batch-skipped-count="${currentReviewAction.reviewMode === "batch" ? currentReviewAction.skippedCount ?? 0 : 0}"
+                data-browser-review-batch-status="${currentReviewAction.reviewMode === "batch" ? currentReviewAction.reviewStatus ?? "" : ""}"
+              >
+                <div class="breakdown-top">
+                  <strong>复核接力条</strong>
+                  <span class="badge">${browserCaptureReviewActionLabel(currentReviewAction.action)}</span>
+                </div>
+                <p>
+                  ${currentReviewAction.reviewMode === "batch" ? "已批量处理" : "已处理"} ${currentReviewAction.taskLabel ?? "当前任务"} ·
+                  ${browserCaptureReviewStatusLabel(currentReviewAction.reviewStatus)} ·
+                  run ${currentReviewAction.runId}
+                </p>
+                <div class="comparison-strip">
+                  ${
+                    currentReviewAction.reviewMode === "batch"
+                      ? `<span class="source-pill">选中 ${currentReviewAction.selectedCount ?? 0}</span>
+                         <span class="source-pill">成功 ${currentReviewAction.affectedCount ?? 0}</span>
+                         <span class="source-pill">跳过 ${currentReviewAction.skippedCount ?? 0}</span>`
+                      : `<span class="source-pill">队列 ${currentReviewAction.queueId ?? "待补"}</span>`
+                  }
+                  <span class="source-pill">剩余待复核 ${currentReviewAction.pendingCount ?? 0}</span>
+                  <span class="source-pill">收件箱 ${currentReviewAction.reviewInboxPendingCount ?? reviewInboxSummary.pendingQueueCount ?? 0}</span>
+                  <span class="source-pill">当前接力 ${currentReviewAction.postReviewTaskLabel ?? currentReviewAction.taskLabel ?? "当前任务"}</span>
+                  <span class="source-pill">${browserCaptureReviewResolutionLabel(currentReviewAction.reviewResolution)}</span>
+                </div>
+                <small>${browserCaptureReviewReasonLabel(currentReviewAction.reason)}</small>
               </article>
             `
             : ""
@@ -8502,13 +9850,61 @@ function renderOperations() {
               : `<span class="source-pill">还没有公开页原文</span>`
           }
           ${
-            selectedSamplingTask.latestCaptureAttentionCount
-              ? `<span class="source-pill">attention ${selectedSamplingTask.latestCaptureAttentionCount}</span>`
+            browserCapturePendingAttentionCount(selectedSamplingTask)
+              ? `<span class="source-pill">待复核 ${browserCapturePendingAttentionCount(selectedSamplingTask)}</span>`
+              : selectedSamplingTask.latestCaptureAttentionCount
+                ? `<span class="source-pill">raw attention ${selectedSamplingTask.latestCaptureAttentionCount}</span>`
               : ""
           }
         </div>
         <div class="capture-workbench-layout">
           <div class="capture-form-column">
+            <article
+              class="import-run-section browser-task-queue-panel browser-review-inbox-panel"
+              data-browser-review-inbox-count="${reviewInboxSummary.pendingQueueCount ?? 0}"
+            >
+              <div class="breakdown-top">
+                <strong>全局待复核收件箱</strong>
+                <span class="badge">${reviewInboxQueue.previewItems.length}</span>
+              </div>
+              <div class="comparison-strip">
+                <span class="source-pill">当前区 ${reviewInboxQueue.districtItems.length}</span>
+                <span class="source-pill">全局 ${reviewInboxSummary.pendingQueueCount ?? 0}</span>
+                <span class="source-pill">任务 ${reviewInboxSummary.pendingTaskCount ?? 0}</span>
+              </div>
+              ${
+                reviewInboxQueue.previewItems.length
+                  ? `
+                    <div class="browser-task-queue">
+                      ${reviewInboxQueue.previewItems
+                        .map(
+                          (item) => `
+                            <article
+                              class="browser-task-queue-item browser-review-inbox-item ${item.inboxItemId === currentReviewInboxItemId ? "is-active" : ""}"
+                              data-browser-review-inbox-item-id="${item.inboxItemId}"
+                              data-browser-review-inbox-run-id="${item.runId}"
+                              data-browser-review-inbox-queue-id="${item.queueId}"
+                              data-browser-review-inbox-task-id="${item.taskId ?? ""}"
+                            >
+                              <div class="breakdown-top">
+                                <strong>${item.taskLabel ?? browserSamplingTaskLabel(item)}</strong>
+                                <span class="trace-status needs_review">${item.businessTypeLabel ?? item.businessType ?? "原文"} · ${(item.attention ?? []).length} 项</span>
+                              </div>
+                              <p>${item.districtName ?? "未知行政区"} · run ${item.runId} · ${item.sourceListingId ?? "待补"}</p>
+                              <small>${(item.attention ?? []).join(" / ") || "待复核 attention"}${item.publishedAt ? ` · ${item.publishedAt}` : ""}</small>
+                            </article>
+                          `
+                        )
+                        .join("")}
+                    </div>
+                  `
+                  : `<p class="helper-text">${
+                      reviewInboxSummary.pendingQueueCount
+                        ? "当前区没有待复核条目，系统会在需要时自动退到全局收件箱。"
+                        : "当前没有待复核条目，可以继续补样。"
+                    }</p>`
+              }
+            </article>
             <article class="import-run-section browser-task-queue-panel">
               <div class="breakdown-top">
                 <strong>连续补样快捷台</strong>
@@ -8516,13 +9912,13 @@ function renderOperations() {
               </div>
               <div class="comparison-strip">
                 <span class="source-pill">同区待办 ${workbenchQueue.districtTasks.length}</span>
-                <span class="source-pill">待复核 ${workbenchQueue.districtTasks.filter((task) => browserSamplingCoverageState(task) === "needs_review").length}</span>
+                <span class="source-pill">待复核 ${workbenchQueue.reviewDistrictCount}</span>
                 <span class="source-pill">待采样/补采 ${workbenchQueue.districtTasks.filter((task) => ["needs_capture", "in_progress"].includes(browserSamplingCoverageState(task))).length}</span>
               </div>
               <div class="action-row compact browser-task-actions">
                 <button class="action compact" data-browser-workbench-copy-brief="${selectedSamplingTask.taskId}">复制整包采样指令</button>
                 <button class="action compact" data-browser-workbench-next-district="${workbenchQueue.nextDistrictTask?.taskId ?? ""}" ${workbenchQueue.nextDistrictTask ? "" : "disabled"}>下一个同区任务</button>
-                <button class="action compact" data-browser-workbench-next-review="${workbenchQueue.nextReviewTask?.taskId ?? ""}" ${workbenchQueue.nextReviewTask ? "" : "disabled"}>下一个待复核</button>
+                <button class="action compact" data-browser-workbench-next-review="${workbenchQueue.nextReviewTask?.taskId ?? ""}" data-browser-workbench-next-review-run-id="${workbenchQueue.nextReviewItem?.runId ?? ""}" data-browser-workbench-next-review-queue-id="${workbenchQueue.nextReviewItem?.queueId ?? ""}" ${workbenchQueue.nextReviewTask ? "" : "disabled"}>下一个待复核</button>
                 <button class="action compact" data-browser-workbench-next-capture="${workbenchQueue.nextCaptureTask?.taskId ?? ""}" ${workbenchQueue.nextCaptureTask ? "" : "disabled"}>下一个待采样</button>
               </div>
               ${
@@ -8645,7 +10041,7 @@ function renderOperations() {
             </div>
           </div>
           <div class="capture-side-column">
-            <article class="import-run-section">
+            <article class="import-run-section" data-browser-capture-current-task-runs="true">
           <div class="breakdown-top">
             <strong>当前任务最近采样</strong>
             <span class="badge">${taskCaptureRuns.length}</span>
@@ -8659,12 +10055,14 @@ function renderOperations() {
                         <article class="import-run-evidence ${selectedCaptureRunDetail?.runId === run.runId ? "is-related" : ""}" data-browser-capture-run-id="${run.runId}" data-browser-capture-import-run-id="${run.importRunId ?? ""}" data-browser-capture-metrics-run-id="${run.metricsRunId ?? ""}" data-community-id="${run.communityId ?? ""}" data-building-id="${run.buildingId ?? ""}" data-floor-no="${run.floorNo ?? ""}">
                           <div class="breakdown-top">
                             <strong>${run.communityName}${run.buildingName ? ` · ${run.buildingName}` : ""}${run.floorNo != null ? ` · ${run.floorNo}层` : ""}</strong>
-                            <span class="trace-status ${run.attentionCount ? "needs_review" : "captured"}">${run.attentionCount ? "含 attention" : "已导入"}</span>
+                            <span class="trace-status ${browserCapturePendingAttentionCount(run) ? "needs_review" : "captured"}">${browserCapturePendingAttentionCount(run) ? "待复核" : "已导入"}</span>
                           </div>
                           <p>${formatTimestamp(run.createdAt)} · 原文 ${run.captureCount} 条 · Sale ${run.saleCaptureCount} / Rent ${run.rentCaptureCount}</p>
                           <small>${
-                            run.attentionCount
-                              ? `${run.attentionCount} 条需要回看原文`
+                            browserCapturePendingAttentionCount(run)
+                              ? `待复核 ${browserCapturePendingAttentionCount(run)} 条 · 已修正 ${browserCaptureResolvedCount(run)} · 已豁免 ${browserCaptureWaivedCount(run)}`
+                              : run.attentionCount
+                                ? `raw attention ${run.attentionCount} 条已闭环`
                               : `已并入 ${run.importRunId ?? "最新 import run"} · metrics ${run.metricsRunId ?? "待刷新"}`
                           }</small>
                         </article>
@@ -8675,7 +10073,7 @@ function renderOperations() {
             }
           </div>
             </article>
-            <article class="import-run-section">
+            <article class="import-run-section" data-browser-capture-recent-runs="true">
           <div class="breakdown-top">
             <strong>最近公开页采样批次</strong>
             <span class="badge">${recentCaptureRuns.length}</span>
@@ -8689,12 +10087,14 @@ function renderOperations() {
                         <article class="import-run-evidence ${selectedCaptureRunDetail?.runId === run.runId ? "is-related" : ""}" data-browser-capture-run-id="${run.runId}" data-browser-capture-import-run-id="${run.importRunId ?? ""}" data-browser-capture-metrics-run-id="${run.metricsRunId ?? ""}" data-browser-task-id="${run.taskId ?? ""}" data-community-id="${run.communityId ?? ""}" data-building-id="${run.buildingId ?? ""}" data-floor-no="${run.floorNo ?? ""}">
                           <div class="breakdown-top">
                             <strong>${run.communityName}${run.buildingName ? ` · ${run.buildingName}` : ""}${run.floorNo != null ? ` · ${run.floorNo}层` : ""}</strong>
-                            <span class="trace-status ${run.attentionCount ? "needs_review" : "captured"}">${run.attentionCount ? "待回看" : "已采完成"}</span>
+                            <span class="trace-status ${browserCapturePendingAttentionCount(run) ? "needs_review" : "captured"}">${browserCapturePendingAttentionCount(run) ? "待复核" : "已采完成"}</span>
                           </div>
                           <p>${formatTimestamp(run.createdAt)} · ${run.taskTypeLabel ?? "公开页采样"} · ${run.captureCount} 条原文</p>
                           <small>${
-                            run.attentionCount
-                              ? `${run.attentionCount} 条 attention`
+                            browserCapturePendingAttentionCount(run)
+                              ? `待复核 ${browserCapturePendingAttentionCount(run)} 条`
+                              : run.attentionCount
+                                ? `raw attention ${run.attentionCount} 条已闭环`
                               : `导入 ${run.importRunId ?? "latest"} · metrics ${run.metricsRunId ?? "latest"}`
                           }</small>
                         </article>
@@ -8709,15 +10109,17 @@ function renderOperations() {
               class="import-run-section"
               data-browser-capture-attention-panel="true"
               data-browser-capture-attention-run-id="${selectedCaptureRunDetail?.runId ?? ""}"
-              data-browser-capture-attention-count="${selectedCaptureRunDetail?.attentionCount ?? 0}"
+              data-browser-capture-attention-count="${browserCapturePendingAttentionCount(selectedCaptureRunDetail)}"
+              data-browser-review-current-run-id="${selectedCaptureRunDetail?.runId ?? ""}"
+              data-browser-review-current-pending-count="${browserCapturePendingAttentionCount(selectedCaptureRunDetail)}"
             >
           <div class="breakdown-top">
-            <strong>attention 回看面板</strong>
+            <strong>review queue 回看面板</strong>
             <span class="badge">${
               state.busyBrowserCaptureRunId
                 ? "加载中"
                 : selectedCaptureRunDetail?.runId
-                  ? `${selectedCaptureRunDetail.attentionCount ?? 0} 条`
+                  ? `${browserCapturePendingAttentionCount(selectedCaptureRunDetail)} 条待处理`
                   : "未选中"
             }</span>
           </div>
@@ -8727,16 +10129,32 @@ function renderOperations() {
               : selectedCaptureRunDetail?.runId
                 ? `
                   <p>${selectedCaptureRunDetail.communityName}${selectedCaptureRunDetail.buildingName ? ` · ${selectedCaptureRunDetail.buildingName}` : ""}${selectedCaptureRunDetail.floorNo != null ? ` · ${selectedCaptureRunDetail.floorNo}层` : ""} · ${formatTimestamp(selectedCaptureRunDetail.createdAt)}</p>
-                  <small>原文 ${selectedCaptureRunDetail.captureCount ?? 0} 条 · attention ${selectedCaptureRunDetail.attentionCount ?? 0} 条${selectedCaptureRunDetail.importRunId ? ` · import ${selectedCaptureRunDetail.importRunId}` : ""}${selectedCaptureRunDetail.metricsRunId ? ` · metrics ${selectedCaptureRunDetail.metricsRunId}` : ""}</small>
+                  <small>原文 ${selectedCaptureRunDetail.captureCount ?? 0} 条 · raw attention ${selectedCaptureRunDetail.attentionCount ?? 0} 条 · 待处理 ${browserCapturePendingAttentionCount(selectedCaptureRunDetail)} 条 · 已修正 ${browserCaptureResolvedCount(selectedCaptureRunDetail)} 条 · 已豁免 ${browserCaptureWaivedCount(selectedCaptureRunDetail)} 条${browserCaptureSupersededCount(selectedCaptureRunDetail) ? ` · 已接力 ${browserCaptureSupersededCount(selectedCaptureRunDetail)} 条` : ""}${selectedCaptureRunDetail.importRunId ? ` · import ${selectedCaptureRunDetail.importRunId}` : ""}${selectedCaptureRunDetail.metricsRunId ? ` · metrics ${selectedCaptureRunDetail.metricsRunId}` : ""}</small>
+                  <div
+                    class="action-row compact browser-task-actions browser-review-batch-toolbar"
+                    data-browser-review-batch-selected-count="${selectedReviewQueueIds.length}"
+                  >
+                    <span class="source-pill">已选 ${selectedReviewQueueIds.length}</span>
+                    <span class="source-pill">pending ${pendingReviewItems.length}</span>
+                    <button class="action compact" data-browser-capture-review-select-all="${selectedCaptureRunDetail.runId}" ${pendingReviewItems.length && !reviewBatchBusy ? "" : "disabled"}>全选当前 pending</button>
+                    <button class="action compact" data-browser-capture-review-clear-selection="${selectedCaptureRunDetail.runId}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>清空选择</button>
+                    <button class="action compact" data-browser-capture-review-batch-resolve="${selectedCaptureRunDetail.runId}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>批量标记已修正</button>
+                    <button class="action compact" data-browser-capture-review-batch-waive="${selectedCaptureRunDetail.runId}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>批量豁免并留痕</button>
+                  </div>
                   <div class="import-run-grid">
                     ${
-                      (selectedCaptureRunDetail.attention ?? []).length
-                        ? (selectedCaptureRunDetail.attention ?? [])
+                      pendingReviewItems.length
+                        ? pendingReviewItems
                             .map(
-                              (item, index) => `
-                                <article class="import-run-evidence">
+                              (item) => `
+                                <article class="import-run-evidence ${item.queueId === state.selectedBrowserCaptureReviewQueueId ? "is-related" : ""}" data-browser-capture-review-queue-item="${item.queueId}">
                                   <div class="breakdown-top">
-                                    <strong>${item.businessTypeLabel} · ${item.sourceListingId}</strong>
+                                    <div class="browser-review-item-heading">
+                                      <label class="browser-review-select">
+                                        <input type="checkbox" data-browser-capture-review-select="${item.queueId}" ${selectedReviewQueueIds.includes(item.queueId) ? "checked" : ""} ${reviewBatchBusy ? "disabled" : ""} />
+                                        <span>${item.businessTypeLabel} · ${item.sourceListingId}</span>
+                                      </label>
+                                    </div>
                                     <span class="trace-status needs_review">${(item.attention ?? []).length} 项缺失</span>
                                   </div>
                                   <p>${(item.attention ?? []).join(" / ")}</p>
@@ -8749,20 +10167,48 @@ function renderOperations() {
                                   <div class="comparison-strip">
                                     ${item.url ? `<span class="source-pill">${truncate(item.url, 52)}</span>` : ""}
                                     ${item.publishedAt ? `<span class="source-pill">${item.publishedAt}</span>` : ""}
+                                    <span class="source-pill">${browserCaptureReviewStatusLabel(item.status)}</span>
                                   </div>
                                   <div class="action-row compact">
-                                    <button class="action compact" data-browser-capture-fill-from-attention="${index}">回填到${item.businessTypeLabel}草稿</button>
-                                    ${item.rawText ? `<button class="action compact" data-browser-capture-copy-raw="${index}">复制原文</button>` : ""}
+                                    <button class="action compact" data-browser-capture-fill-from-attention="${item.queueId}">回填到${item.businessTypeLabel}草稿</button>
+                                    <button class="action compact" data-browser-capture-review-resolve="${item.queueId}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>${state.busyBrowserCaptureReviewQueueId === item.queueId ? "处理中..." : "标记已修正"}</button>
+                                    <button class="action compact" data-browser-capture-review-waive="${item.queueId}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>豁免并留痕</button>
+                                    ${item.rawText ? `<button class="action compact" data-browser-capture-copy-raw="${item.queueId}">复制原文</button>` : ""}
                                   </div>
                                 </article>
                               `
                             )
                             .join("")
-                        : "<p class=\"helper-text\">这次采样没有 attention，当前批次可直接视为已采完成。</p>"
+                        : "<p class=\"helper-text\">当前批次没有待处理 review queue，可继续接力到下一条待复核任务。</p>"
                     }
                   </div>
+                  ${
+                    reviewHistoryItems.length
+                      ? `
+                        <details class="browser-review-history">
+                          <summary>已处理历史 ${reviewHistoryItems.length} 条</summary>
+                          <div class="import-run-grid browser-review-history-grid">
+                            ${reviewHistoryItems
+                              .map(
+                                (item) => `
+                                  <article class="import-run-evidence">
+                                    <div class="breakdown-top">
+                                      <strong>${item.businessTypeLabel} · ${item.sourceListingId}</strong>
+                                      <span class="trace-status ${item.status === "resolved" ? "resolved" : item.status === "waived" ? "medium" : "captured"}">${browserCaptureReviewStatusLabel(item.status)}</span>
+                                    </div>
+                                    <p>${(item.attention ?? []).join(" / ")}</p>
+                                    <small>${item.resolutionNotes ?? "已记录处理结果。"}${item.reviewedAt ? ` · ${formatTimestamp(item.reviewedAt)}` : ""}${item.replacementRunId ? ` · 接力到 ${item.replacementRunId}` : ""}</small>
+                                  </article>
+                                `
+                              )
+                              .join("")}
+                          </div>
+                        </details>
+                      `
+                      : ""
+                  }
                 `
-                : `<p class="helper-text">点击上面的最近采样批次后，这里会展开 attention 明细，并支持一键回填到 sale / rent 草稿。</p>`
+                : `<p class="helper-text">点击上面的最近采样批次后，这里会展开 run 级 review queue，并支持一键回填、标记已修正、或豁免留痕。</p>`
           }
             </article>
           </div>
@@ -8879,8 +10325,8 @@ function renderOperations() {
                               : `<span class="source-pill">样本已达标</span>`
                           }
                           ${
-                            communityItem.latestCaptureAttentionCount
-                              ? `<span class="source-pill">attention ${communityItem.latestCaptureAttentionCount}</span>`
+                            communityItem.pendingAttentionCount
+                              ? `<span class="source-pill">待复核 ${communityItem.pendingAttentionCount}</span>`
                               : ""
                           }
                         </div>
@@ -8994,6 +10440,8 @@ function renderOperations() {
 
   importRunList.querySelectorAll("[data-run-id]").forEach((item) => {
     item.addEventListener("click", async () => {
+      state.operationsHistoryTab = "import";
+      state.operationsDetailTab = "import";
       state.selectedImportRunId = item.dataset.runId;
       state.selectedBaselineRunId = null;
       await loadSelectedImportRunDetail();
@@ -9049,6 +10497,8 @@ function renderOperations() {
 
   geoAssetRunList.querySelectorAll("[data-geo-run-id]").forEach((item) => {
     item.addEventListener("click", async () => {
+      state.operationsHistoryTab = "geo";
+      state.operationsDetailTab = "geo";
       state.selectedGeoAssetRunId = item.dataset.geoRunId;
       state.selectedGeoBaselineRunId = null;
       state.selectedGeoTaskId = null;
@@ -9056,6 +10506,60 @@ function renderOperations() {
       await loadGeoAssets();
       render();
     });
+  });
+
+  document.querySelectorAll("[data-ops-history-tab]").forEach((button) => {
+    const isActive = button.dataset.opsHistoryTab === state.operationsHistoryTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.onclick = () => {
+      const nextTab = button.dataset.opsHistoryTab;
+      if (!operationsHistoryTabs.includes(nextTab) || nextTab === state.operationsHistoryTab) {
+        return;
+      }
+      state.operationsHistoryTab = nextTab;
+      renderOperations();
+    };
+  });
+
+  document.querySelectorAll("[data-ops-history-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.opsHistoryPanel !== state.operationsHistoryTab;
+  });
+
+  document.querySelectorAll("[data-ops-detail-tab]").forEach((button) => {
+    const isActive = button.dataset.opsDetailTab === state.operationsDetailTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.onclick = () => {
+      const nextTab = button.dataset.opsDetailTab;
+      if (!operationsDetailTabs.includes(nextTab) || nextTab === state.operationsDetailTab) {
+        return;
+      }
+      state.operationsDetailTab = nextTab;
+      renderOperations();
+    };
+  });
+
+  document.querySelectorAll("[data-ops-detail-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.opsDetailPanel !== state.operationsDetailTab;
+  });
+
+  document.querySelectorAll("[data-ops-quality-tab]").forEach((button) => {
+    const isActive = button.dataset.opsQualityTab === state.operationsQualityTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.onclick = () => {
+      const nextTab = button.dataset.opsQualityTab;
+      if (!operationsQualityTabs.includes(nextTab) || nextTab === state.operationsQualityTab) {
+        return;
+      }
+      state.operationsQualityTab = nextTab;
+      renderOperations();
+    };
+  });
+
+  document.querySelectorAll("[data-ops-quality-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.opsQualityPanel !== state.operationsQualityTab;
   });
 
   [
@@ -9171,6 +10675,20 @@ function renderOperations() {
   browserSamplingWorkbench.querySelectorAll("[data-browser-workbench-next-district], [data-browser-workbench-next-review], [data-browser-workbench-next-capture], [data-browser-workbench-task-id]").forEach((button) => {
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
+      if (button.dataset.browserWorkbenchNextReview) {
+        const reviewItem =
+          (state.browserReviewInboxItems ?? []).find(
+            (item) =>
+              item?.runId === (button.dataset.browserWorkbenchNextReviewRunId || null) &&
+              item?.queueId === (button.dataset.browserWorkbenchNextReviewQueueId || null)
+          ) ??
+          null;
+        if (reviewItem?.taskId && reviewItem?.runId && reviewItem?.queueId) {
+          await navigateToBrowserReviewInboxItem(reviewItem, { resetDraft: false });
+          render();
+          return;
+        }
+      }
       const taskId =
         button.dataset.browserWorkbenchTaskId ||
         button.dataset.browserWorkbenchNextDistrict ||
@@ -9184,6 +10702,20 @@ function renderOperations() {
         resetDraft: false,
         revealLatestCaptureRun: button.dataset.browserWorkbenchNextReview ? true : "auto"
       });
+      render();
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-review-inbox-item-id]").forEach((card) => {
+    card.addEventListener("click", async () => {
+      const item =
+        (state.browserReviewInboxItems ?? []).find(
+          (entry) =>
+            entry?.inboxItemId === (card.dataset.browserReviewInboxItemId || null) ||
+            (entry?.runId === (card.dataset.browserReviewInboxRunId || null) &&
+              entry?.queueId === (card.dataset.browserReviewInboxQueueId || null))
+        ) ?? null;
+      await navigateToBrowserReviewInboxItem(item, { resetDraft: false });
       render();
     });
   });
@@ -9231,13 +10763,13 @@ function renderOperations() {
   browserSamplingWorkbench.querySelectorAll("[data-browser-capture-fill-from-attention]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      const index = Number(button.dataset.browserCaptureFillFromAttention ?? -1);
-      const attentionItems = currentBrowserCaptureRun()?.attention ?? [];
-      const item = Number.isInteger(index) ? attentionItems[index] : null;
+      const queueId = button.dataset.browserCaptureFillFromAttention || "";
+      const item = currentBrowserCaptureReviewQueue().find((entry) => entry.queueId === queueId) ?? null;
       if (!item) {
         return;
       }
       fillBrowserCaptureDraftFromAttention(item);
+      state.selectedBrowserCaptureReviewQueueId = item.queueId ?? null;
       state.opsMessage = `已把 ${item.businessTypeLabel} attention 原文回填到草稿。`;
       state.opsMessageTone = "success";
       state.opsMessageContext = "sampling";
@@ -9248,10 +10780,107 @@ function renderOperations() {
   browserSamplingWorkbench.querySelectorAll("[data-browser-capture-copy-raw]").forEach((button) => {
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
-      const index = Number(button.dataset.browserCaptureCopyRaw ?? -1);
-      const attentionItems = currentBrowserCaptureRun()?.attention ?? [];
-      const item = Number.isInteger(index) ? attentionItems[index] : null;
+      const queueId = button.dataset.browserCaptureCopyRaw || "";
+      const item = currentBrowserCaptureReviewQueue().find((entry) => entry.queueId === queueId) ?? null;
       await copyTextToClipboard(item?.rawText ?? "", "attention 原文已复制。");
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-select]").forEach((input) => {
+    const syncSelection = (event) => {
+      event.stopPropagation();
+      toggleBrowserCaptureReviewBatchSelection(
+        input.dataset.browserCaptureReviewSelect || "",
+        input.checked,
+        currentBrowserCaptureReviewQueue()
+      );
+      render();
+    };
+    input.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    input.addEventListener("change", syncSelection);
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-select-all]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectAllBrowserCaptureReviewBatchItems(currentBrowserCaptureReviewQueue());
+      render();
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-clear-selection]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      clearBrowserCaptureReviewBatchSelection();
+      render();
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-queue-item]").forEach((card) => {
+    card.addEventListener("click", () => {
+      state.selectedBrowserCaptureReviewQueueId = card.dataset.browserCaptureReviewQueueItem || null;
+      render();
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-resolve]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const runId = currentBrowserCaptureRun()?.runId;
+      const queueId = button.dataset.browserCaptureReviewResolve || "";
+      await reviewBrowserCaptureQueueItem(runId, queueId, {
+        status: "resolved",
+        resolutionNotes: "已修正后由工作台人工确认。",
+      });
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-waive]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const runId = currentBrowserCaptureRun()?.runId;
+      const queueId = button.dataset.browserCaptureReviewWaive || "";
+      const reason = window.prompt("请输入豁免原因：", "已人工确认当前缺失可接受。");
+      if (!reason || !reason.trim()) {
+        return;
+      }
+      await reviewBrowserCaptureQueueItem(runId, queueId, {
+        status: "waived",
+        resolutionNotes: reason.trim(),
+      });
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-batch-resolve]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const runId = button.dataset.browserCaptureReviewBatchResolve || currentBrowserCaptureRun()?.runId;
+      const queueIds = currentBrowserCaptureReviewBatchSelection(currentBrowserCaptureReviewQueue());
+      await reviewBrowserCaptureQueueBatch(runId, queueIds, {
+        status: "resolved",
+        resolutionNotes: "已由工作台批量确认并完成修正。",
+      });
+    });
+  });
+
+  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-review-batch-waive]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const runId = button.dataset.browserCaptureReviewBatchWaive || currentBrowserCaptureRun()?.runId;
+      const queueIds = currentBrowserCaptureReviewBatchSelection(currentBrowserCaptureReviewQueue());
+      if (!queueIds.length) {
+        return;
+      }
+      const reason = window.prompt("请输入本次批量豁免原因：", "已人工确认当前缺失可接受。");
+      if (!reason || !reason.trim()) {
+        return;
+      }
+      await reviewBrowserCaptureQueueBatch(runId, queueIds, {
+        status: "waived",
+        resolutionNotes: reason.trim(),
+      });
     });
   });
 

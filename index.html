@@ -348,11 +348,11 @@
           </div>
         </section>
 
-        <section class="panel operations-panel">
-          <div class="panel-heading">
-            <p class="eyebrow">Ops</p>
-            <h2>数据接入与地址标准化</h2>
-            <p class="helper-text research-helper">这里是研究后场：先看系统状态，再决定是补主档、补样本、补几何，还是直接处理采样 attention。</p>
+          <section class="panel operations-panel">
+            <div class="panel-heading">
+              <p class="eyebrow">Ops</p>
+              <h2>数据接入与地址标准化</h2>
+              <p class="helper-text research-helper">这里是研究后场：先看系统状态，再决定是补主档、补样本、补几何，还是直接处理采样 attention。</p>
           </div>
           <div class="research-group">
             <div class="research-section-label">运行总览</div>
@@ -360,23 +360,84 @@
           </div>
           <div class="research-group">
             <div class="research-section-label">批次与快照</div>
-            <div id="referenceRunList" class="import-run-list"></div>
-            <div id="importRunList" class="import-run-list"></div>
-            <div id="metricsRunList" class="import-run-list"></div>
-            <div id="geoAssetRunList" class="import-run-list"></div>
+            <div class="ops-tab-strip" id="operationsHistoryTabs" role="tablist" aria-label="批次与快照类型">
+              <button type="button" class="segment ops-tab-button is-active" data-ops-history-tab="reference" role="tab" aria-selected="true">
+                Reference
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-history-tab="import" role="tab" aria-selected="false">
+                Import
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-history-tab="metrics" role="tab" aria-selected="false">
+                Metrics
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-history-tab="geo" role="tab" aria-selected="false">
+                Geo
+              </button>
+            </div>
+            <div class="ops-tab-panel" data-ops-history-panel="reference">
+              <div id="referenceRunList" class="import-run-list"></div>
+            </div>
+            <div class="ops-tab-panel" data-ops-history-panel="import" hidden>
+              <div id="importRunList" class="import-run-list"></div>
+            </div>
+            <div class="ops-tab-panel" data-ops-history-panel="metrics" hidden>
+              <div id="metricsRunList" class="import-run-list"></div>
+            </div>
+            <div class="ops-tab-panel" data-ops-history-panel="geo" hidden>
+              <div id="geoAssetRunList" class="import-run-list"></div>
+            </div>
           </div>
           <div class="research-group">
             <div class="research-section-label">运行细节</div>
-            <div id="geoAssetRunDetail" class="import-run-detail"></div>
-            <div id="importRunDetail" class="import-run-detail"></div>
-            <div id="sourceHealthList" class="source-list"></div>
+            <div class="ops-tab-strip ops-tab-strip--subsection" id="operationsDetailTabs" role="tablist" aria-label="运行细节类型">
+              <button type="button" class="segment ops-tab-button is-active" data-ops-detail-tab="geo" role="tab" aria-selected="true">
+                Geo Detail
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-detail-tab="import" role="tab" aria-selected="false">
+                Import Detail
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-detail-tab="sources" role="tab" aria-selected="false">
+                Sources
+              </button>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--detail" data-ops-detail-panel="geo">
+              <div id="geoAssetRunDetail" class="import-run-detail"></div>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--detail" data-ops-detail-panel="import" hidden>
+              <div id="importRunDetail" class="import-run-detail"></div>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--detail" data-ops-detail-panel="sources" hidden>
+              <div id="sourceHealthList" class="source-list"></div>
+            </div>
           </div>
           <div class="research-group">
             <div class="research-section-label">采样与质量</div>
-            <div id="browserSamplingWorkbench" class="import-run-detail"></div>
-            <div id="browserSamplingCoverageBoard" class="import-run-detail"></div>
-            <div id="addressQueueList" class="queue-list"></div>
-            <div id="anchorWatchlist" class="queue-list"></div>
+            <div class="ops-tab-strip ops-tab-strip--subsection" id="operationsQualityTabs" role="tablist" aria-label="采样与质量类型">
+              <button type="button" class="segment ops-tab-button is-active" data-ops-quality-tab="workbench" role="tab" aria-selected="true">
+                Workbench
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-quality-tab="coverage" role="tab" aria-selected="false">
+                Coverage
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-quality-tab="queue" role="tab" aria-selected="false">
+                Review Queue
+              </button>
+              <button type="button" class="segment ops-tab-button" data-ops-quality-tab="anchor" role="tab" aria-selected="false">
+                Anchor Watch
+              </button>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="workbench">
+              <div id="browserSamplingWorkbench" class="import-run-detail"></div>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="coverage" hidden>
+              <div id="browserSamplingCoverageBoard" class="import-run-detail"></div>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="queue" hidden>
+              <div id="addressQueueList" class="queue-list"></div>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="anchor" hidden>
+              <div id="anchorWatchlist" class="queue-list"></div>
+            </div>
           </div>
         </section>
 

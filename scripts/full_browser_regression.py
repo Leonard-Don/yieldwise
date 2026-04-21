@@ -40,8 +40,22 @@ def run_pwcli_with_timeout(session: str, *args: str, timeout_seconds: float = 60
 
 
 def eval_json_with_timeout(session: str, script: str, *, timeout_seconds: float = 60.0):
-    output = run_pwcli_with_timeout(session, "eval", script, timeout_seconds=timeout_seconds)
-    return pw.extract_playwright_result(output)
+    deadline = time.time() + timeout_seconds
+    last_error: Exception | None = None
+    while time.time() < deadline:
+        remaining = max(1.0, deadline - time.time())
+        try:
+            output = run_pwcli_with_timeout(session, "eval", script, timeout_seconds=remaining)
+            return pw.extract_playwright_result(output)
+        except RuntimeError as error:
+            message = str(error)
+            if "Execution context was destroyed" not in message and "Cannot find context with specified id" not in message:
+                raise
+            last_error = error
+            time.sleep(0.5)
+    if last_error:
+        raise last_error
+    raise RuntimeError("Playwright eval 超时，且没有可用结果。")
 
 
 def wait_for(session: str, script: str, *, timeout_seconds: float = 15.0, interval_seconds: float = 0.5):
@@ -63,7 +77,10 @@ def browser_state(session: str) -> dict:
           const selectedCommunity = document.querySelector('#detailCard strong')?.textContent?.trim() || null;
           const samplingTaskLabel = document.querySelector('[data-browser-capture-task-label="true"]')?.textContent?.trim() || null;
           const selectedSamplingTaskId = document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || null;
-          const attentionPanel = document.querySelector('[data-browser-capture-attention-panel="true"]');
+          const reviewPanel = document.querySelector('[data-browser-review-current-run-id]');
+          const reviewInbox = document.querySelector('[data-browser-review-inbox-count]');
+          const reviewRelay = document.querySelector('[data-browser-review-action]');
+          const reviewBatch = document.querySelector('[data-browser-review-batch-selected-count]');
           const summaryCards = [...document.querySelectorAll('#summaryGrid [data-summary-metric]')].map((card) => ({
             key: card.dataset.summaryMetric || null,
             label: card.querySelector('.metric-label')?.textContent?.trim() || null,
@@ -77,9 +94,29 @@ def browser_state(session: str) -> dict:
             selectedCommunity,
             samplingTaskLabel,
             selectedSamplingTaskId,
-            attentionPanelRunId: attentionPanel?.dataset.browserCaptureAttentionRunId || null,
-            attentionPanelAttentionCount: Number(attentionPanel?.dataset.browserCaptureAttentionCount || 0),
+            reviewPanelRunId: reviewPanel?.dataset.browserReviewCurrentRunId || null,
+            reviewPanelPendingCount: Number(reviewPanel?.dataset.browserReviewCurrentPendingCount || 0),
             attentionFillCount: document.querySelectorAll('[data-browser-capture-fill-from-attention]').length,
+            reviewInboxCount: Number(reviewInbox?.dataset.browserReviewInboxCount || 0),
+            reviewInboxVisibleCount: document.querySelectorAll('[data-browser-review-inbox-item-id]').length,
+            reviewInboxActiveItemId: document.querySelector('[data-browser-review-inbox-item-id].is-active')?.dataset.browserReviewInboxItemId || null,
+            reviewRelayAction: reviewRelay?.dataset.browserReviewAction || null,
+            reviewRelayRunId: reviewRelay?.dataset.browserReviewRunId || null,
+            reviewRelayQueueId: reviewRelay?.dataset.browserReviewQueueId || null,
+            reviewRelayWorkflowRunId: reviewRelay?.dataset.browserReviewWorkflowRunId || null,
+            reviewRelayWorkflowQueueId: reviewRelay?.dataset.browserReviewWorkflowQueueId || null,
+            reviewRelayWorkflowTaskId: reviewRelay?.dataset.browserReviewWorkflowTaskId || null,
+            reviewRelayWorkflowItemProvided: reviewRelay?.dataset.browserReviewWorkflowItemProvided === 'true',
+            reviewRelayResolution: reviewRelay?.dataset.browserReviewResolution || null,
+            reviewRelayReason: reviewRelay?.dataset.browserReviewReason || null,
+            reviewRelayTargetTaskId: reviewRelay?.dataset.browserReviewTargetTaskId || null,
+            reviewRelayTargetRunId: reviewRelay?.dataset.browserReviewTargetRunId || null,
+            reviewRelayTargetQueueId: reviewRelay?.dataset.browserReviewTargetQueueId || null,
+            reviewRelayPendingCount: Number(reviewRelay?.dataset.browserReviewPendingCount || 0),
+            reviewBatchSelectedCount: Number(reviewBatch?.dataset.browserReviewBatchSelectedCount || 0),
+            reviewBatchAffectedCount: Number(reviewRelay?.dataset.browserReviewBatchAffectedCount || 0),
+            reviewBatchSkippedCount: Number(reviewRelay?.dataset.browserReviewBatchSkippedCount || 0),
+            reviewBatchStatus: reviewRelay?.dataset.browserReviewBatchStatus || null,
             rankingCount: document.querySelectorAll('#rankingList .ranking-item').length,
             floorWatchlistCount: document.querySelectorAll('#floorWatchlist .ranking-item').length,
             geoTaskCount: document.querySelectorAll('#geoTaskWatchlist .ranking-item').length,
@@ -98,6 +135,48 @@ def browser_state(session: str) -> dict:
 
 def click_via_dom(session: str, script: str) -> dict:
     return pw.eval_json(session, f"() => ({script})")
+
+
+def pick_coverage_card_target(
+    session: str,
+    *,
+    selector: str,
+    require_different_district: bool = False,
+) -> dict:
+    return pw.eval_json(
+        session,
+        f"""() => {{
+          const currentTaskId = document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || '';
+          const currentDistrict = document.querySelector('#districtFilter')?.value || 'all';
+          const cards = [...document.querySelectorAll({json.dumps(selector)})];
+          const card =
+            cards.find((item) => {{
+              const district = item.dataset.browserCoverageDistrict || '';
+              const taskId = item.dataset.browserCoverageTaskId || '';
+              if (taskId && taskId === currentTaskId) {{
+                return false;
+              }}
+              if ({'true' if require_different_district else 'false'} && district && district === currentDistrict) {{
+                return false;
+              }}
+              return true;
+            }}) || cards[0];
+          if (!card) {{
+            return {{ clicked: false }};
+          }}
+          return {{
+            clicked: true,
+            district: card.dataset.browserCoverageDistrict || null,
+            taskId: card.dataset.browserCoverageTaskId || null,
+            communityId: card.dataset.communityId || null,
+            buildingId: card.dataset.buildingId || null,
+            floorNo: card.dataset.floorNo || null,
+            label: card.querySelector('strong')?.textContent?.trim() || null,
+            currentDistrict,
+            currentTaskId,
+          }};
+        }}""",
+    )
 
 
 def set_granularity(session: str, label: str, state_value: str) -> dict:
@@ -128,7 +207,7 @@ def apply_district_scope(session: str, district_id: str) -> dict:
             return {{ changed: false, district: null, reason: 'missing-select' }};
           }}
           if (typeof applyDistrictScope === 'function') {{
-            await applyDistrictScope({json.dumps(district_id)});
+            void applyDistrictScope({json.dumps(district_id)});
             try {{
               render();
             }} catch (error) {{
@@ -209,6 +288,111 @@ def wait_for_floor_layer_ready(session: str) -> dict:
     )
 
 
+def run_browser_capture_workflow_smoke(
+    url: str,
+    session: str,
+    label: str,
+    expected_workflow_action: str,
+    *,
+    headed: bool = False,
+) -> dict:
+    smoke_session = f"{session}-{expected_workflow_action}"
+    command = [
+        sys.executable,
+        str(SCRIPTS_DIR / "browser_capture_smoke.py"),
+        "--url",
+        url,
+        "--session",
+        smoke_session,
+        "--label",
+        f"{label}-{expected_workflow_action}",
+        "--expected-workflow-action",
+        expected_workflow_action,
+        "--fresh-session",
+    ]
+    if headed:
+        command.append("--headed")
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT_DIR,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=240.0,
+        )
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            f"公开页采样 workflow smoke 失败: {expected_workflow_action}\n"
+            f"STDOUT:\n{error.stdout}\nSTDERR:\n{error.stderr}"
+        ) from error
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            f"公开页采样 workflow smoke 输出不是合法 JSON: {expected_workflow_action}\n"
+            f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}"
+        ) from error
+
+
+def run_browser_review_workflow_smoke(
+    url: str,
+    session: str,
+    label: str,
+    expected_workflow_action: str,
+    *,
+    headed: bool = False,
+) -> dict:
+    last_error: RuntimeError | None = None
+    attempt_count = 2 if expected_workflow_action == "review_current_task" else 1
+    for attempt in range(1, attempt_count + 1):
+        retry_suffix = "" if attempt == 1 else f"-retry{attempt}"
+        smoke_session = f"{session}-{expected_workflow_action}{retry_suffix}"
+        command = [
+            sys.executable,
+            str(SCRIPTS_DIR / "browser_review_smoke.py"),
+            "--url",
+            url,
+            "--session",
+            smoke_session,
+            "--label",
+            f"{label}-{expected_workflow_action}{retry_suffix}",
+            "--expected-workflow-action",
+            expected_workflow_action,
+            "--fresh-session",
+        ]
+        if headed:
+            command.append("--headed")
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=ROOT_DIR,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=300.0,
+            )
+            try:
+                return json.loads(completed.stdout)
+            except json.JSONDecodeError as error:
+                last_error = RuntimeError(
+                    f"公开页采样 review workflow smoke 输出不是合法 JSON: {expected_workflow_action} (attempt {attempt})\n"
+                    f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}"
+                )
+                if attempt == attempt_count:
+                    raise last_error from error
+        except subprocess.CalledProcessError as error:
+            last_error = RuntimeError(
+                f"公开页采样 review workflow smoke 失败: {expected_workflow_action} (attempt {attempt})\n"
+                f"STDOUT:\n{error.stdout}\nSTDERR:\n{error.stderr}"
+            )
+            if attempt == attempt_count:
+                raise last_error from error
+    if last_error:
+        raise last_error
+    raise RuntimeError(f"公开页采样 review workflow smoke 没有返回结果: {expected_workflow_action}")
+
+
 def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
     initial = data.get("initialState") or {}
     district_coverage = data.get("districtCoverageState") or {}
@@ -220,10 +404,24 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
     next_capture_click = data.get("nextCaptureClickResult") or {}
     next_review = data.get("nextReviewState") or {}
     next_review_click = data.get("nextReviewClickResult") or {}
+    review_action = data.get("reviewActionState") or {}
+    review_action_click = data.get("reviewActionClickResult") or {}
     building = data.get("buildingState") or {}
     floor = data.get("floorState") or {}
     sampling = data.get("samplingState") or {}
     exports = data.get("exports") or []
+    capture_review_smoke = data.get("captureReviewWorkflowSmoke") or {}
+    capture_advance_smoke = data.get("captureAdvanceWorkflowSmoke") or {}
+    review_current_task_smoke = data.get("reviewCurrentTaskWorkflowSmoke") or {}
+    capture_review_dom = capture_review_smoke.get("domResult") or {}
+    capture_review_relay = capture_review_smoke.get("relay") or {}
+    capture_review_after = capture_review_smoke.get("after6sState") or {}
+    capture_advance_dom = capture_advance_smoke.get("domResult") or {}
+    capture_advance_relay = capture_advance_smoke.get("relay") or {}
+    capture_advance_after = capture_advance_smoke.get("after6sState") or {}
+    review_current_task_relay = review_current_task_smoke.get("relay") or {}
+    review_current_task_after = review_current_task_smoke.get("after6sState") or {}
+    review_current_task_target = review_current_task_smoke.get("expectedTargetItem") or {}
     return {
         "initial_map_live": {
             "passed": initial.get("mapMode") == "AMap Live",
@@ -280,24 +478,71 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
                 "samplingTaskLabel": next_capture.get("samplingTaskLabel"),
             },
         },
-        "workbench_next_review_opens_attention": {
+        "workbench_next_review_opens_inbox_item": {
             "passed": next_review_click.get("reason") == "no-review-task"
             or (
                 bool(next_review_click.get("clicked"))
                 and next_review.get("selectedSamplingTaskId") == next_review_click.get("target")
-                and bool(next_review.get("attentionPanelRunId"))
-                and (next_review.get("attentionPanelAttentionCount") or 0) > 0
+                and bool(next_review.get("reviewPanelRunId"))
+                and (next_review.get("reviewPanelPendingCount") or 0) > 0
                 and (next_review.get("attentionFillCount") or 0) > 0
+                and (next_review.get("reviewInboxVisibleCount") or 0) > 0
             ),
             "actual": {
                 "clicked": next_review_click.get("clicked"),
                 "target": next_review_click.get("target"),
                 "reason": next_review_click.get("reason"),
                 "selectedSamplingTaskId": next_review.get("selectedSamplingTaskId"),
-                "attentionPanelRunId": next_review.get("attentionPanelRunId"),
-                "attentionPanelAttentionCount": next_review.get("attentionPanelAttentionCount"),
+                "reviewPanelRunId": next_review.get("reviewPanelRunId"),
+                "reviewPanelPendingCount": next_review.get("reviewPanelPendingCount"),
+                "reviewInboxCount": next_review.get("reviewInboxCount"),
+                "reviewInboxVisibleCount": next_review.get("reviewInboxVisibleCount"),
+                "reviewInboxActiveItemId": next_review.get("reviewInboxActiveItemId"),
                 "attentionFillCount": next_review.get("attentionFillCount"),
                 "samplingTaskLabel": next_review.get("samplingTaskLabel"),
+            },
+        },
+        "review_queue_batch_updates_relay": {
+            "passed": next_review_click.get("reason") == "no-review-task"
+            or review_action_click.get("reason") == "no-batch-button"
+            or (
+                bool(review_action_click.get("clicked"))
+                and bool(review_action.get("reviewRelayAction"))
+                and bool(review_action.get("reviewRelayRunId"))
+                and bool(review_action.get("reviewRelayQueueId"))
+                and (
+                    review_action.get("reviewRelayAction") == "stay_current"
+                    or (
+                        review_action.get("reviewRelayWorkflowItemProvided") is True
+                        and review_action.get("reviewRelayResolution") == "workflow_item"
+                        and review_action.get("reviewRelayTargetTaskId") == review_action.get("selectedSamplingTaskId")
+                        and bool(review_action.get("reviewRelayTargetRunId"))
+                        and bool(review_action.get("reviewRelayTargetQueueId"))
+                    )
+                )
+                and (review_action.get("reviewBatchAffectedCount") or 0) > 0
+                and review_action.get("reviewBatchStatus") == "waived"
+            ),
+            "actual": {
+                "clicked": review_action_click.get("clicked"),
+                "reason": review_action_click.get("reason"),
+                "reviewRelayAction": review_action.get("reviewRelayAction"),
+                "reviewRelayRunId": review_action.get("reviewRelayRunId"),
+                "reviewRelayQueueId": review_action.get("reviewRelayQueueId"),
+                "reviewRelayWorkflowRunId": review_action.get("reviewRelayWorkflowRunId"),
+                "reviewRelayWorkflowQueueId": review_action.get("reviewRelayWorkflowQueueId"),
+                "reviewRelayWorkflowTaskId": review_action.get("reviewRelayWorkflowTaskId"),
+                "reviewRelayWorkflowItemProvided": review_action.get("reviewRelayWorkflowItemProvided"),
+                "reviewRelayResolution": review_action.get("reviewRelayResolution"),
+                "reviewRelayReason": review_action.get("reviewRelayReason"),
+                "reviewRelayTargetTaskId": review_action.get("reviewRelayTargetTaskId"),
+                "reviewRelayTargetRunId": review_action.get("reviewRelayTargetRunId"),
+                "reviewRelayTargetQueueId": review_action.get("reviewRelayTargetQueueId"),
+                "reviewRelayPendingCount": review_action.get("reviewRelayPendingCount"),
+                "reviewBatchSelectedCount": review_action.get("reviewBatchSelectedCount"),
+                "reviewBatchAffectedCount": review_action.get("reviewBatchAffectedCount"),
+                "reviewBatchSkippedCount": review_action.get("reviewBatchSkippedCount"),
+                "reviewBatchStatus": review_action.get("reviewBatchStatus"),
             },
         },
         "building_mode_has_geometry": {
@@ -311,6 +556,77 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
         "sampling_panel_opened": {
             "passed": bool(sampling.get("samplingTaskLabel")),
             "actual": sampling.get("samplingTaskLabel"),
+        },
+        "capture_review_workflow_smoke": {
+            "passed": capture_review_relay.get("action") == "review_current_capture"
+            and capture_review_relay.get("workflowTaskProvided") is True
+            and capture_review_relay.get("resolution") == "workflow_task"
+            and capture_review_relay.get("workflowTaskId") == capture_review_relay.get("taskId")
+            and capture_review_after.get("taskId") == capture_review_smoke.get("task", {}).get("taskId")
+            and capture_review_after.get("currentTaskRecentRun", {}).get("captureRunId") == capture_review_dom.get("captureRunId")
+            and capture_review_after.get("recentRun", {}).get("captureRunId") == capture_review_dom.get("captureRunId"),
+            "actual": {
+                "selectedTaskId": capture_review_smoke.get("selectedTask", {}).get("taskId"),
+                "resultCaptureRunId": capture_review_dom.get("captureRunId"),
+                "relayAction": capture_review_relay.get("action"),
+                "relayReason": capture_review_relay.get("reason"),
+                "workflowTaskProvided": capture_review_relay.get("workflowTaskProvided"),
+                "relayResolution": capture_review_relay.get("resolution"),
+                "workflowTaskId": capture_review_relay.get("workflowTaskId"),
+                "afterTaskId": capture_review_after.get("taskId"),
+                "currentTaskRecentRunId": capture_review_after.get("currentTaskRecentRun", {}).get("captureRunId"),
+                "recentRunId": capture_review_after.get("recentRun", {}).get("captureRunId"),
+            },
+        },
+        "capture_advance_workflow_smoke": {
+            "passed": capture_advance_relay.get("action") == "advance_next_capture"
+            and capture_advance_relay.get("workflowTaskProvided") is True
+            and capture_advance_relay.get("resolution") == "workflow_task"
+            and capture_advance_relay.get("workflowTaskId") == capture_advance_relay.get("taskId")
+            and capture_advance_after.get("taskId") == capture_advance_relay.get("taskId")
+            and capture_advance_after.get("taskId") != capture_advance_smoke.get("task", {}).get("taskId")
+            and capture_advance_after.get("recentRun", {}).get("captureRunId") == capture_advance_dom.get("captureRunId"),
+            "actual": {
+                "selectedTaskId": capture_advance_smoke.get("selectedTask", {}).get("taskId"),
+                "sourceTaskId": capture_advance_smoke.get("task", {}).get("taskId"),
+                "resultCaptureRunId": capture_advance_dom.get("captureRunId"),
+                "relayAction": capture_advance_relay.get("action"),
+                "relayReason": capture_advance_relay.get("reason"),
+                "workflowTaskProvided": capture_advance_relay.get("workflowTaskProvided"),
+                "relayResolution": capture_advance_relay.get("resolution"),
+                "workflowTaskId": capture_advance_relay.get("workflowTaskId"),
+                "relayTaskId": capture_advance_relay.get("taskId"),
+                "afterTaskId": capture_advance_after.get("taskId"),
+                "recentRunId": capture_advance_after.get("recentRun", {}).get("captureRunId"),
+            },
+        },
+        "review_current_task_workflow_smoke": {
+            "passed": review_current_task_smoke.get("fixtureApplied") is True
+            and review_current_task_relay.get("action") == "review_current_task"
+            and review_current_task_relay.get("workflowItemProvided") is True
+            and review_current_task_relay.get("resolution") == "workflow_item"
+            and review_current_task_relay.get("reason") == "current_task_pending_remaining"
+            and review_current_task_relay.get("workflowTaskId") == review_current_task_target.get("taskId")
+            and review_current_task_relay.get("workflowRunId") == review_current_task_target.get("runId")
+            and review_current_task_relay.get("workflowQueueId") == review_current_task_target.get("queueId")
+            and review_current_task_after.get("taskId") == review_current_task_target.get("taskId")
+            and review_current_task_after.get("reviewPanelRunId") == review_current_task_target.get("runId"),
+            "actual": {
+                "fixtureApplied": review_current_task_smoke.get("fixtureApplied"),
+                "fixtureId": review_current_task_smoke.get("fixtureId"),
+                "sourceTaskId": review_current_task_smoke.get("sourceItem", {}).get("taskId"),
+                "targetTaskId": review_current_task_target.get("taskId"),
+                "targetRunId": review_current_task_target.get("runId"),
+                "targetQueueId": review_current_task_target.get("queueId"),
+                "relayAction": review_current_task_relay.get("action"),
+                "relayReason": review_current_task_relay.get("reason"),
+                "workflowItemProvided": review_current_task_relay.get("workflowItemProvided"),
+                "relayResolution": review_current_task_relay.get("resolution"),
+                "afterTaskId": review_current_task_after.get("taskId"),
+                "afterReviewPanelRunId": review_current_task_after.get("reviewPanelRunId"),
+                "inboxBefore": review_current_task_smoke.get("reviewInboxCountBefore"),
+                "inboxAfter": review_current_task_smoke.get("reviewInboxCountAfter"),
+            },
         },
         "all_exports_ok": {
             "passed": all(item.get("ok") for item in exports),
@@ -339,6 +655,28 @@ def main() -> int:
       "steps": [],
     }
 
+    review_current_task_smoke = run_browser_review_workflow_smoke(
+        args.url,
+        args.session,
+        args.label,
+        "review_current_task",
+        headed=args.headed,
+    )
+    artifacts["steps"].append(
+        {
+            "name": "review-current-task-workflow-smoke",
+            "result": {
+                "fixtureApplied": review_current_task_smoke.get("fixtureApplied"),
+                "taskId": review_current_task_smoke.get("sourceItem", {}).get("taskId"),
+                "relayAction": review_current_task_smoke.get("relay", {}).get("action"),
+                "relayReason": review_current_task_smoke.get("relay", {}).get("reason"),
+                "targetRunId": review_current_task_smoke.get("relay", {}).get("targetRunId"),
+                "targetQueueId": review_current_task_smoke.get("relay", {}).get("targetQueueId"),
+            },
+        }
+    )
+    artifacts["reviewCurrentTaskWorkflowSmoke"] = review_current_task_smoke
+
     session_name = args.session
     opened_new_session = False
     try:
@@ -360,34 +698,33 @@ def main() -> int:
         initial_state = browser_state(session_name)
         artifacts["initialState"] = initial_state
 
-        district_coverage_click_result = click_via_dom(
+        district_coverage_click_result = pick_coverage_card_target(
             session_name,
-            """(() => {
-              const currentTaskId = document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || '';
-              const currentDistrict = document.querySelector('#districtFilter')?.value || 'all';
-              const cards = [...document.querySelectorAll('[data-browser-coverage-district]')];
-              const card = cards.find((item) => {
-                const district = item.dataset.browserCoverageDistrict || '';
-                const taskId = item.dataset.browserCoverageTaskId || '';
-                return district && district !== currentDistrict && taskId && taskId !== currentTaskId;
-              }) || cards[0];
-              if (!card) return { clicked: false };
-              const district = card.dataset.browserCoverageDistrict || null;
-              const taskId = card.dataset.browserCoverageTaskId || null;
-              const label = card.querySelector('strong')?.textContent?.trim() || null;
-              card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              return { clicked: true, district, taskId, label };
-            })()""",
+            selector="[data-browser-coverage-district]",
+            require_different_district=True,
         )
-        if district_coverage_click_result.get("district"):
+        if district_coverage_click_result.get("clicked") and district_coverage_click_result.get("district"):
+            apply_district_scope(session_name, district_coverage_click_result["district"])
             wait_for(
                 session_name,
                 f"""() => document.querySelector('#districtFilter')?.value === {json.dumps(district_coverage_click_result["district"])}""",
+                timeout_seconds=60.0,
             )
-        if district_coverage_click_result.get("taskId"):
+        if district_coverage_click_result.get("clicked") and district_coverage_click_result.get("taskId"):
+            pw.navigate_to_browser_sampling_task(
+                session_name,
+                {
+                    "taskId": district_coverage_click_result.get("taskId"),
+                    "districtId": district_coverage_click_result.get("district"),
+                    "communityId": district_coverage_click_result.get("communityId"),
+                    "buildingId": district_coverage_click_result.get("buildingId"),
+                    "floorNo": district_coverage_click_result.get("floorNo"),
+                },
+            )
             wait_for(
                 session_name,
                 f"""() => document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId === {json.dumps(district_coverage_click_result["taskId"])}""",
+                timeout_seconds=60.0,
             )
         district_coverage_snapshot = pw.take_snapshot(session_name, args.label, "district-coverage")
         district_coverage_state = browser_state(session_name)
@@ -404,26 +741,32 @@ def main() -> int:
         artifacts["steps"].append({"name": "district-filter", "result": district_result, "snapshot": str(pudong_snapshot)})
         artifacts["pudongState"] = pudong_state
 
-        coverage_click_result = click_via_dom(
+        coverage_click_result = pick_coverage_card_target(
             session_name,
-            """(() => {
-              const currentTaskId = document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || '';
-              const cards = [...document.querySelectorAll('[data-browser-coverage-community-id]')];
-              const card = cards.find((item) => {
-                const taskId = item.dataset.browserCoverageTaskId || '';
-                return taskId && taskId !== currentTaskId;
-              }) || cards[0];
-              if (!card) return { clicked: false };
-              const label = card.querySelector('strong')?.textContent?.trim() || null;
-              const taskId = card.dataset.browserCoverageTaskId || null;
-              card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              return { clicked: true, label, taskId };
-            })()""",
+            selector="[data-browser-coverage-community-id]",
         )
-        if coverage_click_result.get("taskId"):
+        if coverage_click_result.get("clicked") and coverage_click_result.get("district"):
+            apply_district_scope(session_name, coverage_click_result["district"])
+            wait_for(
+                session_name,
+                f"""() => document.querySelector('#districtFilter')?.value === {json.dumps(coverage_click_result["district"])}""",
+                timeout_seconds=60.0,
+            )
+        if coverage_click_result.get("clicked") and coverage_click_result.get("taskId"):
+            pw.navigate_to_browser_sampling_task(
+                session_name,
+                {
+                    "taskId": coverage_click_result.get("taskId"),
+                    "districtId": coverage_click_result.get("district"),
+                    "communityId": coverage_click_result.get("communityId"),
+                    "buildingId": coverage_click_result.get("buildingId"),
+                    "floorNo": coverage_click_result.get("floorNo"),
+                },
+            )
             wait_for(
                 session_name,
                 f"""() => document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId === {json.dumps(coverage_click_result["taskId"])}""",
+                timeout_seconds=60.0,
             )
         coverage_snapshot = pw.take_snapshot(session_name, args.label, "coverage-click")
         coverage_state = browser_state(session_name)
@@ -431,24 +774,34 @@ def main() -> int:
         artifacts["steps"].append({"name": "coverage-card", "result": coverage_click_result, "snapshot": str(coverage_snapshot)})
         artifacts["coverageState"] = coverage_state
 
-        next_capture_click_result = click_via_dom(
+        next_capture_click_result = pw.eval_json(
             session_name,
-            """(() => {
+            """() => {
               const button =
                 document.querySelector('[data-browser-workbench-next-capture]:not([disabled])') ||
                 document.querySelector('[data-browser-workbench-next-district]:not([disabled])');
               if (!button) return { clicked: false };
               const before = document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || null;
               const target = button.dataset.browserWorkbenchNextCapture || button.dataset.browserWorkbenchNextDistrict || null;
-              const text = button.textContent?.trim() || null;
-              button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              return { clicked: true, before, target, text };
-            })()""",
+              const targetTask =
+                (state?.browserSamplingPackItems ?? []).find((item) => item?.taskId === target) || null;
+              return {
+                clicked: true,
+                before,
+                target,
+                text: button.textContent?.trim() || null,
+                targetTask,
+              };
+            }""",
         )
+        if next_capture_click_result.get("targetTask"):
+            pw.navigate_to_browser_sampling_task(session_name, next_capture_click_result["targetTask"])
         if next_capture_click_result.get("target"):
             wait_for(
                 session_name,
                 f"""() => document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId === {json.dumps(next_capture_click_result["target"])}""",
+                timeout_seconds=60.0,
+                interval_seconds=0.5,
             )
         next_capture_snapshot = pw.take_snapshot(session_name, args.label, "next-capture")
         next_capture_state = browser_state(session_name)
@@ -456,72 +809,100 @@ def main() -> int:
         artifacts["steps"].append({"name": "next-capture", "result": next_capture_click_result, "snapshot": str(next_capture_snapshot)})
         artifacts["nextCaptureState"] = next_capture_state
 
-        next_review_click_result = eval_json_with_timeout(
+        next_review_click_result = pw.eval_json(
             session_name,
-            """async () => {
+            """() => {
               const before = document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || null;
-              const button = document.querySelector('[data-browser-workbench-next-review]:not([disabled])');
-              if (button) {
-                const target = button.dataset.browserWorkbenchNextReview || null;
-                const text = button.textContent?.trim() || null;
-                button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-                return { clicked: true, before, target, text, via: 'button' };
-              }
-
               const currentDistrict = typeof state !== 'undefined' ? state.districtFilter : 'all';
-              const tasks = Array.isArray(state?.browserSamplingPackItems) ? state.browserSamplingPackItems : [];
-              let targetTask =
-                tasks.find((item) =>
-                  item?.taskId !== before &&
-                  Number(item?.latestCaptureAttentionCount ?? 0) > 0 &&
-                  (currentDistrict === 'all' || item?.districtId === currentDistrict)
-                ) ||
-                tasks.find((item) => item?.taskId !== before && Number(item?.latestCaptureAttentionCount ?? 0) > 0);
-              if (!targetTask) {
+              const button = document.querySelector('[data-browser-workbench-next-review]:not([disabled])');
+              const inboxItems = Array.isArray(state?.browserReviewInboxItems) ? state.browserReviewInboxItems : [];
+              const targetItem =
+                (button
+                  ? inboxItems.find(
+                      (item) =>
+                        item?.runId === (button.dataset.browserWorkbenchNextReviewRunId || null) &&
+                        item?.queueId === (button.dataset.browserWorkbenchNextReviewQueueId || null)
+                    )
+                  : null) ||
+                inboxItems.find((item) => item?.taskId !== before && (currentDistrict === 'all' || item?.districtId === currentDistrict)) ||
+                inboxItems.find((item) => item?.taskId !== before) ||
+                inboxItems[0];
+              if (!targetItem) {
                 return { clicked: false, before, reason: 'no-review-task' };
               }
-              if (typeof applyDistrictScope === 'function' && targetTask.districtId && targetTask.districtId !== currentDistrict) {
-                await applyDistrictScope(targetTask.districtId);
-              }
-              if (typeof navigateToBrowserSamplingTask === 'function') {
-                await navigateToBrowserSamplingTask(targetTask, {
-                  resetDraft: false,
-                  revealLatestCaptureRun: true,
-                });
-                try {
-                  render();
-                } catch (error) {
-                  // Keep the helper resilient if render is temporarily unavailable.
-                }
-              } else {
-                const reviewButton = document.querySelector('[data-browser-workbench-next-review]:not([disabled])');
-                if (!reviewButton) {
-                  return { clicked: false, before, reason: 'missing-helper-and-button' };
-                }
-                reviewButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              }
+              const task = {
+                ...(targetItem.task || {}),
+                taskId: targetItem.taskId || targetItem.task?.taskId || null,
+                taskType: targetItem.taskType || targetItem.task?.taskType || null,
+                taskTypeLabel: targetItem.taskTypeLabel || targetItem.task?.taskTypeLabel || null,
+                targetGranularity: targetItem.targetGranularity || targetItem.task?.targetGranularity || null,
+                focusScope: targetItem.focusScope || targetItem.task?.focusScope || null,
+                priorityScore: targetItem.priorityScore || targetItem.task?.priorityScore || 0,
+                priorityLabel: targetItem.priorityLabel || targetItem.task?.priorityLabel || null,
+                districtId: targetItem.districtId || targetItem.task?.districtId || null,
+                districtName: targetItem.districtName || targetItem.task?.districtName || null,
+                communityId: targetItem.communityId || targetItem.task?.communityId || null,
+                communityName: targetItem.communityName || targetItem.task?.communityName || null,
+                buildingId: targetItem.buildingId || targetItem.task?.buildingId || null,
+                buildingName: targetItem.buildingName || targetItem.task?.buildingName || null,
+                floorNo: targetItem.floorNo || targetItem.task?.floorNo || null,
+                pendingReviewRunId: targetItem.runId || targetItem.task?.pendingReviewRunId || null,
+                pendingReviewQueueId: targetItem.queueId || targetItem.task?.pendingReviewQueueId || null,
+                pendingAttentionCount: targetItem.taskPendingAttentionCount || targetItem.task?.pendingAttentionCount || 1,
+                taskLifecycleStatus: 'needs_review',
+                taskLifecycleLabel: '已采待复核',
+              };
               return {
                 clicked: true,
                 before,
-                target: targetTask.taskId || null,
-                text: targetTask.communityName || targetTask.taskId || null,
-                via: 'fallback-task',
+                target: targetItem.taskId || null,
+                runId: targetItem.runId || null,
+                queueId: targetItem.queueId || null,
+                text: targetItem.taskLabel || targetItem.taskId || null,
+                task,
+                via: button ? 'button-target' : 'fallback-inbox',
               };
             }""",
-            timeout_seconds=60.0,
         )
         if next_review_click_result.get("target"):
+            if next_review_click_result.get("task"):
+                pw.navigate_to_browser_sampling_task(session_name, next_review_click_result["task"])
             wait_for(
                 session_name,
                 f"""() => document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId === {json.dumps(next_review_click_result["target"])}""",
+                timeout_seconds=60.0,
+                interval_seconds=0.5,
             )
+            if next_review_click_result.get("runId"):
+                eval_json_with_timeout(
+                    session_name,
+                    f"""async () => {{
+                      await loadSelectedBrowserCaptureRunDetail(
+                        {json.dumps(next_review_click_result["runId"])},
+                        {{
+                          preferredQueueId: {json.dumps(next_review_click_result.get("queueId"))},
+                        }}
+                      );
+                      try {{
+                        render();
+                      }} catch (error) {{
+                        // Keep the helper resilient if render is temporarily unavailable.
+                      }}
+                      return {{
+                        runId: document.querySelector('[data-browser-review-current-run-id]')?.dataset.browserReviewCurrentRunId || null,
+                        queueId: document.querySelector('[data-browser-capture-review-queue-item].is-related')?.dataset.browserCaptureReviewQueueItem || null,
+                      }};
+                    }}""",
+                    timeout_seconds=60.0,
+                )
             wait_for(
                 session_name,
                 """() => {
-                  const panel = document.querySelector('[data-browser-capture-attention-panel="true"]');
-                  const runId = panel?.dataset.browserCaptureAttentionRunId || '';
-                  const attentionCount = Number(panel?.dataset.browserCaptureAttentionCount || 0);
-                  return runId && attentionCount > 0 ? { runId, attentionCount } : null;
+                  const panel = document.querySelector('[data-browser-review-current-run-id]');
+                  const runId = panel?.dataset.browserReviewCurrentRunId || '';
+                  const pendingCount = Number(panel?.dataset.browserReviewCurrentPendingCount || 0);
+                  const activeQueueId = document.querySelector('[data-browser-capture-review-queue-item].is-related')?.dataset.browserCaptureReviewQueueItem || '';
+                  return runId && pendingCount > 0 && activeQueueId ? { runId, pendingCount, activeQueueId } : null;
                 }""",
                 timeout_seconds=20.0,
             )
@@ -529,6 +910,66 @@ def main() -> int:
         artifacts["nextReviewClickResult"] = next_review_click_result
         artifacts["steps"].append({"name": "next-review", "result": next_review_click_result})
         artifacts["nextReviewState"] = next_review_state
+
+        review_action_click_result = {"clicked": False, "reason": "no-review-task"}
+        review_action_state = {}
+        if next_review_click_result.get("target"):
+            review_action_click_result = eval_json_with_timeout(
+                session_name,
+                """async () => {
+                  const selectable = document.querySelector('[data-browser-capture-review-select]:not([disabled])');
+                  if (!selectable) {
+                    return { clicked: false, reason: 'no-batch-button' };
+                  }
+                  selectable.checked = true;
+                  selectable.dispatchEvent(new Event('change', { bubbles: true }));
+                  const runId =
+                    document.querySelector('[data-browser-capture-review-batch-waive]')?.dataset.browserCaptureReviewBatchWaive ||
+                    (typeof currentBrowserCaptureRun === 'function' ? currentBrowserCaptureRun()?.runId : null);
+                  const queueIds =
+                    typeof currentBrowserCaptureReviewBatchSelection === 'function' && typeof currentBrowserCaptureReviewQueue === 'function'
+                      ? currentBrowserCaptureReviewBatchSelection(currentBrowserCaptureReviewQueue())
+                      : [];
+                  if (!runId || !queueIds.length || typeof reviewBrowserCaptureQueueBatch !== 'function') {
+                    return {
+                      clicked: false,
+                      reason: 'no-batch-button',
+                      selectedCount: Number(document.querySelector('[data-browser-review-batch-selected-count]')?.dataset.browserReviewBatchSelectedCount || 0),
+                    };
+                  }
+                  await reviewBrowserCaptureQueueBatch(runId, queueIds, {
+                    status: 'waived',
+                    resolutionNotes: '回归测试豁免',
+                  });
+                  return {
+                    clicked: true,
+                    runId,
+                    queueIds,
+                    selectedCount: Number(document.querySelector('[data-browser-review-batch-selected-count]')?.dataset.browserReviewBatchSelectedCount || 0),
+                  };
+                }""",
+                timeout_seconds=90.0,
+            )
+            if review_action_click_result.get("clicked"):
+                wait_for(
+                    session_name,
+                    """() => {
+                      const relay = document.querySelector('[data-browser-review-action]');
+                      const action = relay?.dataset.browserReviewAction || '';
+                      const runId = relay?.dataset.browserReviewRunId || '';
+                      const queueId = relay?.dataset.browserReviewQueueId || '';
+                      const resolution = relay?.dataset.browserReviewResolution || '';
+                      const targetTaskId = relay?.dataset.browserReviewTargetTaskId || '';
+                      return action && runId && queueId && resolution
+                        ? { action, runId, queueId, resolution, targetTaskId }
+                        : null;
+                        }""",
+                    timeout_seconds=30.0,
+                )
+            review_action_state = browser_state(session_name)
+        artifacts["reviewActionClickResult"] = review_action_click_result
+        artifacts["steps"].append({"name": "review-action", "result": review_action_click_result})
+        artifacts["reviewActionState"] = review_action_state
 
         ranking_result = click_via_dom(
             session_name,
@@ -569,12 +1010,54 @@ def main() -> int:
 
         exports = fetch_exports(session_name)
         artifacts["exports"] = exports
+        capture_review_smoke = run_browser_capture_workflow_smoke(
+            args.url,
+            session_name,
+            args.label,
+            "review_current_capture",
+            headed=args.headed,
+        )
+        artifacts["steps"].append(
+            {
+                "name": "capture-review-workflow-smoke",
+                "result": {
+                    "taskId": capture_review_smoke.get("selectedTask", {}).get("taskId"),
+                    "captureRunId": capture_review_smoke.get("domResult", {}).get("captureRunId"),
+                    "relayAction": capture_review_smoke.get("relay", {}).get("action"),
+                    "relayReason": capture_review_smoke.get("relay", {}).get("reason"),
+                },
+            }
+        )
+        artifacts["captureReviewWorkflowSmoke"] = capture_review_smoke
+        capture_advance_smoke = run_browser_capture_workflow_smoke(
+            args.url,
+            session_name,
+            args.label,
+            "advance_next_capture",
+            headed=args.headed,
+        )
+        artifacts["steps"].append(
+            {
+                "name": "capture-advance-workflow-smoke",
+                "result": {
+                    "taskId": capture_advance_smoke.get("selectedTask", {}).get("taskId"),
+                    "captureRunId": capture_advance_smoke.get("domResult", {}).get("captureRunId"),
+                    "relayAction": capture_advance_smoke.get("relay", {}).get("action"),
+                    "relayReason": capture_advance_smoke.get("relay", {}).get("reason"),
+                    "relayTaskId": capture_advance_smoke.get("relay", {}).get("taskId"),
+                },
+            }
+        )
+        artifacts["captureAdvanceWorkflowSmoke"] = capture_advance_smoke
 
         console_errors = pw.run_pwcli(session_name, "console", "error")
         console_path = OUTPUT_DIR / f"{args.label}-console.txt"
         console_path.write_text(console_errors, encoding="utf-8")
         artifacts["consoleLog"] = str(console_path)
         artifacts["assertions"] = build_assertions(artifacts)
+        artifacts["all_passed"] = all(
+            bool(result.get("passed")) for result in artifacts["assertions"].values()
+        )
 
         summary_path = OUTPUT_DIR / f"{args.label}.json"
         write_json(summary_path, artifacts)

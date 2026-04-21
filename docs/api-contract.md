@@ -519,6 +519,164 @@
 - `metricsRun`
 - `summary`
 - `attention`
+- `reviewSummary`
+- `workflow`
+- `taskProgress`
+- `task`
+- `reviewInboxSummary`
+
+其中：
+
+- `reviewSummary`
+  - `pendingCount`
+  - `resolvedCount`
+  - `waivedCount`
+  - `supersededCount`
+- `workflow`
+  - `action`: `review_current_capture | advance_next_capture | stay_current`
+  - `reason`: `attention_detected | same_district_queue_available | global_queue_available | no_pending_task`
+  - `taskId`: 提交后工作台应聚焦的任务 id
+  - `task`: 提交后工作台应聚焦的任务快照；`advance_next_capture` 时由后端直接指定接力目标，避免前端再自行推导
+- `taskProgress`
+  - `beforeCount`
+  - `afterCount`
+  - `targetCount`
+  - `missingCount`
+  - `status`
+- `task`
+  - 保留当前任务快照，并额外带回 `pendingReviewRunId`、`pendingReviewQueueId`、`pendingAttentionCount`、`pendingAttentionPreview`
+- `reviewInboxSummary`
+  - `pendingQueueCount`
+  - `pendingTaskCount`
+  - `pendingDistrictCount`
+  - `oldestPendingAt`
+  - `latestPendingAt`
+
+### `GET /api/browser-review-inbox`
+
+返回当前公开页采样 review queue 的全局收件箱。
+
+查询参数：
+
+- `district`: `all` 或行政区 id
+- `limit`
+
+响应包括：
+
+- `summary`
+  - `pendingQueueCount`
+  - `pendingTaskCount`
+  - `pendingDistrictCount`
+  - `oldestPendingAt`
+  - `latestPendingAt`
+- `items`
+  - `inboxItemId`
+  - `runId`
+  - `queueId`
+  - `taskId`
+  - `taskLabel`
+  - `districtId / districtName`
+  - `communityName / buildingName`
+  - `businessType / sourceListingId`
+  - `attention`
+  - `runCreatedAt`
+  - `taskPendingAttentionCount`
+  - `runPendingCount`
+
+### `GET /api/browser-capture-runs`
+
+返回最近公开页采样批次列表。
+
+每个 run summary 除已有字段外，还会带：
+
+- `attentionCount`: 原始 attention 命中数
+- `reviewSummary`
+  - `pendingCount`
+  - `resolvedCount`
+  - `waivedCount`
+  - `supersededCount`
+- `pendingAttentionPreview`
+
+### `GET /api/browser-capture-runs/{run_id}`
+
+返回单个公开页采样批次详情。
+
+除已有 `captures` / `attention` 外，还会返回：
+
+- `reviewQueue`
+  - `queueId`
+  - `businessType`
+  - `sourceListingId`
+  - `attention`
+  - `status`: `pending | resolved | waived | superseded`
+  - `resolutionNotes`
+  - `reviewOwner`
+  - `reviewedAt`
+  - `replacementRunId`
+- `reviewSummary`
+
+### `POST /api/browser-capture-runs/{run_id}/review-queue/{queue_id}`
+
+更新公开页采样批次里的 review queue 条目。
+
+请求体示例：
+
+```json
+{
+  "status": "waived",
+  "resolutionNotes": "已人工核对，当前公开页缺少总层数但可接受。",
+  "reviewOwner": "atlas-ui"
+}
+```
+
+行为约定：
+
+- `status` 仅允许 `resolved` 或 `waived`
+- `waived` 必须填写 `resolutionNotes`
+- 成功后会返回更新后的 queue item、run 级 `reviewSummary`、任务最新复核态、`workflow`，以及 `reviewInboxSummary`
+
+其中 `workflow` 现在还会带：
+
+- `action`: `review_current_run | review_current_task | advance_next_review | stay_current`
+- `reason`: `current_run_pending_remaining | current_task_pending_remaining | same_district_review_available | global_review_available | review_queue_cleared`
+- `runId`: 接力目标 run id
+- `queueId`: 接力目标 queue id
+- `taskId`: 接力目标 task id
+- `task`: 接力目标任务快照
+- `item`: 接力目标 inbox item 快照；命中下一条 review 目标时由后端直接指定，避免前端再本地推导
+
+### `POST /api/browser-capture-runs/{run_id}/review-queue/batch`
+
+批量更新当前公开页采样批次里的 review queue 条目。
+
+请求体示例：
+
+```json
+{
+  "queueIds": ["sale::listing-001", "rent::listing-002"],
+  "status": "waived",
+  "resolutionNotes": "已人工核对，本批次这两条缺失都可接受。",
+  "reviewOwner": "atlas-ui"
+}
+```
+
+行为约定：
+
+- `queueIds` 必填且不能为空
+- `status` 仅允许 `resolved` 或 `waived`
+- `waived` 必须填写 `resolutionNotes`
+- 只会真正更新当前 run 里仍是 `pending` 的条目
+- 成功后返回：
+  - `updatedQueueItems`
+  - `skippedQueueItems`
+    - `reason`: `not_found | not_pending | superseded`
+  - `reviewSummary`
+  - `workflow`
+  - `task`
+  - `detail`
+  - `reviewInboxSummary`
+
+其中 `workflow` 字段约定与单条 review 接口一致，也会直接带回后端选定的接力目标 `item / task / runId / queueId`。
 
 ### `POST /api/reference-runs/{run_id}/persist`
 

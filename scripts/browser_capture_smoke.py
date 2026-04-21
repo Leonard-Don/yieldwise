@@ -201,7 +201,9 @@ def browser_capture_dom_state(session: str) -> dict | None:
           };
           const submitButton = document.querySelector('[data-browser-capture-submit-button]');
           const result = document.querySelector('[data-browser-capture-result="success"]');
-          const currentTaskRun = document.querySelector('[data-browser-capture-run-id]');
+          const relay = document.querySelector('[data-browser-post-submit-action]');
+          const currentTaskRun = document.querySelector('[data-browser-capture-current-task-runs] [data-browser-capture-run-id]');
+          const recentRun = document.querySelector('[data-browser-capture-recent-runs] [data-browser-capture-run-id]');
           return {
             taskId: panel.dataset.browserCaptureTaskId || null,
             communityName: panel.dataset.browserCaptureCommunityName || '',
@@ -228,11 +230,32 @@ def browser_capture_dom_state(session: str) -> dict | None:
                   text: (result.textContent || '').trim(),
                 }
               : null,
+            relay: relay
+              ? {
+                  action: relay.dataset.browserPostSubmitAction || null,
+                  taskId: relay.dataset.browserPostSubmitTaskId || null,
+                  workflowTaskId: relay.dataset.browserPostSubmitWorkflowTaskId || null,
+                  workflowTaskProvided: relay.dataset.browserPostSubmitWorkflowTaskProvided === 'true',
+                  resolution: relay.dataset.browserPostSubmitResolution || null,
+                  sourceTaskId: relay.dataset.browserPostSubmitSourceTaskId || null,
+                  attentionCount: Number(relay.dataset.browserPostSubmitAttentionCount || 0),
+                  reason: relay.dataset.browserPostSubmitReason || null,
+                  status: relay.dataset.browserPostSubmitStatus || null,
+                  text: (relay.textContent || '').trim(),
+                }
+              : null,
             currentTaskRecentRun: currentTaskRun
               ? {
                   captureRunId: currentTaskRun.dataset.browserCaptureRunId || null,
                   importRunId: currentTaskRun.dataset.browserCaptureImportRunId || null,
                   metricsRunId: currentTaskRun.dataset.browserCaptureMetricsRunId || null,
+                }
+              : null,
+            recentRun: recentRun
+              ? {
+                  captureRunId: recentRun.dataset.browserCaptureRunId || null,
+                  importRunId: recentRun.dataset.browserCaptureImportRunId || null,
+                  metricsRunId: recentRun.dataset.browserCaptureMetricsRunId || null,
                 }
               : null,
           };
@@ -317,6 +340,7 @@ def browser_sampling_pack_url(atlas_url: str) -> str:
             "min_yield": "0",
             "max_budget": "10000",
             "min_samples": "1",
+            "limit": "100",
         }
     )
     return urlunparse((parsed.scheme, parsed.netloc, "/api/browser-sampling-pack", "", query, ""))
@@ -336,6 +360,72 @@ def fetch_browser_sampling_pack(atlas_url: str) -> list[dict]:
         )
         payload = json.loads(completed.stdout)
     return payload.get("items", [])
+
+
+def browser_sampling_task_granularity(item: dict | None) -> str:
+    if not item:
+        return ""
+    granularity = str(item.get("targetGranularity") or "").strip().lower()
+    if granularity:
+        return granularity
+    task_id = str(item.get("taskId") or "").strip()
+    if task_id.startswith("browser-community::"):
+        return "community"
+    if task_id.startswith("browser-building::"):
+        return "building"
+    if task_id.startswith("browser-floor::"):
+        return "floor"
+    return ""
+
+
+def resolve_browser_sampling_task(
+    atlas_url: str,
+    *,
+    task_id: str | None = None,
+    expected_workflow_action: str | None = None,
+) -> tuple[dict, list[dict], str]:
+    items = fetch_browser_sampling_pack(atlas_url)
+    if not items:
+        raise RuntimeError("当前 browser_sampling_pack 为空，无法执行公开页采样 smoke。")
+
+    normalized_task_id = str(task_id or "").strip()
+    if normalized_task_id:
+        target = next((item for item in items if str(item.get("taskId") or "") == normalized_task_id), None)
+        if not target:
+            preview = ", ".join(str(item.get("taskId") or "") for item in items[:8])
+            raise RuntimeError(
+                f"当前 browser_sampling_pack 中找不到任务：{normalized_task_id}。"
+                f" 当前可用任务示例：{preview}"
+            )
+        return target, items, "explicit_task_id"
+
+    normalized_action = str(expected_workflow_action or "").strip()
+    if normalized_action == "review_current_capture":
+        target = next((item for item in items if browser_sampling_task_granularity(item) == "community"), None)
+        if target:
+            return target, items, "auto_review_community_task"
+    elif normalized_action == "advance_next_capture":
+        advance_candidates = [item for item in items if browser_sampling_task_granularity(item) in {"floor", "building"}]
+        if advance_candidates:
+            target = sorted(
+                advance_candidates,
+                key=lambda item: (
+                    sum(
+                        1
+                        for peer in items
+                        if peer.get("taskId") != item.get("taskId")
+                        and peer.get("districtId") == item.get("districtId")
+                    ),
+                    1 if browser_sampling_task_granularity(item) == "floor" else 0,
+                    float(item.get("priorityScore") or 0),
+                ),
+                reverse=True,
+            )[0]
+            return target, items, "auto_advance_capture_task"
+    elif normalized_action == "stay_current":
+        raise RuntimeError("自动选择 stay_current 的任务不可靠，请显式传入 --task-id。")
+
+    return items[0], items, "pack_first_item"
 
 
 def inject_browser_sampling_pack(session: str, items: list[dict]) -> dict:
@@ -382,6 +472,88 @@ def wait_for_capture_panel(
     raise RuntimeError(f"等待页面进入公开页采样工作台超时。最后快照：{last_path}\n{last_text[:500]}")
 
 
+def navigate_to_browser_sampling_task(session: str, target: dict) -> dict:
+    normalized_task_id = str((target or {}).get("taskId") or "").strip()
+    if not normalized_task_id:
+        raise RuntimeError("browser capture smoke 缺少有效的目标任务。")
+    return eval_json(
+        session,
+        f"""() => {{
+          const target = {json.dumps(target, ensure_ascii=False)};
+          if (typeof state === 'undefined') {{
+            throw new Error('missing atlas state');
+          }}
+          state.districtFilter = target.districtId || state.districtFilter || 'all';
+          if (!(state.browserSamplingPackItems ?? []).some((item) => item.taskId === target.taskId)) {{
+            state.browserSamplingPackItems = [target, ...(state.browserSamplingPackItems ?? [])];
+          }}
+          selectBrowserSamplingTask(target.taskId, {{
+            resetDraft: true,
+          }});
+          if (typeof render === 'function') {{
+            render();
+          }}
+          const panel = document.querySelector('[data-browser-capture-panel]');
+          return {{
+            selectedTaskId: state.selectedBrowserSamplingTaskId ?? null,
+            districtFilter: state.districtFilter ?? null,
+            panelTaskId: panel?.dataset.browserCaptureTaskId || null,
+          }};
+        }}""",
+    )
+
+
+def wait_for_post_submit_state(
+    session: str,
+    *,
+    expected_source_task_id: str | None = None,
+    previous_import_run_id: str | None = None,
+    timeout_seconds: float = 30.0,
+    interval_seconds: float = 1.0,
+) -> dict:
+    deadline = time.time() + timeout_seconds
+    last_state: dict | None = None
+    while time.time() < deadline:
+        last_state = browser_capture_dom_state(session)
+        submit_button = last_state.get("submitButton") if last_state else {}
+        if (
+            last_state
+            and last_state.get("result")
+            and last_state.get("relay")
+            and submit_button
+            and not submit_button.get("disabled")
+            and "生成采样批次并刷新" in submit_button.get("text", "")
+        ):
+            result = last_state.get("result") or {}
+            relay = last_state.get("relay") or {}
+            relay_action = relay.get("action")
+            relay_task_id = relay.get("taskId")
+            relay_source_task_id = relay.get("sourceTaskId")
+            current_task_id = last_state.get("taskId")
+            result_import_run_id = result.get("importRunId")
+            result_task_id = result.get("taskId")
+            result_capture_run_id = result.get("captureRunId")
+            recent_run = last_state.get("recentRun") or {}
+            if expected_source_task_id and (
+                relay_source_task_id != expected_source_task_id or result_task_id != expected_source_task_id
+            ):
+                time.sleep(interval_seconds)
+                continue
+            if previous_import_run_id and result_import_run_id == previous_import_run_id:
+                time.sleep(interval_seconds)
+                continue
+            if result_capture_run_id and recent_run.get("captureRunId") != result_capture_run_id:
+                time.sleep(interval_seconds)
+                continue
+            if relay_action == "advance_next_capture":
+                if relay_task_id and relay_task_id != relay_source_task_id and current_task_id == relay_task_id:
+                    return last_state
+            elif relay_task_id and current_task_id == relay_task_id:
+                return last_state
+        time.sleep(interval_seconds)
+    raise RuntimeError(f"等待采样提交后的 relay 状态超时。最后状态：{json.dumps(last_state or {}, ensure_ascii=False)}")
+
+
 def fill_capture_form(session: str, values: dict[str, str]) -> dict:
     return eval_json(
         session,
@@ -399,6 +571,23 @@ def fill_capture_form(session: str, values: dict[str, str]) -> dict:
           }}
           return {{ ok: true, filledKeys: Object.keys(values) }};
         }}""",
+    )
+
+
+def clear_browser_capture_feedback(session: str) -> dict:
+    return eval_json(
+        session,
+        """() => {
+          if (typeof state === 'undefined') {
+            return { cleared: false, reason: 'missing-state' };
+          }
+          state.lastBrowserCaptureSubmission = null;
+          state.lastBrowserCaptureReviewAction = null;
+          if (typeof render === 'function') {
+            render();
+          }
+          return { cleared: true };
+        }""",
     )
 
 
@@ -421,20 +610,31 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run a browser smoke test for the public browser capture write path.")
     parser.add_argument("--url", default="http://127.0.0.1:8013/", help="Atlas URL")
     parser.add_argument("--session", default="atlas-smoke", help="Playwright browser session name")
-    parser.add_argument("--label", default=f"atlas-browser-capture-smoke-{datetime.now().strftime('%Y%m%d%H%M%S')}")
+    parser.add_argument("--label", default=None, help="Artifact label prefix. Defaults to timestamp plus session name.")
     parser.add_argument("--headed", action="store_true", help="Run with a visible browser window. Default is headless.")
     parser.add_argument("--fresh-session", action="store_true", help="Force a new browser session instead of reusing an existing one.")
     parser.add_argument("--navigate", action="store_true", help="Navigate the current browser session to --url before running.")
     parser.add_argument("--sale-price-wan", type=int, default=323)
     parser.add_argument("--rent-price-yuan", type=int, default=12200)
     parser.add_argument("--published-at", default="2026-04-14 14:50:00")
+    parser.add_argument("--task-id", default=None, help="Optional browser sampling task id to target explicitly.")
+    parser.add_argument(
+        "--expected-workflow-action",
+        choices=["review_current_capture", "advance_next_capture", "stay_current"],
+        default=None,
+        help="Optionally assert the post-submit workflow action.",
+    )
     parser.add_argument("--keep-session-open", action="store_true", help="Keep the Playwright browser session open after the smoke test.")
     args = parser.parse_args()
+    if not args.label:
+        session_slug = re.sub(r"[^A-Za-z0-9._-]+", "-", str(args.session or "atlas-smoke")).strip("-") or "atlas-smoke"
+        args.label = f"atlas-browser-capture-smoke-{datetime.now().strftime('%Y%m%d%H%M%S')}-{session_slug}"
 
     import_before = newest_run_name(IMPORT_RUNS_DIR, "public-browser-sampling-ui-")
     metrics_before = newest_run_name(METRICS_RUNS_DIR, metrics_capture_prefix())
     opened_session = False
     session_meta = None
+    selected_task_meta: dict | None = None
 
     initial_force_navigate = args.navigate or args.session != "default"
     opened_session, session_meta = ensure_browser_session(
@@ -492,6 +692,33 @@ def main() -> int:
             pre_snapshot, pre_text, pre_state = open_and_wait(initial_force_navigate)
         except RuntimeError:
             pre_snapshot, pre_text, pre_state = open_and_wait(True)
+        target_task = None
+        task_selection_reason = None
+        if args.task_id or args.expected_workflow_action:
+            target_task, _, task_selection_reason = resolve_browser_sampling_task(
+                args.url,
+                task_id=args.task_id,
+                expected_workflow_action=args.expected_workflow_action,
+            )
+            selected_task_meta = {
+                "taskId": target_task.get("taskId"),
+                "selectionReason": task_selection_reason,
+                "granularity": browser_sampling_task_granularity(target_task),
+                "districtId": target_task.get("districtId"),
+                "districtName": target_task.get("districtName"),
+                "communityName": target_task.get("communityName"),
+                "buildingName": target_task.get("buildingName"),
+                "floorNo": target_task.get("floorNo"),
+            }
+        if target_task and pre_state.get("taskId") != target_task.get("taskId"):
+            navigate_result = navigate_to_browser_sampling_task(args.session, target_task)
+            if navigate_result.get("panelTaskId") != target_task.get("taskId"):
+                raise RuntimeError(
+                    f"切换公开页采样任务失败：预期 {target_task.get('taskId')}，"
+                    f" 实际 {navigate_result.get('panelTaskId') or 'unknown'}"
+                )
+            rerender_page(args.session)
+            pre_snapshot, pre_text, pre_state = wait_for_capture_panel(args.session, args.label, attempts=6)
 
         timestamp_slug = datetime.now().strftime("%Y%m%d%H%M%S")
         sale_id = f"browser-smoke-sale-{timestamp_slug}"
@@ -511,6 +738,7 @@ def main() -> int:
         sale_raw = f"上海 {task['districtName']} {task['communityName']} {building_label} {floor_label}/16层 89平米 2室2厅 南向 精装 挂牌总价{args.sale_price_wan}万"
         rent_raw = f"上海 {task['districtName']} {task['communityName']} {building_label} {floor_label}/16层 89平米 2室2厅 南向 精装 月租{args.rent_price_yuan}元"
 
+        clear_browser_capture_feedback(args.session)
         fill_capture_form(
             args.session,
             {
@@ -531,15 +759,19 @@ def main() -> int:
         time.sleep(2)
         success_2s = take_snapshot(args.session, args.label, "after-2s")
         success_state_2s = browser_capture_dom_state(args.session)
-        time.sleep(4)
+        success_state = wait_for_post_submit_state(
+            args.session,
+            expected_source_task_id=task.get("taskId"),
+            previous_import_run_id=import_before,
+        )
         success_6s = take_snapshot(args.session, args.label, "after-6s")
         success_text = snapshot_text(success_6s)
-        success_state = browser_capture_dom_state(args.session)
         console_errors = run_pwcli(args.session, "console", "error")
 
         import_after = newest_run_name(IMPORT_RUNS_DIR, "public-browser-sampling-ui-")
         metrics_after = newest_run_name(METRICS_RUNS_DIR, metrics_capture_prefix())
         latest_result = success_state.get("result") if success_state else None
+        relay_state = success_state.get("relay") if success_state else None
         current_task_run = success_state.get("currentTaskRecentRun") if success_state else None
         button_state = success_state.get("submitButton") if success_state else {}
         attention_count = int(latest_result.get("attentionCount") or 0) if latest_result else None
@@ -548,12 +780,14 @@ def main() -> int:
             "url": args.url,
             "session": args.session,
             "sessionMeta": session_meta,
+            "selectedTask": selected_task_meta,
             "task": task,
             "importRunBefore": import_before,
             "importRunAfter": import_after,
             "metricsRunBefore": metrics_before,
             "metricsRunAfter": metrics_after,
             "domResult": latest_result,
+            "relay": relay_state,
             "attentionCount": attention_count,
             "currentTaskRecentRun": current_task_run,
             "recentSamplingCount": None if not success_text else None,
@@ -575,14 +809,52 @@ def main() -> int:
             raise RuntimeError("公开页采样提交后，没有生成新的 staged metrics run。")
         if not result["buttonRecovered"]:
             raise RuntimeError("提交后按钮没有从“导入中...”恢复。")
+        if not relay_state:
+            raise RuntimeError("提交后没有看到采样接力条。")
+        if args.expected_workflow_action and relay_state.get("action") != args.expected_workflow_action:
+            raise RuntimeError(
+                f"提交后的 workflow action 不符合预期：{relay_state.get('action')} != {args.expected_workflow_action}"
+            )
+        if not relay_state.get("workflowTaskProvided"):
+            raise RuntimeError("采样接力条没有记录后端 workflow.task contract。")
+        if relay_state.get("resolution") != "workflow_task":
+            raise RuntimeError(f"采样接力条没有使用后端指定的接力目标：{relay_state.get('resolution')}")
+        if relay_state.get("workflowTaskId") != relay_state.get("taskId"):
+            raise RuntimeError(
+                "采样接力条里的 workflow.taskId 与最终接力任务不一致："
+                f"{relay_state.get('workflowTaskId')} != {relay_state.get('taskId')}"
+            )
+        if relay_state.get("attentionCount") != attention_count:
+            raise RuntimeError("采样接力条里的 attention 数与结果卡不一致。")
+        if relay_state.get("sourceTaskId") and relay_state.get("sourceTaskId") != task.get("taskId"):
+            raise RuntimeError(
+                f"采样接力条记录的 source task 与提交前任务不一致：{relay_state.get('sourceTaskId')} != {task.get('taskId')}"
+            )
         if attention_count:
-            raise RuntimeError(f"提交后不应出现 attention，当前为 {attention_count} 条：{latest_result.get('text') if latest_result else ''}")
+            if relay_state.get("action") != "review_current_capture":
+                raise RuntimeError(f"有 attention 时应停留当前任务回看，实际为：{relay_state.get('action')}")
+            if relay_state.get("reason") != "attention_detected":
+                raise RuntimeError(f"attention 回看原因不符合预期：{relay_state.get('reason')}")
+            if success_state.get("taskId") != task.get("taskId"):
+                raise RuntimeError("进入 review_current_capture 后，工作台不应跳离原任务。")
+        elif relay_state.get("action") == "advance_next_capture":
+            if success_state.get("taskId") != relay_state.get("taskId"):
+                raise RuntimeError("自动接力后，当前工作台任务和接力条目标任务不一致。")
+            if task.get("taskId") and success_state.get("taskId") == task.get("taskId"):
+                raise RuntimeError("自动接力已触发，但工作台仍停留在原任务。")
+            if relay_state.get("reason") not in {"same_district_queue_available", "global_queue_available"}:
+                raise RuntimeError(f"自动接力原因不符合预期：{relay_state.get('reason')}")
+        elif relay_state.get("action") == "stay_current":
+            if relay_state.get("reason") != "no_pending_task":
+                raise RuntimeError(f"留在当前任务时的原因不符合预期：{relay_state.get('reason')}")
+            if success_state.get("taskId") != task.get("taskId"):
+                raise RuntimeError("接力条显示 stay_current，但工作台已经跳到了别的任务。")
+        else:
+            raise RuntimeError(f"未知的采样接力动作：{relay_state.get('action')}")
         if latest_result and not run_id_matches(latest_result.get("importRunId"), import_after):
             raise RuntimeError(f"页面结果里的 import run 与落盘结果不一致：{latest_result.get('importRunId')} != {import_after}")
         if latest_result and not run_id_matches(latest_result.get("metricsRunId"), metrics_after):
             raise RuntimeError(f"页面结果里的 metrics run 与落盘结果不一致：{latest_result.get('metricsRunId')} != {metrics_after}")
-        if current_task_run and current_task_run.get("captureRunId") and latest_result and latest_result.get("captureRunId") and current_task_run.get("captureRunId") != latest_result.get("captureRunId"):
-            raise RuntimeError("当前任务最近采样的 capture run 与结果卡不一致。")
         if "Total messages: 0" not in result["consoleErrors"] and "Returning 0 messages" not in result["consoleErrors"]:
             raise RuntimeError("提交后浏览器 console 仍然存在 error。")
 
