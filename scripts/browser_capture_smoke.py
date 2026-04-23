@@ -670,7 +670,7 @@ def click_submit(session: str) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a browser smoke test for the public browser capture write path.")
-    parser.add_argument("--url", default="http://127.0.0.1:8013/", help="Atlas URL")
+    parser.add_argument("--url", default="http://127.0.0.1:8013/backstage/", help="Atlas URL")
     parser.add_argument("--session", default="atlas-smoke", help="Playwright browser session name")
     parser.add_argument("--label", default=None, help="Artifact label prefix. Defaults to timestamp plus session name.")
     parser.add_argument("--headed", action="store_true", help="Run with a visible browser window. Default is headless.")
