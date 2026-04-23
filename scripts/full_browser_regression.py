@@ -1586,7 +1586,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run a full browser regression for Shanghai Yield Atlas.")
     parser.add_argument("--session", default="atlas-full-regression", help="Playwright browser session")
     parser.add_argument("--label", default=f"atlas-full-regression-{datetime.now().strftime('%Y%m%d%H%M%S')}")
-    parser.add_argument("--url", default="http://127.0.0.1:8013")
+    parser.add_argument("--url", default="http://127.0.0.1:8013/backstage/")
     parser.add_argument("--headed", action="store_true", help="Run with a visible browser window. Default is headless.")
     parser.add_argument("--fresh-session", action="store_true", help="Force a new browser session instead of reusing an existing one.")
     parser.add_argument("--reuse-open-session", action="store_true", help="Deprecated: sessions are reused automatically when available.")
