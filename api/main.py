@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .persistence import (
@@ -830,4 +831,21 @@ def export_geo_work_orders_csv(
     return Response(content=content, media_type="text/csv; charset=utf-8", headers=headers)
 
 
-app.mount("/", StaticFiles(directory=ROOT_DIR, html=True), name="static")
+FRONTEND_DIR = ROOT_DIR / "frontend"
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon_svg() -> FileResponse:
+    return FileResponse(ROOT_DIR / "favicon.svg", media_type="image/svg+xml")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico() -> FileResponse:
+    return FileResponse(ROOT_DIR / "favicon.ico", media_type="image/x-icon")
+
+
+app.mount(
+    "/backstage",
+    StaticFiles(directory=FRONTEND_DIR / "backstage", html=True),
+    name="backstage",
+)
