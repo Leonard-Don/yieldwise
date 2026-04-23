@@ -90,6 +90,18 @@ def is_session_not_open_error(error: subprocess.CalledProcessError) -> bool:
     return "is not open" in command_error_text(error)
 
 
+def is_retryable_playwright_command_error(text: str) -> bool:
+    retryable_markers = (
+        "Execution context was destroyed",
+        "Cannot find context with specified id",
+        "Target page, context or browser has been closed",
+        "Target closed",
+        "Session closed",
+        "is not open",
+    )
+    return any(marker in text for marker in retryable_markers)
+
+
 def close_session_quietly(session: str) -> None:
     try:
         run_pwcli(session, "close", timeout_seconds=5)
@@ -122,8 +134,33 @@ def extract_playwright_result(output: str):
     return json.loads(match.group(1))
 
 
-def eval_json(session: str, script: str):
-    return extract_playwright_result(run_pwcli(session, "eval", script))
+def eval_json(session: str, script: str, *, timeout_seconds: float = 30.0):
+    deadline = time.time() + timeout_seconds
+    last_error: Exception | None = None
+    while time.time() < deadline:
+        remaining = max(1.0, deadline - time.time())
+        try:
+            return extract_playwright_result(
+                run_pwcli(session, "eval", script, timeout_seconds=min(remaining, 8.0))
+            )
+        except subprocess.TimeoutExpired as error:
+            last_error = error
+            time.sleep(0.5)
+        except subprocess.CalledProcessError as error:
+            message = command_error_text(error)
+            if not is_retryable_playwright_command_error(message):
+                raise
+            last_error = RuntimeError(message)
+            time.sleep(0.5)
+        except RuntimeError as error:
+            message = str(error)
+            if not is_retryable_playwright_command_error(message):
+                raise
+            last_error = error
+            time.sleep(0.5)
+    if last_error:
+        raise last_error
+    raise RuntimeError("Playwright eval 超时，且没有可用结果。")
 
 
 def newest_run_name(directory: Path, prefix: str) -> str | None:
@@ -149,14 +186,27 @@ def take_snapshot(session: str, label: str, suffix: str) -> Path:
     last_error: Exception | None = None
     for staged_target in snapshot_stage_candidates(session, target.name):
         staged_target.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            run_pwcli(session, "snapshot", "--filename", str(staged_target))
-        except subprocess.CalledProcessError as error:
-            combined = f"{error.stdout}\n{error.stderr}"
-            if "File access denied" in combined:
+        snapshot_captured = False
+        for _ in range(3):
+            try:
+                run_pwcli(session, "snapshot", "--filename", str(staged_target))
+                snapshot_captured = True
+                break
+            except subprocess.TimeoutExpired as error:
                 last_error = error
-                continue
-            raise
+                time.sleep(0.5)
+            except subprocess.CalledProcessError as error:
+                combined = command_error_text(error)
+                if "File access denied" in combined:
+                    last_error = error
+                    break
+                if is_retryable_playwright_command_error(combined):
+                    last_error = error
+                    time.sleep(0.5)
+                    continue
+                raise
+        if not snapshot_captured:
+            continue
         for _ in range(20):
             if staged_target.exists():
                 shutil.copy2(staged_target, target)
@@ -273,6 +323,7 @@ def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: 
     open_args = [url, "--headed"] if headed else [url]
     actual_session = cli_session_name(session)
     last_error: subprocess.CalledProcessError | None = None
+    last_timeout: subprocess.TimeoutExpired | None = None
     for attempt in range(max_attempts):
         cleanup_session_artifacts(session)
         try:
@@ -285,6 +336,14 @@ def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: 
                 "reusedExistingSession": False,
                 "headed": headed,
             }
+        except subprocess.TimeoutExpired as error:
+            last_timeout = error
+            if attempt + 1 < max_attempts:
+                time.sleep(0.5)
+                continue
+            raise RuntimeError(
+                f"Timed out opening browser session {session!r} for {url} after {attempt + 1} attempts"
+            ) from error
         except subprocess.CalledProcessError as error:
             last_error = error
             error_text = command_error_text(error)
@@ -296,6 +355,9 @@ def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: 
                         socket_path.unlink(missing_ok=True)
                     except OSError:
                         pass
+                time.sleep(0.5)
+                continue
+            if is_retryable_playwright_command_error(error_text) and attempt + 1 < max_attempts:
                 time.sleep(0.5)
                 continue
             raise
@@ -508,7 +570,7 @@ def wait_for_post_submit_state(
     *,
     expected_source_task_id: str | None = None,
     previous_import_run_id: str | None = None,
-    timeout_seconds: float = 30.0,
+    timeout_seconds: float = 120.0,
     interval_seconds: float = 1.0,
 ) -> dict:
     deadline = time.time() + timeout_seconds

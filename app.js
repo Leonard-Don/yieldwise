@@ -696,7 +696,99 @@ const amapState = {
   transitionToken: 0
 };
 
+const workspaceViews = ["frontstage", "backstage"];
+const backstageTabs = ["strategy", "operations", "pipeline", "schema"];
+const operationsHistoryTabs = ["reference", "import", "metrics", "geo"];
+const operationsDetailTabs = ["geo", "import", "sources"];
+const operationsQualityTabs = ["workbench", "coverage", "queue", "anchor"];
+
+function normalizeWorkspaceView(value) {
+  return workspaceViews.includes(value) ? value : "frontstage";
+}
+
+function normalizeBackstageTab(value) {
+  return backstageTabs.includes(value) ? value : "operations";
+}
+
+function normalizeOperationsHistoryTab(value) {
+  return operationsHistoryTabs.includes(value) ? value : "reference";
+}
+
+function normalizeOperationsDetailTab(value) {
+  return operationsDetailTabs.includes(value) ? value : "geo";
+}
+
+function normalizeOperationsQualityTab(value) {
+  return operationsQualityTabs.includes(value) ? value : "workbench";
+}
+
+function initialWorkspaceViewFromLocation() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeWorkspaceView(params.get("view"));
+  } catch (error) {
+    return "frontstage";
+  }
+}
+
+function initialBackstageTabFromLocation() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeBackstageTab(params.get("backstage"));
+  } catch (error) {
+    return "operations";
+  }
+}
+
+function initialOperationsHistoryTabFromLocation() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeOperationsHistoryTab(params.get("opsHistory"));
+  } catch (error) {
+    return "reference";
+  }
+}
+
+function initialOperationsDetailTabFromLocation() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeOperationsDetailTab(params.get("opsDetail"));
+  } catch (error) {
+    return "geo";
+  }
+}
+
+function initialOperationsQualityTabFromLocation() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeOperationsQualityTab(params.get("opsQuality"));
+  } catch (error) {
+    return "workbench";
+  }
+}
+
+function initialOperationsSelectionParamFromLocation(name) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (
+      normalizeWorkspaceView(params.get("view")) !== "backstage"
+      || normalizeBackstageTab(params.get("backstage")) !== "operations"
+    ) {
+      return null;
+    }
+    const value = params.get(name);
+    return value && value.trim() ? value.trim() : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function shouldInitializeMapExperienceForCurrentView() {
+  return normalizeWorkspaceView(state.workspaceView) === "frontstage";
+}
+
 const state = {
+  workspaceView: initialWorkspaceViewFromLocation(),
   districtFilter: "all",
   minYield: 0,
   maxBudget: 10000,
@@ -709,10 +801,10 @@ const state = {
   selectedCommunityId: "zhangjiang-park",
   selectedBuildingId: null,
   selectedFloorNo: null,
-  selectedImportRunId: null,
-  selectedBaselineRunId: null,
-  selectedGeoAssetRunId: null,
-  selectedGeoBaselineRunId: null,
+  selectedImportRunId: initialOperationsSelectionParamFromLocation("opsImportRun"),
+  selectedBaselineRunId: initialOperationsSelectionParamFromLocation("opsImportBaseline"),
+  selectedGeoAssetRunId: initialOperationsSelectionParamFromLocation("opsGeoRun"),
+  selectedGeoBaselineRunId: initialOperationsSelectionParamFromLocation("opsGeoBaseline"),
   selectedGeoTaskId: null,
   geoWorkOrderStatusFilter: "all",
   geoWorkOrderAssigneeFilter: "all",
@@ -730,9 +822,11 @@ const state = {
     latestPendingAt: null,
   },
   mobileInspectorPanel: "detail",
-  operationsHistoryTab: "reference",
-  operationsDetailTab: "geo",
-  operationsQualityTab: "workbench",
+  filterPanelTab: "scope",
+  researchBackstageTab: initialBackstageTabFromLocation(),
+  operationsHistoryTab: initialOperationsHistoryTabFromLocation(),
+  operationsDetailTab: initialOperationsDetailTabFromLocation(),
+  operationsQualityTab: initialOperationsQualityTabFromLocation(),
   selectedBrowserSamplingTaskId: null,
   selectedCommunityDetail: null,
   selectedBuildingDetail: null,
@@ -838,7 +932,11 @@ const minSamplesValue = document.querySelector("#minSamplesValue");
 const researchSearchInput = document.querySelector("#researchSearchInput");
 const researchSearchResults = document.querySelector("#researchSearchResults");
 const searchClearButton = document.querySelector("#searchClearButton");
+const appShell = document.querySelector("#appShell");
 const globalFeedback = document.querySelector("#globalFeedback");
+const overviewBand = document.querySelector("#overviewBand");
+const frontstageWorkspace = document.querySelector("#frontstageWorkspace");
+const backstageWorkspace = document.querySelector("#backstageWorkspace");
 const summaryGrid = document.querySelector("#summaryGrid");
 const amapContainer = document.querySelector("#amapContainer");
 const mapWaypointBadge = document.querySelector("#mapWaypointBadge");
@@ -1049,15 +1147,20 @@ async function init() {
       scheduleUiHydrationRetry();
       scheduleMapInitializationRetry();
     });
-  void initializeMapExperience()
-    .then(() => {
-      render();
-      scheduleUiHydrationRetry();
-    })
-    .catch(() => {
-      render();
-      scheduleUiHydrationRetry();
-    });
+  if (shouldInitializeMapExperienceForCurrentView()) {
+    void initializeMapExperience()
+      .then(() => {
+        render();
+        scheduleUiHydrationRetry();
+      })
+      .catch(() => {
+        render();
+        scheduleUiHydrationRetry();
+      });
+  } else {
+    setMapMode("standby", "当前打开的是研究后台。切回展示台后再初始化前台地图与区块图层。");
+    render();
+  }
 }
 
 async function loadRuntimeConfig() {
@@ -1139,6 +1242,7 @@ async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
   await loadOperationsOverview();
   ensureImportRunSelection();
   ensureGeoAssetRunSelection();
+  syncOperationsBackstageLocationIfNeeded();
   if (
     state.selectedBrowserCaptureRunId &&
     !(effectiveOperationsOverview().browserCaptureRuns ?? []).some((item) => item.runId === state.selectedBrowserCaptureRunId)
@@ -1433,11 +1537,35 @@ function scheduleMapInitializationRetry() {
   if (!runtimeConfig?.hasAmapKey || !runtimeConfig?.amapApiKey) {
     return;
   }
+  if (!shouldInitializeMapExperienceForCurrentView()) {
+    if (
+      !amapState.map &&
+      !amapState.scriptPromise &&
+      amapState.status !== "loading" &&
+      amapState.status !== "ready" &&
+      amapState.status !== "standby"
+    ) {
+      setMapMode("standby", "当前打开的是研究后台。切回展示台后再初始化前台地图与区块图层。");
+    }
+    return;
+  }
   if (amapState.map || amapState.scriptPromise || amapState.status === "loading" || amapState.status === "ready") {
     return;
   }
   requestAnimationFrame(() => {
     if (!runtimeConfig?.hasAmapKey || !runtimeConfig?.amapApiKey) {
+      return;
+    }
+    if (!shouldInitializeMapExperienceForCurrentView()) {
+      if (
+        !amapState.map &&
+        !amapState.scriptPromise &&
+        amapState.status !== "loading" &&
+        amapState.status !== "ready" &&
+        amapState.status !== "standby"
+      ) {
+        setMapMode("standby", "当前打开的是研究后台。切回展示台后再初始化前台地图与区块图层。");
+      }
       return;
     }
     if (amapState.map || amapState.scriptPromise || amapState.status === "loading" || amapState.status === "ready") {
@@ -1476,6 +1604,7 @@ function setMapMode(mode, noteText) {
   const labelMap = {
     loading: "地图加载中",
     ready: "AMap Live",
+    standby: "前台待启用",
     fallback: "地图待接入",
     error: "地图异常"
   };
@@ -1858,6 +1987,218 @@ function renderInspectorPanels() {
       button.setAttribute("aria-expanded", String(expanded));
       button.textContent = expanded ? "收起" : "展开";
     }
+  });
+}
+
+function syncWorkspaceViewLocation() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  if (state.workspaceView === "backstage") {
+    url.searchParams.set("view", "backstage");
+    url.searchParams.set("backstage", normalizeBackstageTab(state.researchBackstageTab));
+    if (normalizeBackstageTab(state.researchBackstageTab) === "operations") {
+      url.searchParams.set("opsHistory", normalizeOperationsHistoryTab(state.operationsHistoryTab));
+      url.searchParams.set("opsDetail", normalizeOperationsDetailTab(state.operationsDetailTab));
+      url.searchParams.set("opsQuality", normalizeOperationsQualityTab(state.operationsQualityTab));
+      if (state.selectedImportRunId) {
+        url.searchParams.set("opsImportRun", state.selectedImportRunId);
+      } else {
+        url.searchParams.delete("opsImportRun");
+      }
+      if (state.selectedBaselineRunId) {
+        url.searchParams.set("opsImportBaseline", state.selectedBaselineRunId);
+      } else {
+        url.searchParams.delete("opsImportBaseline");
+      }
+      if (state.selectedGeoAssetRunId) {
+        url.searchParams.set("opsGeoRun", state.selectedGeoAssetRunId);
+      } else {
+        url.searchParams.delete("opsGeoRun");
+      }
+      if (state.selectedGeoBaselineRunId) {
+        url.searchParams.set("opsGeoBaseline", state.selectedGeoBaselineRunId);
+      } else {
+        url.searchParams.delete("opsGeoBaseline");
+      }
+    } else {
+      url.searchParams.delete("opsHistory");
+      url.searchParams.delete("opsDetail");
+      url.searchParams.delete("opsQuality");
+      url.searchParams.delete("opsImportRun");
+      url.searchParams.delete("opsImportBaseline");
+      url.searchParams.delete("opsGeoRun");
+      url.searchParams.delete("opsGeoBaseline");
+    }
+  } else {
+    url.searchParams.delete("view");
+    url.searchParams.delete("backstage");
+    url.searchParams.delete("opsHistory");
+    url.searchParams.delete("opsDetail");
+    url.searchParams.delete("opsQuality");
+    url.searchParams.delete("opsImportRun");
+    url.searchParams.delete("opsImportBaseline");
+    url.searchParams.delete("opsGeoRun");
+    url.searchParams.delete("opsGeoBaseline");
+  }
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl !== currentUrl) {
+    window.history.replaceState({}, "", nextUrl);
+  }
+}
+
+function requestMapResizeSoon() {
+  if (typeof window === "undefined" || typeof amapState.map?.resize !== "function") {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      amapState.map?.resize?.();
+    });
+  });
+}
+
+function setWorkspaceView(
+  nextView,
+  {
+    backstageTab = null,
+    operationsHistoryTab = null,
+    operationsDetailTab = null,
+    operationsQualityTab = null
+  } = {}
+) {
+  const normalizedView = normalizeWorkspaceView(nextView);
+  const normalizedBackstageTab = normalizeBackstageTab(backstageTab ?? state.researchBackstageTab);
+  const normalizedOperationsHistoryTab =
+    operationsHistoryTab == null ? state.operationsHistoryTab : normalizeOperationsHistoryTab(operationsHistoryTab);
+  const normalizedOperationsDetailTab =
+    operationsDetailTab == null ? state.operationsDetailTab : normalizeOperationsDetailTab(operationsDetailTab);
+  const normalizedOperationsQualityTab =
+    operationsQualityTab == null ? state.operationsQualityTab : normalizeOperationsQualityTab(operationsQualityTab);
+  const didViewChange = normalizedView !== state.workspaceView;
+  const didTabChange = normalizedView === "backstage" && normalizedBackstageTab !== state.researchBackstageTab;
+  const didOperationsTabChange =
+    normalizedView === "backstage"
+    && normalizedBackstageTab === "operations"
+    && (
+      normalizedOperationsHistoryTab !== state.operationsHistoryTab
+      || normalizedOperationsDetailTab !== state.operationsDetailTab
+      || normalizedOperationsQualityTab !== state.operationsQualityTab
+    );
+  if (!didViewChange && !didTabChange && !didOperationsTabChange) {
+    return;
+  }
+  state.workspaceView = normalizedView;
+  if (normalizedView === "backstage") {
+    state.researchBackstageTab = normalizedBackstageTab;
+    if (normalizedBackstageTab === "operations") {
+      state.operationsHistoryTab = normalizedOperationsHistoryTab;
+      state.operationsDetailTab = normalizedOperationsDetailTab;
+      state.operationsQualityTab = normalizedOperationsQualityTab;
+    }
+  }
+  syncWorkspaceViewLocation();
+  render();
+  if (normalizedView === "frontstage") {
+    scheduleMapInitializationRetry();
+    requestMapResizeSoon();
+  } else {
+    scheduleMapInitializationRetry();
+  }
+}
+
+function renderWorkspaceView() {
+  const currentView = normalizeWorkspaceView(state.workspaceView);
+  state.workspaceView = currentView;
+  if (appShell) {
+    appShell.dataset.workspaceView = currentView;
+  }
+  if (overviewBand) {
+    overviewBand.hidden = currentView !== "frontstage";
+  }
+  if (frontstageWorkspace) {
+    frontstageWorkspace.hidden = currentView !== "frontstage";
+  }
+  if (backstageWorkspace) {
+    backstageWorkspace.hidden = currentView !== "backstage";
+  }
+
+  document.querySelectorAll("[data-workspace-view]").forEach((button) => {
+    const key = normalizeWorkspaceView(button.dataset.workspaceView);
+    const isActive = key === currentView;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.onclick = () => {
+      setWorkspaceView(key, {
+        backstageTab: key === "backstage" ? state.researchBackstageTab : null
+      });
+    };
+  });
+}
+
+function renderResearchBackstage() {
+  const availableTabs = backstageTabs;
+  if (!availableTabs.includes(state.researchBackstageTab)) {
+    state.researchBackstageTab = "operations";
+  }
+
+  document.querySelectorAll("[data-research-backstage-tab]").forEach((button) => {
+    const key = button.dataset.researchBackstageTab;
+    const isActive = key === state.researchBackstageTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.onclick = () => {
+      if (!availableTabs.includes(key) || key === state.researchBackstageTab) {
+        return;
+      }
+      state.researchBackstageTab = key;
+      if (state.workspaceView === "backstage") {
+        syncWorkspaceViewLocation();
+      }
+      renderResearchBackstage();
+    };
+  });
+
+  document.querySelectorAll("[data-research-panel]").forEach((panel) => {
+    const isActive = panel.dataset.researchPanel === state.researchBackstageTab;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active-backstage", isActive);
+  });
+}
+
+function syncOperationsBackstageLocationIfNeeded() {
+  if (
+    normalizeWorkspaceView(state.workspaceView) === "backstage"
+    && normalizeBackstageTab(state.researchBackstageTab) === "operations"
+  ) {
+    syncWorkspaceViewLocation();
+  }
+}
+
+function renderFilterPanel() {
+  const availableTabs = ["scope", "threshold", "display"];
+  if (!availableTabs.includes(state.filterPanelTab)) {
+    state.filterPanelTab = "scope";
+  }
+
+  document.querySelectorAll("[data-filter-tab]").forEach((button) => {
+    const key = button.dataset.filterTab;
+    const isActive = key === state.filterPanelTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.onclick = () => {
+      if (!availableTabs.includes(key) || key === state.filterPanelTab) {
+        return;
+      }
+      state.filterPanelTab = key;
+      renderFilterPanel();
+    };
+  });
+
+  document.querySelectorAll("[data-filter-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.filterPanel !== state.filterPanelTab;
   });
 }
 
@@ -2908,6 +3249,9 @@ function buildScoreBreakdown(building, community, sampleSizeEstimate, avgPriceWa
 function render() {
   renderGlobalFeedback();
   renderInspectorPanels();
+  renderFilterPanel();
+  renderWorkspaceView();
+  renderResearchBackstage();
   renderSummary();
   renderSearchResults();
   renderDetail();
@@ -7017,6 +7361,7 @@ async function submitBrowserSamplingCapture(task) {
     if (body.importRunId) {
       state.selectedImportRunId = body.importRunId;
       state.selectedBaselineRunId = null;
+      syncOperationsBackstageLocationIfNeeded();
     }
     const optimisticRun = buildOptimisticBrowserCaptureRun(task, body);
     const optimisticTask = buildOptimisticBrowserSamplingTask(task, optimisticRun, body?.taskProgress ?? null);
@@ -8557,9 +8902,6 @@ function renderOperations() {
   const selectedRunDetail = state.selectedImportRunDetail;
   const selectedGeoRunId = state.selectedGeoAssetRunId;
   const selectedGeoRunDetail = state.selectedGeoAssetRunDetail;
-  const operationsHistoryTabs = ["reference", "import", "metrics", "geo"];
-  const operationsDetailTabs = ["geo", "import", "sources"];
-  const operationsQualityTabs = ["workbench", "coverage", "queue", "anchor"];
   if (!operationsHistoryTabs.includes(state.operationsHistoryTab)) {
     state.operationsHistoryTab = "reference";
   }
@@ -10444,6 +10786,7 @@ function renderOperations() {
       state.operationsDetailTab = "import";
       state.selectedImportRunId = item.dataset.runId;
       state.selectedBaselineRunId = null;
+      syncOperationsBackstageLocationIfNeeded();
       await loadSelectedImportRunDetail();
       render();
     });
@@ -10502,6 +10845,7 @@ function renderOperations() {
       state.selectedGeoAssetRunId = item.dataset.geoRunId;
       state.selectedGeoBaselineRunId = null;
       state.selectedGeoTaskId = null;
+      syncOperationsBackstageLocationIfNeeded();
       await loadSelectedGeoAssetRunDetail();
       await loadGeoAssets();
       render();
@@ -10518,6 +10862,7 @@ function renderOperations() {
         return;
       }
       state.operationsHistoryTab = nextTab;
+      syncOperationsBackstageLocationIfNeeded();
       renderOperations();
     };
   });
@@ -10536,6 +10881,7 @@ function renderOperations() {
         return;
       }
       state.operationsDetailTab = nextTab;
+      syncOperationsBackstageLocationIfNeeded();
       renderOperations();
     };
   });
@@ -10554,6 +10900,7 @@ function renderOperations() {
         return;
       }
       state.operationsQualityTab = nextTab;
+      syncOperationsBackstageLocationIfNeeded();
       renderOperations();
     };
   });
@@ -11018,6 +11365,7 @@ function renderOperations() {
     select.addEventListener("change", async (event) => {
       event.stopPropagation();
       state.selectedBaselineRunId = select.value || null;
+      syncOperationsBackstageLocationIfNeeded();
       await loadSelectedImportRunDetail();
       render();
     });
@@ -11028,6 +11376,7 @@ function renderOperations() {
       event.stopPropagation();
       state.selectedGeoBaselineRunId = select.value || null;
       state.selectedGeoTaskId = null;
+      syncOperationsBackstageLocationIfNeeded();
       await loadSelectedGeoAssetRunDetail();
       render();
     });

@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" id="appShell">
       <header class="topbar">
         <div class="topbar-copy">
           <p class="eyebrow">Spatial Arbitrage Workbench</p>
@@ -39,12 +39,33 @@
             <span class="meta-label">模式</span>
             <strong>租售比 + 机会评分</strong>
           </div>
+          <div class="topbar-mode-card">
+            <span class="meta-label">视图</span>
+            <div class="ops-tab-strip workspace-mode-switch" id="workspaceModeSwitch" role="tablist" aria-label="页面视图切换">
+              <button type="button" class="segment ops-tab-button is-active" data-workspace-view="frontstage" role="tab" aria-selected="true">
+                展示台
+              </button>
+              <button type="button" class="segment ops-tab-button" data-workspace-view="backstage" role="tab" aria-selected="false">
+                研究后台
+              </button>
+            </div>
+            <p class="workspace-mode-helper">前台只保留地图、楼栋矩阵和证据；后台单独处理策略、运维与流水线。</p>
+          </div>
         </div>
       </header>
 
       <div id="globalFeedback" class="ops-feedback global-feedback" aria-live="polite" hidden></div>
 
-      <main class="workspace">
+      <section id="overviewBand" class="panel metric-strip overview-band">
+        <div class="panel-heading">
+          <p class="eyebrow">Pulse</p>
+          <h2>全局观测</h2>
+          <p class="helper-text">这块只回答一个问题：当前这个筛选窗口里，盘面大概长什么样，是否值得继续下钻。</p>
+        </div>
+        <div class="metric-grid" id="summaryGrid"></div>
+      </section>
+
+      <main id="frontstageWorkspace" class="workspace">
         <aside class="sidebar">
           <section class="panel filter-panel">
             <div class="panel-heading">
@@ -53,102 +74,111 @@
               <p class="helper-text">先定研究范围，再收紧收益与样本门槛，最后决定是看小区、楼栋还是楼层。</p>
             </div>
 
-            <div class="filter-group">
-              <div class="filter-group-heading">
-                <span class="filter-group-label">研究范围</span>
-                <p>先把行政区和当前目标对象锁住，后面的地图、榜单和证据面板都会跟着一起收敛。</p>
-              </div>
+            <div class="ops-tab-strip filter-tab-strip" id="filterTabs" role="tablist" aria-label="筛选条件分组">
+              <button type="button" class="segment ops-tab-button is-active" data-filter-tab="scope" role="tab" aria-selected="true">
+                范围
+              </button>
+              <button type="button" class="segment ops-tab-button" data-filter-tab="threshold" role="tab" aria-selected="false">
+                门槛
+              </button>
+              <button type="button" class="segment ops-tab-button" data-filter-tab="display" role="tab" aria-selected="false">
+                导出
+              </button>
             </div>
 
-            <div class="filter-group">
-              <label class="field">
-                <span>行政区</span>
-                <select id="districtFilter" name="district_filter" aria-label="行政区筛选"></select>
-              </label>
-
-              <div class="field search-field">
-                <div class="field-header">
-                  <span>研究对象搜索</span>
-                  <button id="searchClearButton" type="button" class="action compact subtle search-clear">清空</button>
-                </div>
-                <input
-                  id="researchSearchInput"
-                  type="text"
-                  name="research_search"
-                  placeholder="搜索小区 / 楼栋 / 楼层 / 采样任务…"
-                  autocomplete="off"
-                  spellcheck="false"
-                  role="combobox"
-                  aria-haspopup="listbox"
-                  aria-label="研究对象搜索"
-                  aria-autocomplete="list"
-                  aria-expanded="false"
-                  aria-controls="researchSearchResults"
-                />
-                <div id="researchSearchResults" class="search-results" role="listbox" aria-label="研究对象搜索结果"></div>
-              </div>
-            </div>
-
-            <div class="filter-group">
-              <div class="filter-group-heading">
-                <span class="filter-group-label">研究门槛</span>
-                <p>用收益、预算和样本量先把盘面压到值得研究的窗口，避免地图和榜单一开始就过载。</p>
-              </div>
-
-              <label class="field">
-                <div class="field-header">
-                  <span>最低年化回报率</span>
-                  <strong id="minYieldValue">0.0%</strong>
-                </div>
-                <input id="minYieldFilter" name="min_yield" type="range" min="0" max="5" step="0.1" value="0" />
-              </label>
-
-              <label class="field">
-                <div class="field-header">
-                  <span>最高总价预算</span>
-                  <strong id="maxBudgetValue">10000 万</strong>
-                </div>
-                <input id="maxBudgetFilter" name="max_budget" type="range" min="300" max="10000" step="50" value="10000" />
-              </label>
-
-              <label class="field">
-                <div class="field-header">
-                  <span>最小样本量</span>
-                  <strong id="minSamplesValue">1 套</strong>
-                </div>
-                <input id="minSamplesFilter" name="min_samples" type="range" min="1" max="60" step="1" value="1" />
-              </label>
-            </div>
-
-            <div class="filter-group">
-              <div class="filter-group-heading">
-                <span class="filter-group-label">展示与导出</span>
-                <p>先切小区、楼栋、楼层粒度，再导出当前研究窗口里的对象给外部巡检或继续分析。</p>
-              </div>
-
-              <div class="field segmented">
-                <span>展示粒度</span>
-                <div class="segment-group" id="granularityGroup">
-                  <button type="button" class="segment is-active" data-granularity="community" aria-pressed="true">小区</button>
-                  <button type="button" class="segment" data-granularity="building" aria-pressed="false">楼栋</button>
-                  <button type="button" class="segment" data-granularity="floor" aria-pressed="false">楼层</button>
+            <div class="filter-panel-content" data-filter-panel="scope">
+              <div class="filter-group">
+                <div class="filter-group-heading">
+                  <span class="filter-group-label">研究范围</span>
+                  <p>先把行政区和当前目标对象锁住，后面的地图、榜单和证据面板都会跟着一起收敛。</p>
                 </div>
               </div>
 
-              <div class="action-row">
-                <button id="exportKmlButton" type="button" class="action primary">导出 KML 草稿</button>
-                <button id="exportGeoJsonButton" type="button" class="action">导出 GeoJSON</button>
+              <div class="filter-group">
+                <label class="field">
+                  <span>行政区</span>
+                  <select id="districtFilter" name="district_filter" aria-label="行政区筛选"></select>
+                </label>
+
+                <div class="field search-field">
+                  <div class="field-header">
+                    <span>研究对象搜索</span>
+                    <button id="searchClearButton" type="button" class="action compact subtle search-clear">清空</button>
+                  </div>
+                  <input
+                    id="researchSearchInput"
+                    type="text"
+                    name="research_search"
+                    placeholder="搜索小区 / 楼栋 / 楼层 / 采样任务…"
+                    autocomplete="off"
+                    spellcheck="false"
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-label="研究对象搜索"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="researchSearchResults"
+                  />
+                  <div id="researchSearchResults" class="search-results" role="listbox" aria-label="研究对象搜索结果"></div>
+                </div>
               </div>
             </div>
-          </section>
 
-          <section class="panel metric-strip">
-            <div class="panel-heading">
-              <p class="eyebrow">Pulse</p>
-              <h2>全局观测</h2>
-              <p class="helper-text">这块只回答一个问题：当前这个筛选窗口里，盘面大概长什么样，是否值得继续下钻。</p>
+            <div class="filter-panel-content" data-filter-panel="threshold" hidden>
+              <div class="filter-group">
+                <div class="filter-group-heading">
+                  <span class="filter-group-label">研究门槛</span>
+                  <p>用收益、预算和样本量先把盘面压到值得研究的窗口，避免地图和榜单一开始就过载。</p>
+                </div>
+
+                <label class="field">
+                  <div class="field-header">
+                    <span>最低年化回报率</span>
+                    <strong id="minYieldValue">0.0%</strong>
+                  </div>
+                  <input id="minYieldFilter" name="min_yield" type="range" min="0" max="5" step="0.1" value="0" />
+                </label>
+
+                <label class="field">
+                  <div class="field-header">
+                    <span>最高总价预算</span>
+                    <strong id="maxBudgetValue">10000 万</strong>
+                  </div>
+                  <input id="maxBudgetFilter" name="max_budget" type="range" min="300" max="10000" step="50" value="10000" />
+                </label>
+
+                <label class="field">
+                  <div class="field-header">
+                    <span>最小样本量</span>
+                    <strong id="minSamplesValue">1 套</strong>
+                  </div>
+                  <input id="minSamplesFilter" name="min_samples" type="range" min="1" max="60" step="1" value="1" />
+                </label>
+              </div>
             </div>
-            <div class="metric-grid" id="summaryGrid"></div>
+
+            <div class="filter-panel-content" data-filter-panel="display" hidden>
+              <div class="filter-group">
+                <div class="filter-group-heading">
+                  <span class="filter-group-label">展示与导出</span>
+                  <p>先切小区、楼栋、楼层粒度，再导出当前研究窗口里的对象给外部巡检或继续分析。</p>
+                </div>
+
+                <div class="field segmented">
+                  <span>展示粒度</span>
+                  <div class="segment-group" id="granularityGroup">
+                    <button type="button" class="segment is-active" data-granularity="community" aria-pressed="true">小区</button>
+                    <button type="button" class="segment" data-granularity="building" aria-pressed="false">楼栋</button>
+                    <button type="button" class="segment" data-granularity="floor" aria-pressed="false">楼层</button>
+                  </div>
+                </div>
+
+                <div class="action-row">
+                  <button id="exportKmlButton" type="button" class="action primary">导出 KML 草稿</button>
+                  <button id="exportGeoJsonButton" type="button" class="action">导出 GeoJSON</button>
+                </div>
+              </div>
+            </div>
           </section>
         </aside>
 
@@ -331,8 +361,29 @@
         </aside>
       </main>
 
-      <section class="research-grid">
-        <section class="panel strategy-panel">
+      <section id="backstageWorkspace" class="research-grid" hidden>
+        <div class="research-backstage-controls">
+          <div class="research-backstage-copy">
+            <div class="research-section-label">研究后场</div>
+            <p class="helper-text research-helper">这里现在是独立 backstage 视图，可以直接深链打开；前台展示页不再继续挂着整段后台内容。</p>
+          </div>
+          <div class="ops-tab-strip research-backstage-tabs" id="researchBackstageTabs" role="tablist" aria-label="研究后场模块">
+            <button type="button" class="segment ops-tab-button is-active" data-research-backstage-tab="strategy" role="tab" aria-selected="true">
+              策略
+            </button>
+            <button type="button" class="segment ops-tab-button" data-research-backstage-tab="operations" role="tab" aria-selected="false">
+              Ops
+            </button>
+            <button type="button" class="segment ops-tab-button" data-research-backstage-tab="pipeline" role="tab" aria-selected="false">
+              流水线
+            </button>
+            <button type="button" class="segment ops-tab-button" data-research-backstage-tab="schema" role="tab" aria-selected="false">
+              存储
+            </button>
+          </div>
+        </div>
+
+        <section class="panel strategy-panel" data-research-panel="strategy">
           <div class="panel-heading">
             <p class="eyebrow">Stack</p>
             <h2>地图与数据策略</h2>
@@ -348,7 +399,7 @@
           </div>
         </section>
 
-          <section class="panel operations-panel">
+          <section class="panel operations-panel" data-research-panel="operations" hidden>
             <div class="panel-heading">
               <p class="eyebrow">Ops</p>
               <h2>数据接入与地址标准化</h2>
@@ -441,7 +492,7 @@
           </div>
         </section>
 
-        <section class="panel pipeline-panel">
+        <section class="panel pipeline-panel" data-research-panel="pipeline" hidden>
           <div class="panel-heading">
             <p class="eyebrow">Architecture</p>
             <h2>采集与清洗链路</h2>
@@ -450,7 +501,7 @@
           <div id="pipeline" class="pipeline"></div>
         </section>
 
-        <section class="panel schema-panel">
+        <section class="panel schema-panel" data-research-panel="schema" hidden>
           <div class="panel-heading">
             <p class="eyebrow">Storage</p>
             <h2>核心表设计</h2>

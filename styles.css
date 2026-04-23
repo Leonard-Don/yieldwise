@@ -72,7 +72,7 @@ button,
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(0, 1.72fr) repeat(3, minmax(138px, 0.48fr));
+  grid-template-columns: minmax(0, 1.52fr) repeat(4, minmax(136px, 0.38fr));
   align-items: stretch;
   gap: 14px;
   padding: 18px 22px 20px;
@@ -159,6 +159,10 @@ button,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
+.topbar-mode-card {
+  gap: 12px;
+}
+
 .topbar-meta > div strong {
   display: block;
   font-size: 0.96rem;
@@ -172,9 +176,45 @@ button,
   font-size: 0.82rem;
 }
 
+.workspace-mode-switch {
+  padding: 0;
+  gap: 8px;
+}
+
+.workspace-mode-switch .ops-tab-button {
+  flex: 1 1 auto;
+  min-height: 40px;
+}
+
+.workspace-mode-helper {
+  margin: 0;
+  color: #d5e4f0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.overview-band {
+  margin-top: 16px;
+  padding-bottom: 24px;
+}
+
+.overview-band .panel-heading {
+  padding-bottom: 0;
+}
+
+.overview-band .metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+
+.overview-band[hidden],
+.workspace[hidden],
+.research-grid[hidden] {
+  display: none !important;
+}
+
 .workspace {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 312px;
+  grid-template-columns: 228px minmax(0, 1fr) 312px;
   gap: 16px;
   margin-top: 16px;
   align-items: start;
@@ -190,23 +230,18 @@ button,
 }
 
 .sidebar {
-  position: sticky;
-  top: 16px;
-  height: calc(100svh - 16px);
-  overflow: auto;
-  padding-right: 6px;
-  scrollbar-gutter: stable;
-  overscroll-behavior: contain;
+  position: static;
+  height: auto;
+  overflow: visible;
+  padding-right: 0;
+  gap: 0;
 }
 
 .inspector {
-  position: sticky;
-  top: 16px;
-  height: calc(100svh - 16px);
-  overflow: auto;
-  padding-right: 6px;
-  scrollbar-gutter: stable;
-  overscroll-behavior: contain;
+  position: static;
+  height: auto;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .panel {
@@ -245,6 +280,17 @@ button,
 
 .panel-heading h2 {
   font-size: 1.4rem;
+}
+
+.inspector-panel .panel-body {
+  max-height: min(72vh, 980px);
+  overflow: auto;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+}
+
+.inspector-panel.is-collapsed .panel-body {
+  display: none;
 }
 
 .filter-panel,
@@ -572,6 +618,14 @@ input[type="range"]:focus-visible,
   flex-wrap: wrap;
 }
 
+.filter-tab-strip {
+  padding-top: 12px;
+}
+
+.filter-panel-content[hidden] {
+  display: none;
+}
+
 .action {
   flex: 1;
 }
@@ -586,13 +640,13 @@ input[type="range"]:focus-visible,
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   padding: 18px 24px 0;
 }
 
 .metric {
   position: relative;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 20px;
   background:
@@ -611,16 +665,6 @@ input[type="range"]:focus-visible,
   opacity: 0;
 }
 
-.metric:first-child {
-  grid-column: 1 / -1;
-  padding: 18px 18px 20px;
-  border-color: rgba(117, 240, 207, 0.2);
-  background:
-    radial-gradient(circle at top right, rgba(117, 240, 207, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(117, 240, 207, 0.12), rgba(117, 240, 207, 0.03)),
-    rgba(255, 255, 255, 0.02);
-}
-
 .metric:first-child::before,
 .metric:nth-child(5)::before {
   opacity: 1;
@@ -635,12 +679,12 @@ input[type="range"]:focus-visible,
 
 .metric strong {
   display: block;
-  font-size: 1.48rem;
+  font-size: 1.3rem;
   letter-spacing: -0.04em;
 }
 
 .metric:first-child strong {
-  font-size: 1.82rem;
+  font-size: 1.3rem;
 }
 
 .metric.mini strong {
@@ -649,7 +693,7 @@ input[type="range"]:focus-visible,
 
 .metric small {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: #c0d6e5;
 }
 
@@ -1873,14 +1917,46 @@ input[type="range"]:focus-visible,
 
 .research-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-top: 18px;
   align-items: start;
 }
 
-.research-grid .operations-panel {
-  grid-row: span 2;
+.research-backstage-controls {
+  display: grid;
+  gap: 10px;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(12, 27, 41, 0.92), rgba(8, 21, 33, 0.86)),
+    rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow);
+}
+
+.research-backstage-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.research-backstage-copy .research-section-label {
+  margin: 0;
+}
+
+.research-backstage-tabs {
+  padding: 0;
+}
+
+.research-grid .panel[hidden] {
+  display: none;
+}
+
+.research-grid .panel.is-active-backstage {
+  max-height: min(76vh, 960px);
+  overflow: auto;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
 }
 
 .strategy-panel,
@@ -1925,11 +2001,11 @@ input[type="range"]:focus-visible,
 
 @media (max-width: 1500px) {
   .workspace {
-    grid-template-columns: 248px minmax(0, 1fr) 296px;
+    grid-template-columns: 220px minmax(0, 1fr) 296px;
   }
 
   .topbar {
-    grid-template-columns: minmax(0, 1.62fr) repeat(3, minmax(132px, 0.5fr));
+    grid-template-columns: minmax(0, 1.38fr) repeat(4, minmax(118px, 0.38fr));
   }
 }
 
@@ -2752,6 +2828,26 @@ input[type="range"]:focus-visible,
 }
 
 @media (max-width: 1280px) {
+  .topbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar-copy {
+    grid-column: 1 / -1;
+    min-height: auto;
+  }
+
+  .topbar-meta {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .topbar-meta > div {
+    min-height: auto;
+  }
+
   .inspector {
     position: static;
     height: min(76vh, 860px);
@@ -2760,7 +2856,7 @@ input[type="range"]:focus-visible,
   }
 
   .workspace {
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 216px minmax(0, 1fr);
   }
 
   .inspector {
@@ -2774,8 +2870,8 @@ input[type="range"]:focus-visible,
     grid-template-columns: 1fr;
   }
 
-  .research-grid .operations-panel {
-    grid-row: auto;
+  .overview-band .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .schema-panel {
@@ -2822,6 +2918,10 @@ input[type="range"]:focus-visible,
   .inspector {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .workspace-mode-switch .ops-tab-button {
+    width: 100%;
   }
 
   .action-row,
@@ -2871,14 +2971,15 @@ input[type="range"]:focus-visible,
     max-width: none;
   }
 
-  .sidebar {
-    position: static;
-  }
-
   .ops-summary,
   .ops-tab-panel,
   .import-run-grid {
     grid-template-columns: 1fr;
+    max-height: none;
+    padding-right: 0;
+  }
+
+  .research-grid .panel.is-active-backstage {
     max-height: none;
     padding-right: 0;
   }

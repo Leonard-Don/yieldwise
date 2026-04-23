@@ -101,10 +101,45 @@ def restore_review_fixture(atlas_url: str, fixture_id: str) -> dict:
     return request_json(review_fixture_restore_url(atlas_url, fixture_id), method="DELETE")
 
 
-def eval_json_with_timeout(session: str, script: str, *, timeout_seconds: float):
-    return pw.extract_playwright_result(
-        pw.run_pwcli(session, "eval", script, timeout_seconds=timeout_seconds)
+def is_retryable_playwright_error(message: str) -> bool:
+    retryable_markers = (
+        "Execution context was destroyed",
+        "Cannot find context with specified id",
+        "Target page, context or browser has been closed",
+        "Target closed",
+        "Session closed",
+        "is not open",
     )
+    return any(marker in message for marker in retryable_markers)
+
+
+def eval_json_with_timeout(session: str, script: str, *, timeout_seconds: float):
+    deadline = time.time() + timeout_seconds
+    last_error: Exception | None = None
+    while time.time() < deadline:
+        remaining = max(1.0, deadline - time.time())
+        try:
+            return pw.extract_playwright_result(
+                pw.run_pwcli(session, "eval", script, timeout_seconds=min(remaining, 8.0))
+            )
+        except subprocess.TimeoutExpired as error:
+            last_error = error
+            time.sleep(0.5)
+        except subprocess.CalledProcessError as error:
+            message = pw.command_error_text(error)
+            if not is_retryable_playwright_error(message):
+                raise
+            last_error = RuntimeError(message)
+            time.sleep(0.5)
+        except RuntimeError as error:
+            message = str(error)
+            if not is_retryable_playwright_error(message):
+                raise
+            last_error = error
+            time.sleep(0.5)
+    if last_error:
+        raise last_error
+    raise RuntimeError("Playwright eval 超时，且没有可用结果。")
 
 
 def build_review_groups(items: list[dict]) -> tuple[list[dict], dict[str, list[dict]], list[dict]]:
@@ -318,7 +353,7 @@ def resolve_browser_review_target(
 
 
 def browser_review_dom_state(session: str) -> dict | None:
-    return pw.eval_json(
+    return eval_json_with_timeout(
         session,
         """() => {
           const panel = document.querySelector('[data-browser-capture-panel]');
@@ -356,14 +391,21 @@ def browser_review_dom_state(session: str) -> dict | None:
               : null,
           };
         }""",
+        timeout_seconds=30.0,
     )
 
 
 def wait_for_review_ready(session: str, *, timeout_seconds: float = 30.0, interval_seconds: float = 1.0) -> dict:
     deadline = time.time() + timeout_seconds
     last_state: dict | None = None
+    last_error: Exception | None = None
     while time.time() < deadline:
-        last_state = browser_review_dom_state(session)
+        try:
+            last_state = browser_review_dom_state(session)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError) as error:
+            last_error = error
+            time.sleep(interval_seconds)
+            continue
         if (
             last_state
             and last_state.get("taskId")
@@ -372,6 +414,10 @@ def wait_for_review_ready(session: str, *, timeout_seconds: float = 30.0, interv
         ):
             return last_state
         time.sleep(interval_seconds)
+    if last_error:
+        raise RuntimeError(
+            f"等待 review inbox 加载超时。最后状态：{json.dumps(last_state or {}, ensure_ascii=False)} last_error={last_error}"
+        ) from last_error
     raise RuntimeError(f"等待 review inbox 加载超时。最后状态：{json.dumps(last_state or {}, ensure_ascii=False)}")
 
 
@@ -505,8 +551,14 @@ def wait_for_selected_task(
 ) -> dict:
     deadline = time.time() + timeout_seconds
     last_state: dict | None = None
+    last_error: Exception | None = None
     while time.time() < deadline:
-        last_state = browser_review_dom_state(session)
+        try:
+            last_state = browser_review_dom_state(session)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError) as error:
+            last_error = error
+            time.sleep(interval_seconds)
+            continue
         if (
             last_state
             and last_state.get("taskId") == target_task_id
@@ -515,6 +567,12 @@ def wait_for_selected_task(
         ):
             return last_state
         time.sleep(interval_seconds)
+    if last_error:
+        raise RuntimeError(
+            "等待 source review queue 展开超时："
+            f" task={target_task_id} run={target_run_id} queue={target_queue_id}"
+            f" state={json.dumps(last_state or {}, ensure_ascii=False)} last_error={last_error}"
+        ) from last_error
     raise RuntimeError(
         "等待 source review queue 展开超时："
         f" task={target_task_id} run={target_run_id} queue={target_queue_id}"
@@ -552,7 +610,7 @@ def apply_review_action(session: str, *, run_id: str, queue_id: str, review_stat
         if review_status == "resolved"
         else "review smoke: 已由脚本验证并标记豁免。"
     )
-    return pw.eval_json(
+    return eval_json_with_timeout(
         session,
         f"""() => {{
           const runId = {json.dumps(run_id)};
@@ -574,6 +632,7 @@ def apply_review_action(session: str, *, run_id: str, queue_id: str, review_stat
             taskId: document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || null,
           }};
         }}""",
+        timeout_seconds=30.0,
     )
 
 
@@ -589,8 +648,14 @@ def wait_for_post_review_state(
 ) -> dict:
     deadline = time.time() + timeout_seconds
     last_state: dict | None = None
+    last_error: Exception | None = None
     while time.time() < deadline:
-        last_state = browser_review_dom_state(session)
+        try:
+            last_state = browser_review_dom_state(session)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError) as error:
+            last_error = error
+            time.sleep(interval_seconds)
+            continue
         relay = (last_state or {}).get("reviewRelay") or {}
         if (
             relay.get("action") != expected_workflow_action
@@ -622,6 +687,10 @@ def wait_for_post_review_state(
             ):
                 return last_state
         time.sleep(interval_seconds)
+    if last_error:
+        raise RuntimeError(
+            f"等待 review relay 状态超时。最后状态：{json.dumps(last_state or {}, ensure_ascii=False)} last_error={last_error}"
+        ) from last_error
     raise RuntimeError(f"等待 review relay 状态超时。最后状态：{json.dumps(last_state or {}, ensure_ascii=False)}")
 
 

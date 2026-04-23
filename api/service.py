@@ -1470,9 +1470,6 @@ def _browser_review_current_task_fixture_candidate() -> dict[str, Any] | None:
         if not task_id or int(task_snapshot.get("pendingAttentionCount") or 0) < 3:
             continue
         preferred_run_id = str(task_snapshot.get("pendingReviewRunId") or "")
-        latest_capture_run_id = str(task_snapshot.get("latestCaptureRunId") or "")
-        if not preferred_run_id or preferred_run_id != latest_capture_run_id:
-            continue
         task_items = items_by_task.get(task_id) or []
         if len(task_items) < 3:
             continue
@@ -4185,8 +4182,7 @@ def floor_watchlist(
                 )
             if baseline_row is None and len(relevant_rows) >= 2:
                 baseline_row = relevant_rows[0]
-            history_payload = db_floor_history(building_id, floor_no)
-            summary = history_payload.get("summary") or {}
+            summary = db_floor_history_summary_from_snapshot_rows(history_rows) or {}
             latest_yield = float(latest_row.get("yield_pct") or 0)
             latest_pair_count = int(latest_row.get("pair_count") or 0)
             baseline_yield = float(baseline_row.get("yield_pct") or 0) if baseline_row else None
@@ -5926,10 +5922,20 @@ def geo_task_watchlist(
             for item in floor_watchlist(district=district, limit=50)
             if item.get("buildingId")
         }
-        work_orders = {
-            str(row.get("primary_task_id") or row.get("work_order_id")): row
-            for row in db_geo_work_order_rows(geo_run_id)
-        }
+        work_order_by_task_id: dict[str, dict[str, Any]] = {}
+        for order in db_geo_work_order_rows(geo_run_id):
+            primary_task_id = order.get("primary_task_id")
+            if primary_task_id:
+                work_order_by_task_id[str(primary_task_id)] = order
+            task_ids = order.get("task_ids_json") or []
+            if isinstance(task_ids, str):
+                try:
+                    task_ids = json.loads(task_ids)
+                except json.JSONDecodeError:
+                    task_ids = []
+            for task_id in task_ids:
+                if task_id:
+                    work_order_by_task_id[str(task_id)] = order
         items = []
         for row in db_geo_task_rows(geo_run_id):
             if not include_resolved and row.get("status") not in {"needs_review", "needs_capture", "scheduled"}:
@@ -5937,14 +5943,7 @@ def geo_task_watchlist(
             if district not in (None, "", "all") and row.get("district_id") != district:
                 continue
             linked_watchlist = watchlist_by_building.get(row.get("building_id"))
-            linked_order = next(
-                (
-                    order
-                    for order in db_geo_work_order_rows(geo_run_id)
-                    if row.get("task_id") in (order.get("task_ids_json") or [])
-                ),
-                None,
-            )
+            linked_order = work_order_by_task_id.get(str(row.get("task_id") or ""))
             impact_score = round(
                 clamp(
                     (linked_watchlist.get("persistenceScore") if linked_watchlist else 0)
@@ -7624,6 +7623,24 @@ def db_district_dataset(
     return visible_districts
 
 
+def db_floor_history_summary_from_snapshot_rows(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    first = rows[0]
+    latest = rows[-1]
+    return {
+        "observedRuns": len(rows),
+        "latestRunId": latest.get("run_id"),
+        "latestBatchName": latest.get("batch_name"),
+        "firstBatchName": first.get("batch_name"),
+        "yieldDeltaSinceFirst": round(float(latest.get("yield_pct") or 0) - float(first.get("yield_pct") or 0), 2)
+        if len(rows) >= 2
+        else None,
+        "avgYieldPct": round(sum(float(row.get("yield_pct") or 0) for row in rows) / len(rows), 2),
+        "totalPairCount": sum(int(row.get("pair_count") or 0) for row in rows),
+    }
+
+
 def db_floor_history(building_id: str, floor_no: int) -> dict[str, Any]:
     rows = [
         row
@@ -7663,19 +7680,9 @@ def db_floor_history(building_id: str, floor_no: int) -> dict[str, Any]:
         )
         previous = history_rows[-1]
     history_rows[-1]["isLatest"] = True
-    first = history_rows[0]
-    latest = history_rows[-1]
     return {
         "timeline": list(reversed(history_rows)),
-        "summary": {
-            "observedRuns": len(history_rows),
-            "latestRunId": latest["runId"],
-            "latestBatchName": latest["batchName"],
-            "firstBatchName": first["batchName"],
-            "yieldDeltaSinceFirst": round(latest["yieldPct"] - first["yieldPct"], 2) if len(history_rows) >= 2 else None,
-            "avgYieldPct": round(sum(item["yieldPct"] for item in history_rows) / len(history_rows), 2),
-            "totalPairCount": sum(item["pairCount"] for item in history_rows),
-        },
+        "summary": db_floor_history_summary_from_snapshot_rows(rows),
     }
 
 
