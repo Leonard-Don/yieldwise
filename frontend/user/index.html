@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shanghai Yield Atlas</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles/tokens.css" />
+    <link rel="stylesheet" href="/styles/shell.css" />
+  </head>
+  <body data-user-shell="atlas">
+    <div class="atlas-shell">
+      <header class="atlas-topbar">
+        <h1>Shanghai · Yield · Atlas</h1>
+      </header>
+      <div class="atlas-filterbar"><span>筛选条位置</span></div>
+      <main class="atlas-main">
+        <section class="atlas-map"><div class="atlas-placeholder">地图</div></section>
+        <aside class="atlas-board"><div class="atlas-placeholder">机会榜</div></aside>
+      </main>
+      <footer class="atlas-statusbar">
+        <span class="mono">Phase 1 scaffold · platform shell</span>
+      </footer>
+    </div>
+    <script type="module" src="/modules/main.js"></script>
+  </body>
+</html>

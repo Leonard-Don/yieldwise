@@ -853,3 +853,9 @@ app.mount(
     StaticFiles(directory=FRONTEND_DIR / "backstage", html=True),
     name="backstage",
 )
+
+app.mount(
+    "/",
+    StaticFiles(directory=FRONTEND_DIR / "user", html=True),
+    name="user",
+)
