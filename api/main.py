@@ -68,6 +68,8 @@ from .service import (
     update_import_queue_review,
 )
 
+from .domains import health as v2_health
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
 
@@ -89,6 +91,9 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.include_router(v2_health.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
