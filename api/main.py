@@ -69,6 +69,7 @@ from .service import (
 )
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
     title="Shanghai Yield Atlas API",
@@ -831,17 +832,20 @@ def export_geo_work_orders_csv(
     return Response(content=content, media_type="text/csv; charset=utf-8", headers=headers)
 
 
-FRONTEND_DIR = ROOT_DIR / "frontend"
-
-
 @app.get("/favicon.svg", include_in_schema=False)
 def favicon_svg() -> FileResponse:
-    return FileResponse(ROOT_DIR / "favicon.svg", media_type="image/svg+xml")
+    path = ROOT_DIR / "favicon.svg"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/svg+xml")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon_ico() -> FileResponse:
-    return FileResponse(ROOT_DIR / "favicon.ico", media_type="image/x-icon")
+    path = ROOT_DIR / "favicon.ico"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/x-icon")
 
 
 app.mount(
