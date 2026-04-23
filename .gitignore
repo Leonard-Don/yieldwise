@@ -14,3 +14,4 @@ node_modules/
 tmp/
 output/
 test-results/
+.superpowers/
