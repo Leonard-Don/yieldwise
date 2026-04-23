@@ -20,6 +20,17 @@
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
 - 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
 
+## 路由布局（Phase 1 起）
+
+| 路径 | 绑定 | 说明 |
+| --- | --- | --- |
+| `/` | `frontend/user/` | 面向用户的研究平台（Phase 1 为空壳，后续 phase 填入） |
+| `/backstage` | `frontend/backstage/` | 原研究台，所有运营/复核/几何 QA 在此 |
+| `/api/*` | `api/service.py` + `api/backstage/`（Phase 2 迁移） | 传统接口，backstage 前端使用 |
+| `/api/v2/*` | `api/domains/` | 用户平台专属接口 |
+
+要直接打开研究台请访问 `http://127.0.0.1:8000/backstage/`。`/` 在 Phase 1 结束时是一个空的 D1 shell。
+
 ## GitHub 首页速看
 
 | 模块 | 现在能做什么 |
@@ -36,14 +47,16 @@
 uvicorn api.main:app --reload --port 8000
 ```
 
-打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)。
+- 用户平台：[http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- 研究台（原主页）：[http://127.0.0.1:8000/backstage/](http://127.0.0.1:8000/backstage/)
 
 如果你只想先做一轮静态和浏览器侧校验，最短路径是：
 
 ```bash
 python3 -m compileall api jobs scripts
-node --check app.js
-python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
+node --check frontend/backstage/app.js
+python3 scripts/phase1_smoke.py
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage/
 ```
 
 ## 仓库导览
@@ -262,7 +275,7 @@ python3 jobs/import_reference_dictionary.py \
 - `.github/workflows/validate.yml`
   - 每次 `push / pull_request` 会跑：
     - `python3 -m compileall api jobs scripts`
-    - `node --check app.js`
+    - `node --check frontend/backstage/app.js`
 - `.github/ISSUE_TEMPLATE/public-sampling-task.yml`
   - 用来派发公开页人工采样任务
 - `.github/ISSUE_TEMPLATE/bug-report.yml`
@@ -398,7 +411,7 @@ python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/
 如果你想顺手把整张 Atlas 研究台也做一次真实浏览器回归，而不只是验证采样提交流程，可以再跑：
 
 ```bash
-python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage/
 ```
 
 它会覆盖全局观测、行政区覆盖卡片、行政区筛选、采样覆盖看板联动、连续补样快捷台跳转、机会榜点击、楼栋/楼层粒度切换，以及所有导出接口是否还能正常返回。

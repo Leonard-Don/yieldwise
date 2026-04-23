@@ -24,8 +24,20 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install Python deps
+        run: pip install -r api/requirements-dev.txt
+
       - name: Python compile check
         run: python3 -m compileall api jobs scripts
 
-      - name: Frontend syntax check
-        run: node --check app.js
+      - name: Backstage JS syntax check
+        run: node --check frontend/backstage/app.js
+
+      - name: User shell JS syntax check
+        run: node --check frontend/user/modules/main.js
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Phase 1 route smoke
+        run: python3 scripts/phase1_smoke.py

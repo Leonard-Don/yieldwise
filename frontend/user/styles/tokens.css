@@ -1,0 +1,46 @@
+:root {
+  --bg-0: #070a10;
+  --bg-1: #0a0e14;
+  --bg-2: #0f1823;
+  --line: #1a2332;
+  --text-0: #cfd6e0;
+  --text-dim: #7a8494;
+  --text-xs: #5a6a80;
+  --up: #00d68f;
+  --down: #ff4d4d;
+  --warn: #ffb020;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.up { color: var(--up); }
+.down { color: var(--down); }
+.warn { color: var(--warn); }
+.dim { color: var(--text-dim); }

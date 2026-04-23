@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .persistence import (
@@ -67,7 +68,10 @@ from .service import (
     update_import_queue_review,
 )
 
+from .domains import health as v2_health
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
     title="Shanghai Yield Atlas API",
@@ -87,6 +91,9 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.include_router(v2_health.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
@@ -830,4 +837,30 @@ def export_geo_work_orders_csv(
     return Response(content=content, media_type="text/csv; charset=utf-8", headers=headers)
 
 
-app.mount("/", StaticFiles(directory=ROOT_DIR, html=True), name="static")
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon_svg() -> FileResponse:
+    path = ROOT_DIR / "favicon.svg"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/svg+xml")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico() -> FileResponse:
+    path = ROOT_DIR / "favicon.ico"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/x-icon")
+
+
+app.mount(
+    "/backstage",
+    StaticFiles(directory=FRONTEND_DIR / "backstage", html=True),
+    name="backstage",
+)
+
+app.mount(
+    "/",
+    StaticFiles(directory=FRONTEND_DIR / "user", html=True),
+    name="user",
+)
