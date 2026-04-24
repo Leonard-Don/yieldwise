@@ -2,6 +2,7 @@ import { createStore } from "./state.js";
 import { initShell } from "./shell.js";
 import { initMap } from "./map.js";
 import { initBoard } from "./opportunity-board.js";
+import { initDrawer } from "./detail-drawer.js";
 
 const root = document.querySelector('[data-user-shell="atlas"]');
 if (!root) {
@@ -20,6 +21,7 @@ async function bootstrap(root) {
   });
 
   initShell({ root, store });
+  initDrawer({ root, store });
 
   const mapContainer = root.querySelector('[data-component="map"]');
   const boardContainer = root.querySelector('[data-component="board"]');
