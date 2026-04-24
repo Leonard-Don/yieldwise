@@ -63,6 +63,10 @@ def main() -> int:
             (f"{base}/backstage/", "<title>Shanghai Yield Atlas</title>"),
             (f"{base}/api/v2/health", '"surface":"user-platform-v2"'),
             (f"{base}/api/health", '"status":"ok"'),
+            (f"{base}/api/v2/opportunities", '"items"'),
+            (f"{base}/api/v2/map/districts", '"districts"'),
+            (f"{base}/api/v2/map/communities", '"items"'),
+            (f"{base}/api/v2/map/buildings", '"features"'),
         ]
         failed: list[str] = []
         for url, expected_substring in checks:
