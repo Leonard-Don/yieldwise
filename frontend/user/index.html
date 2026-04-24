@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/styles/shell.css" />
     <link rel="stylesheet" href="/styles/map.css" />
     <link rel="stylesheet" href="/styles/board.css" />
+    <link rel="stylesheet" href="/styles/drawer.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
@@ -34,6 +35,19 @@
           <div class="atlas-board-empty" data-role="board-empty" hidden>暂无机会</div>
         </aside>
       </main>
+      <div class="atlas-drawer-backdrop" data-component="drawer-backdrop" data-open="false"></div>
+      <aside class="atlas-drawer" data-component="drawer" data-open="false" aria-hidden="true">
+        <header class="atlas-drawer-header">
+          <div>
+            <h2 class="atlas-drawer-title" data-role="drawer-title">—</h2>
+            <span class="atlas-drawer-subtitle mono" data-role="drawer-subtitle">—</span>
+          </div>
+          <button type="button" class="atlas-drawer-close" data-role="drawer-close" aria-label="关闭">×</button>
+        </header>
+        <div class="atlas-drawer-body" data-role="drawer-body">
+          <div class="atlas-drawer-empty">选择楼栋或机会榜条目以查看详情</div>
+        </div>
+      </aside>
       <footer class="atlas-statusbar mono" data-component="statusbar">
         <span data-role="statusbar-mode">mode: --</span>
         <span data-role="statusbar-data">data: --</span>
