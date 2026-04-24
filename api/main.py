@@ -68,7 +68,13 @@ from .service import (
     update_import_queue_review,
 )
 
-from .domains import health as v2_health
+from .domains import (
+    buildings as v2_buildings,
+    communities as v2_communities,
+    health as v2_health,
+    map_tiles as v2_map_tiles,
+    opportunities as v2_opportunities,
+)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
@@ -94,6 +100,10 @@ def health() -> dict[str, str]:
 
 
 app.include_router(v2_health.router, prefix="/api/v2")
+app.include_router(v2_opportunities.router, prefix="/api/v2")
+app.include_router(v2_map_tiles.router, prefix="/api/v2")
+app.include_router(v2_buildings.router, prefix="/api/v2")
+app.include_router(v2_communities.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")

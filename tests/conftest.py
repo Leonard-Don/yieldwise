@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
+import os
 
-from api.main import app
+import pytest
+
+os.environ.setdefault("ATLAS_ENABLE_DEMO_MOCK", "1")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from api.main import app  # noqa: E402
+from api.service import _runtime_data_state_cached  # noqa: E402
+
+_runtime_data_state_cached.cache_clear()
 
 
 @pytest.fixture(scope="session")
