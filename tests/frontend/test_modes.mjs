@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { MODES, getMode, yieldColorFor } from "../../frontend/user/modules/modes.js";
+import { MODES, getMode, yieldColorFor, defaultFiltersFor } from "../../frontend/user/modules/modes.js";
 
 test("MODES: yield/home/city present in declared order", () => {
   assert.deepEqual(MODES.map((m) => m.id), ["yield", "home", "city"]);
@@ -32,4 +32,13 @@ test("yieldColorFor: yieldPct >= 5 is up/green", () => {
 test("yieldColorFor: null/NaN returns dim", () => {
   assert.equal(yieldColorFor(null), "var(--text-dim)");
   assert.equal(yieldColorFor(Number.NaN), "var(--text-dim)");
+});
+
+test("defaultFiltersFor: yield mode returns minYield 4 + maxBudget 1500", () => {
+  assert.deepEqual(defaultFiltersFor("yield"), { minYield: 4, maxBudget: 1500 });
+});
+
+test("defaultFiltersFor: home and city modes default to empty filters", () => {
+  assert.deepEqual(defaultFiltersFor("home"), {});
+  assert.deepEqual(defaultFiltersFor("city"), {});
 });

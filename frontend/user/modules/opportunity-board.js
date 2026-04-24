@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { getMode } from "./modes.js";
+import { getMode, filtersToApiParams } from "./modes.js";
 
 export async function initBoard({ container, store }) {
   const list = container.querySelector('[data-role="board-list"]');
@@ -9,27 +9,38 @@ export async function initBoard({ container, store }) {
 
   let lastItems = [];
   let lastMode = store.get().mode;
+  let lastFilterKey = filterKeyFor(store.get(), lastMode);
 
-  await loadFor(lastMode);
+  function publishCount(value) {
+    const current = store.get().boardCount;
+    if (current === value) return;
+    store.set({ boardCount: value });
+  }
+
+  await loadFor(lastMode, store.get());
 
   store.subscribe(async (state) => {
-    if (state.mode !== lastMode) {
+    const nextFilterKey = filterKeyFor(state, state.mode);
+    if (state.mode !== lastMode || nextFilterKey !== lastFilterKey) {
       lastMode = state.mode;
-      await loadFor(state.mode);
+      lastFilterKey = nextFilterKey;
+      await loadFor(state.mode, state);
       return;
     }
     render(state);
   });
 
-  async function loadFor(modeId) {
+  async function loadFor(modeId, state) {
     const mode = getMode(modeId);
     if (!mode.enabled) {
       lastItems = [];
       render(store.get());
       return;
     }
+    const filters = (state && state.filters && state.filters[modeId]) || {};
+    const params = filtersToApiParams(filters);
     try {
-      const data = await api.opportunities();
+      const data = await api.opportunities(params);
       lastItems = sortItems(data.items || [], mode.defaultSort);
     } catch (err) {
       console.error("[atlas:board] opportunities load failed", err);
@@ -46,6 +57,7 @@ export async function initBoard({ container, store }) {
       empty.hidden = false;
       empty.textContent = `${mode.label} 模式将于 Phase 3 启用`;
       countEl.textContent = "--";
+      publishCount(null);
       return;
     }
     if (lastItems.length === 0) {
@@ -53,10 +65,12 @@ export async function initBoard({ container, store }) {
       empty.hidden = false;
       empty.textContent = "暂无机会";
       countEl.textContent = "0";
+      publishCount(0);
       return;
     }
     empty.hidden = true;
     countEl.textContent = String(lastItems.length);
+    publishCount(lastItems.length);
     list.innerHTML = lastItems
       .map((item) => renderRow(item, mode, state.selection))
       .join("");
@@ -130,4 +144,9 @@ function escapeText(value) {
 
 function escapeAttr(value) {
   return escapeText(value).replace(/'/g, "&#39;");
+}
+
+function filterKeyFor(state, modeId) {
+  const filters = (state && state.filters && state.filters[modeId]) || {};
+  return JSON.stringify(filters);
 }
