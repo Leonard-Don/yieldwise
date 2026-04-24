@@ -141,7 +141,7 @@ export function initDrawer({ root, store }) {
     const cols = bars
       .map(
         (b) =>
-          `<div class="atlas-bucket-col"><span class="atlas-bucket-value">${escapeText(formatBucketValue(b.value))}</span><div class="atlas-bucket-bar" style="height: ${b.pct}%"><span></span></div><span class="atlas-bucket-label">${escapeText(b.label)}</span></div>`,
+          `<div class="atlas-bucket-col"><span class="atlas-bucket-value">${escapeText(formatBucketValue(b.value))}</span><div class="atlas-bucket-bar-track"><div class="atlas-bucket-bar" style="height: ${b.pct}%"></div></div><span class="atlas-bucket-label">${escapeText(b.label)}</span></div>`,
       )
       .join("");
     return `<div><h3 class="atlas-section-title">楼层段租售比</h3><div class="atlas-bucket-chart">${cols}</div></div>`;

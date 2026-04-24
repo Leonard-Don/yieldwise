@@ -36,6 +36,7 @@
   display: grid;
   grid-template-columns: 1.6fr 1fr;
   overflow: hidden;
+  position: relative;
 }
 
 .atlas-map {
