@@ -1,0 +1,59 @@
+.atlas-board-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.atlas-board-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-board-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+
+.atlas-board-row:hover {
+  background: var(--bg-2);
+}
+
+.atlas-board-row[aria-selected="true"] {
+  background: rgba(0, 214, 143, 0.06);
+  border-left: 2px solid var(--up);
+  padding-left: 12px;
+}
+
+.atlas-board-row .name {
+  color: var(--text-0);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-board-row .secondary {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.atlas-board-empty {
+  padding: 32px 14px;
+  text-align: center;
+  color: var(--text-xs);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
