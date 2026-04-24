@@ -1,4 +1,3 @@
-import { api } from "./api.js";
 import { bucketBars, formatWan, formatYuan, pickKpisFor } from "./drawer-data.js";
 
 export function initDrawer({ root, store }) {
