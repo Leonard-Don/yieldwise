@@ -116,3 +116,55 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+
+.atlas-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.atlas-filter-spacer {
+  flex: 1;
+}
+
+.atlas-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px 2px 8px;
+  font-size: 11px;
+  color: var(--text-0);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-filter-chip-clear {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.atlas-filter-chip-clear:hover {
+  color: var(--down);
+}
+
+.atlas-filter-empty {
+  font-size: 11px;
+  color: var(--text-xs);
+  letter-spacing: 0.08em;
+}
+
+.atlas-filter-count {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}

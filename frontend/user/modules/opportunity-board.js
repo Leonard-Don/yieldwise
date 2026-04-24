@@ -11,6 +11,12 @@ export async function initBoard({ container, store }) {
   let lastMode = store.get().mode;
   let lastFilterKey = filterKeyFor(store.get(), lastMode);
 
+  function publishCount(value) {
+    const current = store.get().boardCount;
+    if (current === value) return;
+    store.set({ boardCount: value });
+  }
+
   await loadFor(lastMode, store.get());
 
   store.subscribe(async (state) => {
@@ -51,6 +57,7 @@ export async function initBoard({ container, store }) {
       empty.hidden = false;
       empty.textContent = `${mode.label} 模式将于 Phase 3 启用`;
       countEl.textContent = "--";
+      publishCount(null);
       return;
     }
     if (lastItems.length === 0) {
@@ -58,10 +65,12 @@ export async function initBoard({ container, store }) {
       empty.hidden = false;
       empty.textContent = "暂无机会";
       countEl.textContent = "0";
+      publishCount(0);
       return;
     }
     empty.hidden = true;
     countEl.textContent = String(lastItems.length);
+    publishCount(lastItems.length);
     list.innerHTML = lastItems
       .map((item) => renderRow(item, mode, state.selection))
       .join("");
