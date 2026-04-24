@@ -7,19 +7,37 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles/tokens.css" />
     <link rel="stylesheet" href="/styles/shell.css" />
+    <link rel="stylesheet" href="/styles/map.css" />
+    <link rel="stylesheet" href="/styles/board.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
       <header class="atlas-topbar">
         <h1>Shanghai · Yield · Atlas</h1>
+        <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
+        <div class="atlas-topbar-spacer"></div>
+        <span class="atlas-runtime-tag mono dim" data-component="runtime-tag"></span>
       </header>
-      <div class="atlas-filterbar"><span>筛选条位置</span></div>
+      <div class="atlas-filterbar" data-component="filter-bar">
+        <span class="dim">筛选条 (Phase 3 启用)</span>
+      </div>
       <main class="atlas-main">
-        <section class="atlas-map"><div class="atlas-placeholder">地图</div></section>
-        <aside class="atlas-board"><div class="atlas-placeholder">机会榜</div></aside>
+        <section class="atlas-map" id="atlas-map" data-component="map">
+          <div class="atlas-placeholder" data-role="map-placeholder">地图加载中…</div>
+        </section>
+        <aside class="atlas-board" data-component="board">
+          <div class="atlas-board-header mono">
+            <span data-role="board-count">--</span>
+            <span class="dim" data-role="board-mode-label">--</span>
+          </div>
+          <ol class="atlas-board-list" data-role="board-list"></ol>
+          <div class="atlas-board-empty" data-role="board-empty" hidden>暂无机会</div>
+        </aside>
       </main>
-      <footer class="atlas-statusbar">
-        <span class="mono">Phase 1 scaffold · platform shell</span>
+      <footer class="atlas-statusbar mono" data-component="statusbar">
+        <span data-role="statusbar-mode">mode: --</span>
+        <span data-role="statusbar-data">data: --</span>
+        <span data-role="statusbar-build">phase 2b</span>
       </footer>
     </div>
     <script type="module" src="/modules/main.js"></script>

@@ -20,11 +20,11 @@
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
 - 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
 
-## 路由布局（Phase 2a 起）
+## 路由布局（Phase 2b 起）
 
 | 路径 | 绑定 | 说明 |
 | --- | --- | --- |
-| `/` | `frontend/user/` | 面向用户的研究平台（Phase 1 为空壳，后续 phase 填入） |
+| `/` | `frontend/user/` | 用户平台。收益模式端到端：AMap 楼栋 + 机会榜 + URL ?mode= 同步。Home/City 模式 chip 已启用，行为见 Phase 3。 |
 | `/backstage` | `frontend/backstage/` | 原研究台，所有运营/复核/几何 QA 在此 |
 | `/api/*` | `api/service.py` + `api/backstage/`（Phase 2 迁移） | 传统接口，backstage 前端使用 |
 | `/api/v2/*` | `api/domains/` | 用户平台专属接口。已开放：`/health`、`/opportunities`、`/map/{districts,communities,buildings}`、`/buildings/{id}`、`/communities/{id}` |
