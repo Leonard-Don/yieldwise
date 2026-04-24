@@ -70,6 +70,7 @@ from .service import (
 
 from .domains import (
     buildings as v2_buildings,
+    communities as v2_communities,
     health as v2_health,
     map_tiles as v2_map_tiles,
     opportunities as v2_opportunities,
@@ -102,6 +103,7 @@ app.include_router(v2_health.router, prefix="/api/v2")
 app.include_router(v2_opportunities.router, prefix="/api/v2")
 app.include_router(v2_map_tiles.router, prefix="/api/v2")
 app.include_router(v2_buildings.router, prefix="/api/v2")
+app.include_router(v2_communities.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
