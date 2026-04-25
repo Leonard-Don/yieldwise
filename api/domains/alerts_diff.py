@@ -35,15 +35,17 @@ def _diff_target(
     rules: AlertRules,
 ) -> list[Alert]:
     out: list[Alert] = []
+    name_raw = snapshot.get("name")
+    target_name = str(name_raw) if name_raw else None
 
     base_yield = _normalize_yield(baseline.get("yield"))
     snap_yield = _normalize_yield(snapshot.get("yield"))
     if base_yield is not None and snap_yield is not None:
         delta = snap_yield - base_yield
         if delta >= rules.yield_delta_abs:
-            out.append(_alert(target_id, target_type, "yield_up", base_yield, snap_yield, delta))
+            out.append(_alert(target_id, target_type, "yield_up", base_yield, snap_yield, delta, target_name))
         elif -delta >= rules.yield_delta_abs:
-            out.append(_alert(target_id, target_type, "yield_down", base_yield, snap_yield, delta))
+            out.append(_alert(target_id, target_type, "yield_down", base_yield, snap_yield, delta, target_name))
 
     base_price = _maybe_float(baseline.get("price"))
     snap_price = _maybe_float(snapshot.get("price"))
@@ -58,6 +60,7 @@ def _diff_target(
                     base_price,
                     snap_price,
                     snap_price - base_price,
+                    target_name,
                 )
             )
 
@@ -67,7 +70,7 @@ def _diff_target(
         delta = snap_score - base_score
         if abs(delta) >= rules.score_delta_abs:
             out.append(
-                _alert(target_id, target_type, "score_jump", base_score, snap_score, delta)
+                _alert(target_id, target_type, "score_jump", base_score, snap_score, delta, target_name)
             )
 
     return out
@@ -93,9 +96,18 @@ def _maybe_float(value: Any) -> float | None:
     return result
 
 
-def _alert(target_id: str, target_type: str, kind: str, base: float, snap: float, delta: float) -> Alert:
+def _alert(
+    target_id: str,
+    target_type: str,
+    kind: str,
+    base: float,
+    snap: float,
+    delta: float,
+    target_name: str | None = None,
+) -> Alert:
     return Alert(
         target_id=target_id,
+        target_name=target_name,
         target_type=target_type,
         kind=kind,
         from_value=base,

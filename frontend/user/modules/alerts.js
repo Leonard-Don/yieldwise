@@ -49,7 +49,8 @@ export function initAlerts({ root, store }) {
 
   function renderRow(alert) {
     const severity = severityFor(alert);
-    return `<li class="atlas-banner-row" data-severity="${escapeAttr(severity)}"><span class="atlas-banner-target">${escapeText(alert.target_id || "")}</span><span class="atlas-banner-line">${escapeText(formatAlertLine(alert))}</span></li>`;
+    const display = alert.target_name || alert.target_id || "";
+    return `<li class="atlas-banner-row" data-severity="${escapeAttr(severity)}"><span class="atlas-banner-target" title="${escapeAttr(alert.target_id || "")}">${escapeText(display)}</span><span class="atlas-banner-line">${escapeText(formatAlertLine(alert))}</span></li>`;
   }
 
   async function markSeen() {

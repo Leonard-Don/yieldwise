@@ -55,3 +55,31 @@ def test_alert_round_trip() -> None:
     alert = Alert.model_validate(payload)
     assert alert.kind == "yield_up"
     assert alert.delta == 0.6
+
+
+def test_alert_round_trip_with_target_name() -> None:
+    payload = {
+        "target_id": "daning-jinmaofu-b1",
+        "target_name": "1号楼",
+        "target_type": "building",
+        "kind": "yield_up",
+        "from_value": 4.0,
+        "to_value": 4.6,
+        "delta": 0.6,
+    }
+    alert = Alert.model_validate(payload)
+    assert alert.target_name == "1号楼"
+
+
+def test_alert_target_name_defaults_to_none() -> None:
+    alert = Alert.model_validate(
+        {
+            "target_id": "x",
+            "target_type": "building",
+            "kind": "yield_up",
+            "from_value": 4.0,
+            "to_value": 4.6,
+            "delta": 0.6,
+        }
+    )
+    assert alert.target_name is None

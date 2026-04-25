@@ -103,3 +103,28 @@ def test_mark_seen_then_since_last_open_returns_no_alerts(
     # baselines == current → no alerts
     assert response["items"] == []
     assert response["last_open_at"] is not None
+
+
+def test_since_last_open_includes_target_name(
+    client, isolated_personal_dir: Path
+) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
+    )
+    state = {
+        "baselines": {
+            "zhangjiang-park-b1": {"yield": 1.0, "price": 100.0, "score": 30}
+        },
+        "last_open_at": "2026-04-20T10:00:00",
+    }
+    (isolated_personal_dir / "alerts_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+    response = client.get("/api/v2/alerts/since-last-open").json()
+    assert len(response["items"]) >= 1
+    for item in response["items"]:
+        assert item["target_id"] == "zhangjiang-park-b1"
+        # mock data exposes a building name distinct from the slug id
+        assert item.get("target_name")
+        assert item["target_name"] != item["target_id"]
