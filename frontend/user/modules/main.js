@@ -6,6 +6,9 @@ import { initDrawer } from "./detail-drawer.js";
 import { initFilterBar } from "./filter-bar.js";
 import { createStorage } from "./storage.js";
 import { MODES, defaultFiltersFor } from "./modes.js";
+import { initOnboarding } from "./home-onboarding.js";
+import { isPrefsEmpty } from "./user-prefs-helpers.js";
+import { api } from "./api.js";
 
 const root = document.querySelector('[data-user-shell="atlas"]');
 if (!root) {
@@ -30,7 +33,17 @@ async function bootstrap(root) {
     runtime: null,
     filters: initialFilters,
     boardCount: null,
+    userPrefs: null,
+    onboardingOpen: false,
   });
+
+  // Fire-and-forget: prefetch the user prefs (needed by the home onboarding
+  // gate). Failures are non-fatal — the user can still click 偏好 to open
+  // the modal and try again.
+  api.userPrefs
+    .get()
+    .then((prefs) => store.set({ userPrefs: prefs }))
+    .catch((err) => console.warn("[atlas] user prefs prefetch failed", err));
 
   let lastSerializedFilters = JSON.stringify(initialFilters);
   store.subscribe((state) => {
@@ -41,6 +54,22 @@ async function bootstrap(root) {
   });
 
   initShell({ root, store });
+  initOnboarding({ root, store });
+
+  // Auto-open the onboarding modal when a fresh user lands on home mode.
+  let lastMode = store.get().mode;
+  store.subscribe((state) => {
+    if (state.mode !== lastMode) {
+      lastMode = state.mode;
+      if (state.mode === "home" && isPrefsEmpty(state.userPrefs)) {
+        store.set({ onboardingOpen: true });
+      }
+    }
+  });
+  if (store.get().mode === "home" && isPrefsEmpty(store.get().userPrefs)) {
+    store.set({ onboardingOpen: true });
+  }
+
   initDrawer({ root, store });
   initFilterBar({ root, store });
 

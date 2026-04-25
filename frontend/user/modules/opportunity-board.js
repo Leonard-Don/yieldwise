@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { getMode, filtersToApiParams } from "./modes.js";
+import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js";
 
 export async function initBoard({ container, store }) {
   const list = container.querySelector('[data-role="board-list"]');
@@ -37,7 +37,11 @@ export async function initBoard({ container, store }) {
       render(store.get());
       return;
     }
-    const filters = (state && state.filters && state.filters[modeId]) || {};
+    const persisted = state && state.filters ? state.filters[modeId] : null;
+    const filters =
+      persisted && Object.keys(persisted).length > 0
+        ? persisted
+        : resolveDefaultFilters(modeId, (state && state.userPrefs) || null);
     const params = filtersToApiParams(filters);
     try {
       const data = await api.opportunities(params);
@@ -148,5 +152,9 @@ function escapeAttr(value) {
 
 function filterKeyFor(state, modeId) {
   const filters = (state && state.filters && state.filters[modeId]) || {};
-  return JSON.stringify(filters);
+  const prefsKey =
+    state && state.userPrefs && state.userPrefs.updated_at
+      ? state.userPrefs.updated_at
+      : "";
+  return JSON.stringify(filters) + "|" + prefsKey;
 }

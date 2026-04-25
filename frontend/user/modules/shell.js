@@ -21,6 +21,13 @@ export function initShell({ root, store }) {
     setMode(target.dataset.mode);
   });
 
+  const prefsButton = root.querySelector('[data-component="prefs-button"]');
+  if (prefsButton) {
+    prefsButton.addEventListener("click", () => {
+      store.set({ onboardingOpen: true });
+    });
+  }
+
   // Initial mode from URL ?mode=... falling back to store.
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("mode");
