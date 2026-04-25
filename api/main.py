@@ -75,6 +75,7 @@ from .domains import (
     map_tiles as v2_map_tiles,
     opportunities as v2_opportunities,
     user_prefs as v2_user_prefs,
+    watchlist as v2_watchlist,
 )
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -106,6 +107,7 @@ app.include_router(v2_map_tiles.router, prefix="/api/v2")
 app.include_router(v2_buildings.router, prefix="/api/v2")
 app.include_router(v2_communities.router, prefix="/api/v2")
 app.include_router(v2_user_prefs.router, prefix="/api/v2")
+app.include_router(v2_watchlist.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
