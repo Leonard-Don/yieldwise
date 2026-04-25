@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { loadAmap } from "./runtime.js";
-import { yieldColorFor } from "./modes.js";
+import { yieldColorFor, districtColorFor } from "./modes.js";
 
 const SHANGHAI_CENTER = [121.4737, 31.2304];
 const DEFAULT_ZOOM = 10.8;
@@ -40,8 +40,48 @@ export async function initMap({ container, store }) {
   container.classList.add("is-ready");
   if (placeholder) placeholder.remove();
 
-  const buildings = await api.mapBuildings();
-  renderBuildings({ map, AMap, store, features: buildings.features || [] });
+  let currentOverlays = [];
+  let currentMode = null;
+  let renderToken = 0;
+
+  function clearOverlays() {
+    if (currentOverlays.length === 0) return;
+    map.remove(currentOverlays);
+    currentOverlays = [];
+  }
+
+  async function renderForMode(modeId) {
+    const myToken = ++renderToken;
+    clearOverlays();
+    if (modeId === "city") {
+      const next = await renderDistricts({ AMap, map, store });
+      if (myToken !== renderToken) {
+        // a newer mode-change won — discard these overlays
+        map.remove(next);
+        return;
+      }
+      currentOverlays = next;
+    } else {
+      const next = await renderBuildings({ AMap, map, store });
+      if (myToken !== renderToken) {
+        map.remove(next);
+        return;
+      }
+      currentOverlays = next;
+    }
+  }
+
+  currentMode = store.get().mode;
+  await renderForMode(currentMode);
+
+  store.subscribe((state) => {
+    if (state.mode !== currentMode) {
+      currentMode = state.mode;
+      renderForMode(currentMode).catch((err) =>
+        console.error("[atlas:map] renderForMode failed", err),
+      );
+    }
+  });
 
   syncSelectionHighlight({ map, AMap, store });
 
@@ -55,9 +95,16 @@ function showError(container, message) {
   container.appendChild(div);
 }
 
-function renderBuildings({ map, AMap, store, features }) {
+async function renderBuildings({ AMap, map, store }) {
   const overlays = [];
-  for (const feature of features) {
+  let buildings;
+  try {
+    buildings = await api.mapBuildings();
+  } catch (err) {
+    console.error("[atlas:map] buildings load failed", err);
+    return overlays;
+  }
+  for (const feature of buildings.features || []) {
     const geometry = feature.geometry;
     const props = feature.properties || {};
     if (!geometry) continue;
@@ -73,8 +120,87 @@ function renderBuildings({ map, AMap, store, features }) {
     });
     overlays.push(overlay);
   }
-  map.add(overlays);
+  if (overlays.length > 0) map.add(overlays);
   return overlays;
+}
+
+const districtBoundaryCache = new Map();
+
+async function renderDistricts({ AMap, map, store }) {
+  const overlays = [];
+  let payload;
+  try {
+    payload = await api.mapDistricts();
+  } catch (err) {
+    console.error("[atlas:map] districts load failed", err);
+    return overlays;
+  }
+
+  const districts = payload.districts || [];
+  const summary = payload.summary || {};
+  const meanYield = summary.avgYield;
+
+  if (!AMap.DistrictSearch) {
+    console.warn("[atlas:map] AMap.DistrictSearch unavailable — falling back to label markers");
+    for (const district of districts) {
+      // No polygon plugin — skip silently. Phase 6 may add label markers fallback.
+    }
+    return overlays;
+  }
+
+  const search = new AMap.DistrictSearch({
+    level: "district",
+    extensions: "all",
+    subdistrict: 0,
+    showbiz: false,
+  });
+
+  await Promise.all(
+    districts.map(async (district) => {
+      const boundaries = await fetchBoundariesCached(search, district.name);
+      const color = districtColorFor(district.yield, meanYield);
+      for (const path of boundaries) {
+        const polygon = new AMap.Polygon({
+          path,
+          strokeColor: color,
+          strokeWeight: 1,
+          strokeOpacity: 0.85,
+          fillColor: color,
+          fillOpacity: 0.25,
+          bubble: false,
+        });
+        polygon.setExtData({ districtId: district.id, props: district });
+        polygon.on("click", () => {
+          store.set({
+            selection: { type: "district", id: district.id, props: district },
+          });
+        });
+        overlays.push(polygon);
+      }
+    }),
+  );
+
+  if (overlays.length > 0) map.add(overlays);
+  return overlays;
+}
+
+function fetchBoundariesCached(search, districtName) {
+  if (districtBoundaryCache.has(districtName)) {
+    return Promise.resolve(districtBoundaryCache.get(districtName));
+  }
+  return new Promise((resolve) => {
+    search.search(districtName, (status, result) => {
+      if (status !== "complete") {
+        districtBoundaryCache.set(districtName, []);
+        resolve([]);
+        return;
+      }
+      const first = result?.districtList?.[0];
+      const boundaries = first?.boundaries ?? [];
+      districtBoundaryCache.set(districtName, boundaries);
+      resolve(boundaries);
+    });
+  });
 }
 
 function createOverlay({ AMap, geometry, color }) {
