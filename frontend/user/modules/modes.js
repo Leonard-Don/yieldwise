@@ -30,13 +30,13 @@ export const MODES = [
     label: "全市观察",
     hotkey: "3",
     boardColumns: [
-      { key: "districtName", label: "区" },
+      { key: "name", label: "区" },
       { key: "yield", label: "均租售比", format: "pct" },
       { key: "score", label: "机会分", format: "int" },
     ],
     defaultSort: { key: "yield", direction: "desc" },
     defaultFilters: {},
-    enabled: false,
+    enabled: true,
   },
 ];
 
