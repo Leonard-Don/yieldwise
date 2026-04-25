@@ -56,19 +56,27 @@ async function bootstrap(root) {
   initShell({ root, store });
   initOnboarding({ root, store });
 
-  // Auto-open the onboarding modal when a fresh user lands on home mode.
+  // Auto-open the onboarding modal when a fresh user lands on home mode AND
+  // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).
+  // Fire on either mode-change or prefs-hydration transitions.
   let lastMode = store.get().mode;
+  let prefsHydrated = store.get().userPrefs !== null && store.get().userPrefs !== undefined;
   store.subscribe((state) => {
-    if (state.mode !== lastMode) {
-      lastMode = state.mode;
-      if (state.mode === "home" && isPrefsEmpty(state.userPrefs)) {
-        store.set({ onboardingOpen: true });
-      }
+    const modeChanged = state.mode !== lastMode;
+    const prefsLoadedNow = state.userPrefs !== null && state.userPrefs !== undefined;
+    const prefsJustHydrated = !prefsHydrated && prefsLoadedNow;
+    if (modeChanged) lastMode = state.mode;
+    if (prefsJustHydrated) prefsHydrated = true;
+    if (
+      (modeChanged || prefsJustHydrated) &&
+      state.mode === "home" &&
+      prefsLoadedNow &&
+      isPrefsEmpty(state.userPrefs) &&
+      !state.onboardingOpen
+    ) {
+      store.set({ onboardingOpen: true });
     }
   });
-  if (store.get().mode === "home" && isPrefsEmpty(store.get().userPrefs)) {
-    store.set({ onboardingOpen: true });
-  }
 
   initDrawer({ root, store });
   initFilterBar({ root, store });
