@@ -54,6 +54,17 @@
           <div class="atlas-drawer-body" data-role="drawer-body">
             <div class="atlas-drawer-empty">选择楼栋或机会榜条目以查看详情</div>
           </div>
+          <section class="atlas-drawer-notes" data-component="notes-section" hidden>
+            <header class="atlas-notes-header">
+              <h3>笔记</h3>
+              <span class="atlas-notes-status mono dim" data-role="notes-status">—</span>
+            </header>
+            <ol class="atlas-notes-list" data-role="notes-list"></ol>
+            <form class="atlas-notes-add" data-role="notes-add" novalidate>
+              <textarea data-role="notes-add-input" placeholder="添加笔记 …" rows="2"></textarea>
+              <button type="submit" data-role="notes-add-submit" disabled>添加</button>
+            </form>
+          </section>
         </aside>
         <div class="atlas-onboarding-backdrop" data-component="onboarding-backdrop" data-open="false"></div>
         <section class="atlas-onboarding" data-component="onboarding" data-open="false" aria-hidden="true" aria-labelledby="atlas-onboarding-title">
