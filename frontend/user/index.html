@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/styles/map.css" />
     <link rel="stylesheet" href="/styles/board.css" />
     <link rel="stylesheet" href="/styles/drawer.css" />
+    <link rel="stylesheet" href="/styles/onboarding.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
@@ -17,6 +18,7 @@
         <h1>Shanghai · Yield · Atlas</h1>
         <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
         <div class="atlas-topbar-spacer"></div>
+        <button type="button" class="atlas-prefs-button" data-component="prefs-button">偏好</button>
         <span class="atlas-runtime-tag mono dim" data-component="runtime-tag"></span>
       </header>
       <div class="atlas-filterbar" data-component="filter-bar">
@@ -49,6 +51,37 @@
             <div class="atlas-drawer-empty">选择楼栋或机会榜条目以查看详情</div>
           </div>
         </aside>
+        <div class="atlas-onboarding-backdrop" data-component="onboarding-backdrop" data-open="false"></div>
+        <section class="atlas-onboarding" data-component="onboarding" data-open="false" aria-hidden="true" aria-labelledby="atlas-onboarding-title">
+          <header class="atlas-onboarding-header">
+            <h2 id="atlas-onboarding-title" class="atlas-onboarding-title">自住找房 · 偏好设定</h2>
+            <button type="button" class="atlas-onboarding-close" data-role="onboarding-close" aria-label="关闭">×</button>
+          </header>
+          <form class="atlas-onboarding-form" data-role="onboarding-form" novalidate>
+            <fieldset class="atlas-onboarding-fieldset">
+              <legend>预算（万元）<span class="atlas-onboarding-required">*</span></legend>
+              <div class="atlas-onboarding-pair">
+                <label>下限<input type="number" name="budget_min_wan" min="0" step="10" placeholder="0" /></label>
+                <label>上限<input type="number" name="budget_max_wan" min="0" step="10" placeholder="必填" required /></label>
+              </div>
+            </fieldset>
+            <fieldset class="atlas-onboarding-fieldset">
+              <legend>优先区域</legend>
+              <div class="atlas-onboarding-districts" data-role="onboarding-districts"></div>
+            </fieldset>
+            <fieldset class="atlas-onboarding-fieldset">
+              <legend>面积（平米）</legend>
+              <div class="atlas-onboarding-pair">
+                <label>下限<input type="number" name="area_min_sqm" min="0" step="5" placeholder="0" /></label>
+                <label>上限<input type="number" name="area_max_sqm" min="0" step="5" placeholder="无上限" /></label>
+              </div>
+            </fieldset>
+            <footer class="atlas-onboarding-actions">
+              <span class="atlas-onboarding-status mono dim" data-role="onboarding-status">填写后保存到 data/personal/user_prefs.json</span>
+              <button type="submit" class="atlas-onboarding-submit" data-role="onboarding-submit" disabled>保存</button>
+            </footer>
+          </form>
+        </section>
       </main>
       <footer class="atlas-statusbar mono" data-component="statusbar">
         <span data-role="statusbar-mode">mode: --</span>
