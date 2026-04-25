@@ -73,6 +73,7 @@ def main() -> int:
             (f"{base}/api/v2/map/communities", '"items"'),
             (f"{base}/api/v2/map/buildings", '"features"'),
             (f"{base}/api/v2/user/prefs", '"districts"'),
+            (f"{base}/api/v2/watchlist", '"items"'),
         ]
         failed: list[str] = []
         for url, expected_substring in checks:

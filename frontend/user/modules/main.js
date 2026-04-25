@@ -7,6 +7,7 @@ import { initFilterBar } from "./filter-bar.js";
 import { createStorage } from "./storage.js";
 import { MODES, defaultFiltersFor } from "./modes.js";
 import { initOnboarding } from "./home-onboarding.js";
+import { initWatchlist } from "./watchlist.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
 
@@ -35,6 +36,7 @@ async function bootstrap(root) {
     boardCount: null,
     userPrefs: null,
     onboardingOpen: false,
+    watchlist: [],
   });
 
   // Fire-and-forget: prefetch the user prefs (needed by the home onboarding
@@ -44,6 +46,11 @@ async function bootstrap(root) {
     .get()
     .then((prefs) => store.set({ userPrefs: prefs }))
     .catch((err) => console.warn("[atlas] user prefs prefetch failed", err));
+
+  api.watchlist
+    .list()
+    .then((data) => store.set({ watchlist: data.items || [] }))
+    .catch((err) => console.warn("[atlas] watchlist prefetch failed", err));
 
   let lastSerializedFilters = JSON.stringify(initialFilters);
   store.subscribe((state) => {
@@ -55,6 +62,7 @@ async function bootstrap(root) {
 
   initShell({ root, store });
   initOnboarding({ root, store });
+  initWatchlist({ root, store });
 
   // Auto-open the onboarding modal when a fresh user lands on home mode AND
   // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).
