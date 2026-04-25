@@ -55,6 +55,24 @@ export function yieldColorFor(yieldPct) {
   return "var(--up)";
 }
 
+function normalizeYieldScalar(value) {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  if (Number.isNaN(num)) return null;
+  // Match the percent-vs-fraction heuristic in map.js: < 1 means fraction.
+  return num < 1 ? num * 100 : num;
+}
+
+export function districtColorFor(value, mean) {
+  const v = normalizeYieldScalar(value);
+  const m = normalizeYieldScalar(mean);
+  if (v === null || m === null) return "var(--text-dim)";
+  const delta = v - m;
+  if (delta > 0.2) return "var(--up)";
+  if (delta < -0.2) return "var(--down)";
+  return "var(--warn)";
+}
+
 export function defaultFiltersFor(modeId) {
   return { ...(getMode(modeId).defaultFilters || {}) };
 }

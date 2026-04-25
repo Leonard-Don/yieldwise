@@ -7,6 +7,7 @@ import {
   yieldColorFor,
   defaultFiltersFor,
   resolveDefaultFilters,
+  districtColorFor,
 } from "../../frontend/user/modules/modes.js";
 
 test("MODES: yield/home/city present in declared order", () => {
@@ -79,4 +80,30 @@ test("resolveDefaultFilters: city mode is empty regardless of prefs", () => {
 
 test("MODES: home mode is now enabled", () => {
   assert.equal(getMode("home").enabled, true);
+});
+
+test("districtColorFor: null/NaN returns dim", () => {
+  assert.equal(districtColorFor(null, 4), "var(--text-dim)");
+  assert.equal(districtColorFor(Number.NaN, 4), "var(--text-dim)");
+  assert.equal(districtColorFor(4, null), "var(--text-dim)");
+});
+
+test("districtColorFor: value above mean by > 0.2 → up", () => {
+  assert.equal(districtColorFor(5, 4), "var(--up)");
+});
+
+test("districtColorFor: value below mean by > 0.2 → down", () => {
+  assert.equal(districtColorFor(3, 4), "var(--down)");
+});
+
+test("districtColorFor: value within ±0.2 of mean → warn", () => {
+  assert.equal(districtColorFor(4.1, 4), "var(--warn)");
+  assert.equal(districtColorFor(3.9, 4), "var(--warn)");
+});
+
+test("districtColorFor: handles fractional yield (auto-scale 0.04 → 4)", () => {
+  // The function should accept either fraction or percent — same heuristic as
+  // yieldColorFor — to handle staged data that stores yield as 0.04 vs 4.0.
+  assert.equal(districtColorFor(0.05, 0.04), "var(--up)");
+  assert.equal(districtColorFor(0.03, 0.04), "var(--down)");
 });
