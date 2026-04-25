@@ -135,3 +135,25 @@ def test_multiple_alerts_per_target() -> None:
     )
     kinds = sorted(a.kind for a in items)
     assert kinds == ["price_drop", "score_jump", "yield_up"]
+
+
+def test_compute_alerts_threads_target_name_from_snapshot() -> None:
+    items = compute_alerts(
+        watchlist_items=_watchlist([("x", "building")]),
+        baselines={"x": {"yield": 4.0, "price": 800.0, "score": 60}},
+        snapshots={"x": {"name": "1号楼", "yield": 4.6, "price": 800.0, "score": 60}},
+        rules=AlertRules(),
+    )
+    assert len(items) == 1
+    assert items[0].target_name == "1号楼"
+
+
+def test_compute_alerts_target_name_none_when_snapshot_lacks_name() -> None:
+    items = compute_alerts(
+        watchlist_items=_watchlist([("x", "building")]),
+        baselines={"x": {"yield": 4.0, "price": 800.0, "score": 60}},
+        snapshots={"x": {"yield": 4.6, "price": 800.0, "score": 60}},
+        rules=AlertRules(),
+    )
+    assert len(items) == 1
+    assert items[0].target_name is None

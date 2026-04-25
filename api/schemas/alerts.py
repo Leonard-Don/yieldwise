@@ -53,6 +53,7 @@ class Alert(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     target_id: str
+    target_name: str | None = None
     target_type: AlertTargetType
     kind: AlertKind
     from_value: float | None = None
