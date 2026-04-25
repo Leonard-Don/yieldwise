@@ -6,6 +6,9 @@ import { initDrawer } from "./detail-drawer.js";
 import { initFilterBar } from "./filter-bar.js";
 import { createStorage } from "./storage.js";
 import { MODES, defaultFiltersFor } from "./modes.js";
+import { initOnboarding } from "./home-onboarding.js";
+import { isPrefsEmpty } from "./user-prefs-helpers.js";
+import { api } from "./api.js";
 
 const root = document.querySelector('[data-user-shell="atlas"]');
 if (!root) {
@@ -30,7 +33,17 @@ async function bootstrap(root) {
     runtime: null,
     filters: initialFilters,
     boardCount: null,
+    userPrefs: null,
+    onboardingOpen: false,
   });
+
+  // Fire-and-forget: prefetch the user prefs (needed by the home onboarding
+  // gate). Failures are non-fatal — the user can still click 偏好 to open
+  // the modal and try again.
+  api.userPrefs
+    .get()
+    .then((prefs) => store.set({ userPrefs: prefs }))
+    .catch((err) => console.warn("[atlas] user prefs prefetch failed", err));
 
   let lastSerializedFilters = JSON.stringify(initialFilters);
   store.subscribe((state) => {
@@ -41,6 +54,30 @@ async function bootstrap(root) {
   });
 
   initShell({ root, store });
+  initOnboarding({ root, store });
+
+  // Auto-open the onboarding modal when a fresh user lands on home mode AND
+  // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).
+  // Fire on either mode-change or prefs-hydration transitions.
+  let lastMode = store.get().mode;
+  let prefsHydrated = store.get().userPrefs !== null && store.get().userPrefs !== undefined;
+  store.subscribe((state) => {
+    const modeChanged = state.mode !== lastMode;
+    const prefsLoadedNow = state.userPrefs !== null && state.userPrefs !== undefined;
+    const prefsJustHydrated = !prefsHydrated && prefsLoadedNow;
+    if (modeChanged) lastMode = state.mode;
+    if (prefsJustHydrated) prefsHydrated = true;
+    if (
+      (modeChanged || prefsJustHydrated) &&
+      state.mode === "home" &&
+      prefsLoadedNow &&
+      isPrefsEmpty(state.userPrefs) &&
+      !state.onboardingOpen
+    ) {
+      store.set({ onboardingOpen: true });
+    }
+  });
+
   initDrawer({ root, store });
   initFilterBar({ root, store });
 

@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { MODES, getMode, yieldColorFor, defaultFiltersFor } from "../../frontend/user/modules/modes.js";
+import {
+  MODES,
+  getMode,
+  yieldColorFor,
+  defaultFiltersFor,
+  resolveDefaultFilters,
+} from "../../frontend/user/modules/modes.js";
 
 test("MODES: yield/home/city present in declared order", () => {
   assert.deepEqual(MODES.map((m) => m.id), ["yield", "home", "city"]);
@@ -41,4 +47,36 @@ test("defaultFiltersFor: yield mode returns minYield 4 + maxBudget 1500", () => 
 test("defaultFiltersFor: home and city modes default to empty filters", () => {
   assert.deepEqual(defaultFiltersFor("home"), {});
   assert.deepEqual(defaultFiltersFor("city"), {});
+});
+
+test("resolveDefaultFilters: yield mode static defaults", () => {
+  assert.deepEqual(resolveDefaultFilters("yield", null), { minYield: 4, maxBudget: 1500 });
+});
+
+test("resolveDefaultFilters: home with empty prefs returns empty", () => {
+  assert.deepEqual(resolveDefaultFilters("home", null), {});
+  assert.deepEqual(resolveDefaultFilters("home", {}), {});
+  assert.deepEqual(resolveDefaultFilters("home", { budget_max_wan: null, districts: [] }), {});
+});
+
+test("resolveDefaultFilters: home with budget pulls maxBudget", () => {
+  assert.deepEqual(
+    resolveDefaultFilters("home", { budget_max_wan: 1200, districts: [] }),
+    { maxBudget: 1200 },
+  );
+});
+
+test("resolveDefaultFilters: home with districts uses first district", () => {
+  assert.deepEqual(
+    resolveDefaultFilters("home", { budget_max_wan: 1200, districts: ["pudong", "jingan"] }),
+    { maxBudget: 1200, district: "pudong" },
+  );
+});
+
+test("resolveDefaultFilters: city mode is empty regardless of prefs", () => {
+  assert.deepEqual(resolveDefaultFilters("city", { budget_max_wan: 1200 }), {});
+});
+
+test("MODES: home mode is now enabled", () => {
+  assert.equal(getMode("home").enabled, true);
 });

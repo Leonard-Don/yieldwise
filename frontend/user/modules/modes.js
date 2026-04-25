@@ -23,7 +23,7 @@ export const MODES = [
     ],
     defaultSort: { key: "avgPriceWan", direction: "asc" },
     defaultFilters: {},
-    enabled: false,
+    enabled: true,
   },
   {
     id: "city",
@@ -64,6 +64,7 @@ const FILTER_KEY_MAP = {
   maxBudget: "max_budget",
   minSamples: "min_samples",
   minScore: "min_score",
+  district: "district",
 };
 
 const FILTER_API_DEFAULTS = {
@@ -71,6 +72,7 @@ const FILTER_API_DEFAULTS = {
   maxBudget: 10000,
   minSamples: 0,
   minScore: 0,
+  district: "all",
 };
 
 export function filtersToApiParams(filters) {
@@ -89,6 +91,7 @@ const FILTER_LABELS = {
   maxBudget: (v) => `总价 ≤ ${v} 万`,
   minSamples: (v) => `样本量 ≥ ${v}`,
   minScore: (v) => `机会分 ≥ ${v}`,
+  district: (v) => `区域 = ${v}`,
 };
 
 export function describeFilter(key, value) {
@@ -101,9 +104,32 @@ export function prunedFilters(filters) {
   for (const [key, value] of Object.entries(filters || {})) {
     if (value === undefined || value === null || value === "") continue;
     if (Object.prototype.hasOwnProperty.call(FILTER_API_DEFAULTS, key)) {
-      if (Number(value) === FILTER_API_DEFAULTS[key]) continue;
+      const apiDefault = FILTER_API_DEFAULTS[key];
+      if (typeof apiDefault === "number" && Number(value) === apiDefault) continue;
+      if (typeof apiDefault === "string" && value === apiDefault) continue;
     }
     out[key] = value;
   }
   return out;
+}
+
+export function resolveDefaultFilters(modeId, userPrefs) {
+  if (modeId === "yield") {
+    return { ...defaultFiltersFor("yield") };
+  }
+  if (modeId === "home") {
+    const out = {};
+    if (userPrefs && typeof userPrefs === "object") {
+      const budget = userPrefs.budget_max_wan;
+      if (budget !== null && budget !== undefined && budget !== "") {
+        out.maxBudget = Number(budget);
+      }
+      const districts = userPrefs.districts;
+      if (Array.isArray(districts) && districts.length > 0) {
+        out.district = String(districts[0]);
+      }
+    }
+    return out;
+  }
+  return {};
 }
