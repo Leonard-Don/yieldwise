@@ -69,6 +69,7 @@ from .service import (
 )
 
 from .domains import (
+    alerts as v2_alerts,
     annotations as v2_annotations,
     buildings as v2_buildings,
     communities as v2_communities,
@@ -102,6 +103,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(v2_alerts.router, prefix="/api/v2")
 app.include_router(v2_health.router, prefix="/api/v2")
 app.include_router(v2_opportunities.router, prefix="/api/v2")
 app.include_router(v2_map_tiles.router, prefix="/api/v2")
