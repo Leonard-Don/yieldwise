@@ -1,0 +1,125 @@
+.atlas-banner {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 176, 32, 0.12);
+  border-bottom: 1px solid var(--warn);
+  color: var(--text-0);
+  font-family: var(--font-ui);
+}
+
+.atlas-banner[hidden] {
+  display: none;
+}
+
+.atlas-banner-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 14px;
+  flex: 1;
+}
+
+.atlas-banner-count {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--warn);
+}
+
+.atlas-banner-since {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.atlas-banner-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 8px;
+}
+
+.atlas-banner-toggle,
+.atlas-banner-mark {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.atlas-banner-toggle:hover,
+.atlas-banner-mark:hover {
+  color: var(--text-0);
+  border-color: var(--warn);
+}
+
+.atlas-banner-mark {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.atlas-banner-mark:hover {
+  background: rgba(255, 176, 32, 0.12);
+}
+
+.atlas-banner-mark[disabled],
+.atlas-banner-toggle[disabled] {
+  opacity: 0.4;
+  cursor: progress;
+}
+
+.atlas-banner-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px dashed var(--line);
+}
+
+.atlas-banner-list[hidden] {
+  display: none;
+}
+
+.atlas-banner-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr);
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.atlas-banner-row:last-child {
+  border-bottom: none;
+}
+
+.atlas-banner-target {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-banner-line {
+  color: var(--text-0);
+}
+
+.atlas-banner-row[data-severity="up"] .atlas-banner-line {
+  color: var(--up);
+}
+
+.atlas-banner-row[data-severity="down"] .atlas-banner-line {
+  color: var(--down);
+}
+
+.atlas-banner-row[data-severity="warn"] .atlas-banner-line {
+  color: var(--warn);
+}
