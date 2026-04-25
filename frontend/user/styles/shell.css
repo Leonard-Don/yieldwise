@@ -168,3 +168,18 @@
   font-size: 11px;
   letter-spacing: 0.06em;
 }
+
+.atlas-star-tag {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.atlas-star-tag[data-active="true"] {
+  color: var(--warn);
+  border-color: var(--warn);
+}

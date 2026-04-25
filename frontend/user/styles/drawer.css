@@ -211,3 +211,38 @@
   padding: 24px 0;
   text-align: center;
 }
+
+.atlas-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-drawer-star {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 14px;
+  width: 28px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.atlas-drawer-star[aria-pressed="true"] {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: rgba(255, 176, 32, 0.08);
+}
+
+.atlas-drawer-star:hover {
+  color: var(--warn);
+}
+
+.atlas-drawer-star[disabled] {
+  opacity: 0.5;
+  cursor: progress;
+}
