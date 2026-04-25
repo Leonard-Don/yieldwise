@@ -63,6 +63,7 @@ def _snapshot(target_id: str, target_type: str) -> dict[str, Any] | None:
         if not record:
             return None
         return {
+            "name": record.get("name"),
             "yield": record.get("yieldAvg"),
             "price": record.get("saleMedianWan"),
             "score": record.get("score"),
@@ -72,6 +73,7 @@ def _snapshot(target_id: str, target_type: str) -> dict[str, Any] | None:
         if not record:
             return None
         return {
+            "name": record.get("name"),
             "yield": record.get("yield"),
             "price": record.get("avgPriceWan"),
             "score": record.get("score"),
