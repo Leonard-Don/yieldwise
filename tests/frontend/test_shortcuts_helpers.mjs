@@ -45,6 +45,10 @@ test("parseShortcut: f with Cmd modifier → null (browser bookmark)", () => {
   assert.equal(parseShortcut(makeEvent({ key: "n", ctrlKey: true })), null);
 });
 
+test("parseShortcut: '/' with shiftKey → help (Playwright/QWERTY layout fallback)", () => {
+  assert.equal(parseShortcut(makeEvent({ key: "/", shiftKey: true })), "help");
+});
+
 test("parseShortcut: ? (Shift+/) → help", () => {
   assert.equal(parseShortcut(makeEvent({ key: "?", shiftKey: true })), "help");
 });
