@@ -37,6 +37,17 @@ export async function initBoard({ container, store }) {
       render(store.get());
       return;
     }
+    if (modeId === "city") {
+      try {
+        const data = await api.mapDistricts();
+        lastItems = sortItems(data.districts || [], mode.defaultSort);
+      } catch (err) {
+        console.error("[atlas:board] districts load failed", err);
+        lastItems = [];
+      }
+      render(store.get());
+      return;
+    }
     const persisted = state && state.filters ? state.filters[modeId] : null;
     const filters =
       persisted && Object.keys(persisted).length > 0
@@ -83,14 +94,16 @@ export async function initBoard({ container, store }) {
         const id = row.dataset.id;
         const item = lastItems.find((it) => String(it.id) === id);
         if (!item) return;
-        store.set({
-          selection: {
-            type: "community",
-            id: item.id,
-            props: item,
-            primaryBuildingId: item.primaryBuildingId,
-          },
-        });
+        const selectionType = state.mode === "city" ? "district" : "community";
+        const selection = {
+          type: selectionType,
+          id: item.id,
+          props: item,
+        };
+        if (selectionType === "community" && item.primaryBuildingId) {
+          selection.primaryBuildingId = item.primaryBuildingId;
+        }
+        store.set({ selection });
       });
     });
   }
