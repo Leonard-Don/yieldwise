@@ -8,6 +8,7 @@ import { createStorage } from "./storage.js";
 import { MODES, defaultFiltersFor } from "./modes.js";
 import { initOnboarding } from "./home-onboarding.js";
 import { initWatchlist } from "./watchlist.js";
+import { initAnnotations } from "./annotations.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
 
@@ -37,6 +38,7 @@ async function bootstrap(root) {
     userPrefs: null,
     onboardingOpen: false,
     watchlist: [],
+    annotationsByTarget: {},
   });
 
   // Fire-and-forget: prefetch the user prefs (needed by the home onboarding
@@ -63,6 +65,7 @@ async function bootstrap(root) {
   initShell({ root, store });
   initOnboarding({ root, store });
   initWatchlist({ root, store });
+  initAnnotations({ root, store });
 
   // Auto-open the onboarding modal when a fresh user lands on home mode AND
   // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).
