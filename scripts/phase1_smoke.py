@@ -75,6 +75,7 @@ def main() -> int:
             (f"{base}/api/v2/user/prefs", '"districts"'),
             (f"{base}/api/v2/watchlist", '"items"'),
             (f"{base}/api/v2/annotations/by-target/probe", '"items"'),
+            (f"{base}/api/v2/alerts/rules", '"yield_delta_abs"'),
         ]
         failed: list[str] = []
         for url, expected_substring in checks:
