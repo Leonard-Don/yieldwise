@@ -63,6 +63,7 @@ def main() -> int:
             (f"{base}/", 'data-component="mode-chips"'),
             (f"{base}/", 'data-component="drawer"'),
             (f"{base}/", 'data-role="filter-chips"'),
+            (f"{base}/", 'data-component="onboarding"'),
             (f"{base}/backstage/", "<title>Shanghai Yield Atlas</title>"),
             (f"{base}/api/v2/health", '"surface":"user-platform-v2"'),
             (f"{base}/api/health", '"status":"ok"'),
