@@ -69,6 +69,7 @@ from .service import (
 )
 
 from .domains import (
+    annotations as v2_annotations,
     buildings as v2_buildings,
     communities as v2_communities,
     health as v2_health,
@@ -108,6 +109,7 @@ app.include_router(v2_buildings.router, prefix="/api/v2")
 app.include_router(v2_communities.router, prefix="/api/v2")
 app.include_router(v2_user_prefs.router, prefix="/api/v2")
 app.include_router(v2_watchlist.router, prefix="/api/v2")
+app.include_router(v2_annotations.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
