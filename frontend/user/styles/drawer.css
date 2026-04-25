@@ -246,3 +246,167 @@
   opacity: 0.5;
   cursor: progress;
 }
+
+.atlas-drawer-notes {
+  border-top: 1px solid var(--line);
+  padding: 12px 14px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-drawer-notes[hidden] {
+  display: none;
+}
+
+.atlas-notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.atlas-notes-header h3 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.atlas-notes-status {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.atlas-notes-status[data-state="error"] {
+  color: var(--down);
+}
+
+.atlas-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-note-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-note-body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-0);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.atlas-note-meta {
+  font-size: 10px;
+  color: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.atlas-note-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.atlas-note-actions button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-dim);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.atlas-note-actions button:hover {
+  color: var(--text-0);
+  border-color: var(--up);
+}
+
+.atlas-note-actions button[data-variant="danger"]:hover {
+  color: var(--down);
+  border-color: var(--down);
+}
+
+.atlas-note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-note-edit textarea {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  min-height: 60px;
+  resize: vertical;
+}
+
+.atlas-notes-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atlas-notes-add textarea {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.atlas-notes-add button {
+  align-self: flex-end;
+  appearance: none;
+  border: 1px solid var(--up);
+  background: rgba(0, 214, 143, 0.1);
+  color: var(--text-0);
+  padding: 3px 12px;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.atlas-notes-add button[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.atlas-notes-empty {
+  color: var(--text-xs);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 4px 0;
+}
