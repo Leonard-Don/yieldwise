@@ -62,6 +62,7 @@ def main() -> int:
             (f"{base}/", 'data-user-shell="atlas"'),
             (f"{base}/", 'data-component="mode-chips"'),
             (f"{base}/", 'data-component="drawer"'),
+            (f"{base}/", 'data-component="help-overlay"'),
             (f"{base}/", 'data-role="filter-chips"'),
             (f"{base}/", 'data-component="onboarding"'),
             (f"{base}/backstage/", "<title>Shanghai Yield Atlas</title>"),

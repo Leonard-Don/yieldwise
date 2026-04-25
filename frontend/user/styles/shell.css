@@ -183,3 +183,22 @@
   color: var(--warn);
   border-color: var(--warn);
 }
+
+.atlas-help-chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  width: 22px;
+  height: 22px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.atlas-help-chip:hover {
+  color: var(--text-0);
+  border-color: var(--up);
+}
