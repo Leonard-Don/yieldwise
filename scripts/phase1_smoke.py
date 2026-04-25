@@ -69,6 +69,7 @@ def main() -> int:
             (f"{base}/api/health", '"status":"ok"'),
             (f"{base}/api/v2/opportunities", '"items"'),
             (f"{base}/api/v2/map/districts", '"districts"'),
+            (f"{base}/api/v2/map/districts", '"summary"'),
             (f"{base}/api/v2/map/communities", '"items"'),
             (f"{base}/api/v2/map/buildings", '"features"'),
             (f"{base}/api/v2/user/prefs", '"districts"'),
