@@ -20,11 +20,11 @@
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
 - 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
 
-## 路由布局（Phase 5a 起）
+## 路由布局（Phase 5b 起）
 
 | 路径 | 绑定 | 说明 |
 | --- | --- | --- |
-| `/` | `frontend/user/` | 用户平台。收益模式 + 详情抽屉 + 筛选条 + 自住模式 + 全市模式 + 关注夹（★）+ 笔记（抽屉内 markdown 文本笔记 read/edit/add/delete；持久化到 data/personal/annotations.json）。 |
+| `/` | `frontend/user/` | 用户平台。收益模式 + 详情抽屉 + 筛选条 + 自住模式 + 全市模式 + 关注夹（★）+ 笔记 + 变化横幅（顶部展示自上次打开以来关注对象的变化，支持收起+标记已读）。 |
 | `/backstage` | `frontend/backstage/` | 原研究台，所有运营/复核/几何 QA 在此 |
 | `/api/*` | `api/service.py` + `api/backstage/`（Phase 2 迁移） | 传统接口，backstage 前端使用 |
 | `/api/v2/*` | `api/domains/` | 用户平台专属接口。已开放：`/health`、`/opportunities`、`/map/{districts,communities,buildings}`、`/buildings/{id}`、`/communities/{id}`、`/user/prefs` (GET + PATCH)、`/watchlist` (GET + POST + DELETE)、`/annotations` (GET-by-target + POST + PATCH + DELETE)、`/alerts/{rules,since-last-open,mark-seen}` (GET + PATCH + POST) |
