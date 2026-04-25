@@ -87,5 +87,19 @@ export const api = {
     remove: (targetId) =>
       deleteJSON(`/api/v2/watchlist/${encodeURIComponent(targetId)}`),
   },
+  annotations: {
+    listForTarget: (targetId) =>
+      getJSONFresh(`/api/v2/annotations/by-target/${encodeURIComponent(targetId)}`),
+    create: (targetId, targetType, body) =>
+      postJSON("/api/v2/annotations", {
+        target_id: targetId,
+        target_type: targetType,
+        body,
+      }),
+    update: (noteId, body) =>
+      patchJSON(`/api/v2/annotations/${encodeURIComponent(noteId)}`, { body }),
+    remove: (noteId) =>
+      deleteJSON(`/api/v2/annotations/${encodeURIComponent(noteId)}`),
+  },
   invalidate,
 };
