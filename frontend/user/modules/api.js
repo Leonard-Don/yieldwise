@@ -101,5 +101,11 @@ export const api = {
     remove: (noteId) =>
       deleteJSON(`/api/v2/annotations/${encodeURIComponent(noteId)}`),
   },
+  alerts: {
+    sinceLastOpen: () => getJSONFresh("/api/v2/alerts/since-last-open"),
+    markSeen: () => postJSON("/api/v2/alerts/mark-seen", {}),
+    getRules: () => getJSONFresh("/api/v2/alerts/rules"),
+    patchRules: (payload) => patchJSON("/api/v2/alerts/rules", payload),
+  },
   invalidate,
 };
