@@ -1,0 +1,74 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  formatAlertLine,
+  severityFor,
+} from "../../frontend/user/modules/alerts-helpers.js";
+
+test("formatAlertLine: yield_up renders pp delta", () => {
+  const line = formatAlertLine({
+    kind: "yield_up",
+    from_value: 4.0,
+    to_value: 4.6,
+    delta: 0.6,
+  });
+  assert.equal(line, "租售比 4.00% → 4.60% (+0.60)");
+});
+
+test("formatAlertLine: yield_down renders negative delta", () => {
+  const line = formatAlertLine({
+    kind: "yield_down",
+    from_value: 4.0,
+    to_value: 3.4,
+    delta: -0.6,
+  });
+  assert.equal(line, "租售比 4.00% → 3.40% (−0.60)");
+});
+
+test("formatAlertLine: price_drop renders percent off base", () => {
+  const line = formatAlertLine({
+    kind: "price_drop",
+    from_value: 1000.0,
+    to_value: 950.0,
+    delta: -50.0,
+  });
+  assert.equal(line, "总价 1000 → 950 万 (−5.0%)");
+});
+
+test("formatAlertLine: score_jump renders signed delta", () => {
+  const up = formatAlertLine({
+    kind: "score_jump",
+    from_value: 60,
+    to_value: 70,
+    delta: 10,
+  });
+  assert.equal(up, "机会分 60 → 70 (+10)");
+  const down = formatAlertLine({
+    kind: "score_jump",
+    from_value: 60,
+    to_value: 50,
+    delta: -10,
+  });
+  assert.equal(down, "机会分 60 → 50 (−10)");
+});
+
+test("formatAlertLine: unknown kind falls back to string", () => {
+  const line = formatAlertLine({ kind: "mystery", from_value: 1, to_value: 2 });
+  assert.equal(line, "mystery 1 → 2");
+});
+
+test("severityFor: yield_up + score_jump positive → up", () => {
+  assert.equal(severityFor({ kind: "yield_up" }), "up");
+  assert.equal(severityFor({ kind: "score_jump", delta: 10 }), "up");
+});
+
+test("severityFor: yield_down + price_drop + negative score → down", () => {
+  assert.equal(severityFor({ kind: "yield_down" }), "down");
+  assert.equal(severityFor({ kind: "price_drop" }), "down");
+  assert.equal(severityFor({ kind: "score_jump", delta: -5 }), "down");
+});
+
+test("severityFor: unknown kind → warn", () => {
+  assert.equal(severityFor({ kind: "mystery" }), "warn");
+});

@@ -11,9 +11,21 @@
     <link rel="stylesheet" href="/styles/board.css" />
     <link rel="stylesheet" href="/styles/drawer.css" />
     <link rel="stylesheet" href="/styles/onboarding.css" />
+    <link rel="stylesheet" href="/styles/alerts.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
+      <section class="atlas-banner" data-component="alerts-banner" hidden>
+        <div class="atlas-banner-summary">
+          <strong class="atlas-banner-count" data-role="banner-count">0 条变化</strong>
+          <span class="atlas-banner-since mono dim" data-role="banner-since"></span>
+        </div>
+        <div class="atlas-banner-actions">
+          <button type="button" class="atlas-banner-toggle" data-role="banner-toggle" aria-expanded="false">展开</button>
+          <button type="button" class="atlas-banner-mark" data-role="banner-mark">标记已读</button>
+        </div>
+        <ol class="atlas-banner-list" data-role="banner-list" hidden></ol>
+      </section>
       <header class="atlas-topbar">
         <h1>Shanghai · Yield · Atlas</h1>
         <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
