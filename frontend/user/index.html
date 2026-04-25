@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/styles/drawer.css" />
     <link rel="stylesheet" href="/styles/onboarding.css" />
     <link rel="stylesheet" href="/styles/alerts.css" />
+    <link rel="stylesheet" href="/styles/shortcuts.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
@@ -32,6 +33,7 @@
         <div class="atlas-topbar-spacer"></div>
         <span class="atlas-star-tag mono" data-component="watchlist-count" title="关注数">★ —</span>
         <button type="button" class="atlas-prefs-button" data-component="prefs-button">偏好</button>
+        <button type="button" class="atlas-help-chip" data-component="help-chip" title="键盘快捷键 (?)">?</button>
         <span class="atlas-runtime-tag mono dim" data-component="runtime-tag"></span>
       </header>
       <div class="atlas-filterbar" data-component="filter-bar">
@@ -108,6 +110,22 @@
               <button type="submit" class="atlas-onboarding-submit" data-role="onboarding-submit" disabled>保存</button>
             </footer>
           </form>
+        </section>
+        <div class="atlas-help-backdrop" data-component="help-backdrop" data-open="false"></div>
+        <section class="atlas-help" data-component="help-overlay" data-open="false" aria-hidden="true" aria-labelledby="atlas-help-title">
+          <header class="atlas-help-header">
+            <h2 id="atlas-help-title" class="atlas-help-title">键盘快捷键</h2>
+            <button type="button" class="atlas-help-close" data-role="help-close" aria-label="关闭">×</button>
+          </header>
+          <dl class="atlas-help-list">
+            <dt><kbd>⌘1</kbd> / <kbd>⌃1</kbd></dt><dd>切换到收益猎手模式</dd>
+            <dt><kbd>⌘2</kbd> / <kbd>⌃2</kbd></dt><dd>切换到自住找房模式</dd>
+            <dt><kbd>⌘3</kbd> / <kbd>⌃3</kbd></dt><dd>切换到全市观察模式</dd>
+            <dt><kbd>F</kbd></dt><dd>把当前抽屉里的楼栋/小区加入或移出关注夹</dd>
+            <dt><kbd>N</kbd></dt><dd>聚焦笔记输入框</dd>
+            <dt><kbd>?</kbd></dt><dd>切换本帮助面板</dd>
+            <dt><kbd>Esc</kbd></dt><dd>关闭抽屉 / 模态 / 帮助面板</dd>
+          </dl>
         </section>
       </main>
       <footer class="atlas-statusbar mono" data-component="statusbar">
