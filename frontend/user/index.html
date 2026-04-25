@@ -18,6 +18,7 @@
         <h1>Shanghai · Yield · Atlas</h1>
         <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
         <div class="atlas-topbar-spacer"></div>
+        <span class="atlas-star-tag mono" data-component="watchlist-count" title="关注数">★ —</span>
         <button type="button" class="atlas-prefs-button" data-component="prefs-button">偏好</button>
         <span class="atlas-runtime-tag mono dim" data-component="runtime-tag"></span>
       </header>
@@ -45,7 +46,10 @@
               <h2 class="atlas-drawer-title" data-role="drawer-title">—</h2>
               <span class="atlas-drawer-subtitle mono" data-role="drawer-subtitle">—</span>
             </div>
-            <button type="button" class="atlas-drawer-close" data-role="drawer-close" aria-label="关闭">×</button>
+            <div class="atlas-drawer-actions">
+              <button type="button" class="atlas-drawer-star" data-component="drawer-star" aria-pressed="false" hidden>★</button>
+              <button type="button" class="atlas-drawer-close" data-role="drawer-close" aria-label="关闭">×</button>
+            </div>
           </header>
           <div class="atlas-drawer-body" data-role="drawer-body">
             <div class="atlas-drawer-empty">选择楼栋或机会榜条目以查看详情</div>
