@@ -30,13 +30,13 @@ export const MODES = [
     label: "全市观察",
     hotkey: "3",
     boardColumns: [
-      { key: "districtName", label: "区" },
+      { key: "name", label: "区" },
       { key: "yield", label: "均租售比", format: "pct" },
       { key: "score", label: "机会分", format: "int" },
     ],
     defaultSort: { key: "yield", direction: "desc" },
     defaultFilters: {},
-    enabled: false,
+    enabled: true,
   },
 ];
 
@@ -53,6 +53,24 @@ export function yieldColorFor(yieldPct) {
   if (yieldPct < 3.5) return "var(--down)";
   if (yieldPct < 5) return "var(--warn)";
   return "var(--up)";
+}
+
+function normalizeYieldScalar(value) {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  if (Number.isNaN(num)) return null;
+  // Match the percent-vs-fraction heuristic in map.js: < 1 means fraction.
+  return num < 1 ? num * 100 : num;
+}
+
+export function districtColorFor(value, mean) {
+  const v = normalizeYieldScalar(value);
+  const m = normalizeYieldScalar(mean);
+  if (v === null || m === null) return "var(--text-dim)";
+  const delta = v - m;
+  if (delta > 0.2) return "var(--up)";
+  if (delta < -0.2) return "var(--down)";
+  return "var(--warn)";
 }
 
 export function defaultFiltersFor(modeId) {

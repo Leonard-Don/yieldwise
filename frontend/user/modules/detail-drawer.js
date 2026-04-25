@@ -25,7 +25,7 @@ export function initDrawer({ root, store }) {
 
   function handleStateChange(state) {
     const sel = state.selection;
-    if (!sel) {
+    if (!sel || (sel.type !== "building" && sel.type !== "community")) {
       if (lastSelectionId !== null) {
         renderClosed();
         lastSelectionId = null;

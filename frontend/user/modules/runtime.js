@@ -24,7 +24,7 @@ export function loadAmap({ apiKey, securityJsCode, timeoutMs = 8000 }) {
     script.async = true;
     script.defer = true;
     script.dataset.amapLoader = "user-platform";
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(apiKey)}&plugin=AMap.Scale,AMap.ToolBar`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(apiKey)}&plugin=AMap.DistrictSearch,AMap.Scale,AMap.ToolBar`;
     script.onload = () => {
       window.clearTimeout(timeoutId);
       if (window.AMap) {
