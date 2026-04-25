@@ -20,14 +20,14 @@
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
 - 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
 
-## 路由布局（Phase 3b 起）
+## 路由布局（Phase 3c-1 起）
 
 | 路径 | 绑定 | 说明 |
 | --- | --- | --- |
 | `/` | `frontend/user/` | 用户平台。收益模式端到端 + 详情抽屉 + 实时筛选条（按模式记忆筛选 + 命中条数）。Home/City 模式 chip 已启用，全模式支持见后续 phase。 |
 | `/backstage` | `frontend/backstage/` | 原研究台，所有运营/复核/几何 QA 在此 |
 | `/api/*` | `api/service.py` + `api/backstage/`（Phase 2 迁移） | 传统接口，backstage 前端使用 |
-| `/api/v2/*` | `api/domains/` | 用户平台专属接口。已开放：`/health`、`/opportunities`、`/map/{districts,communities,buildings}`、`/buildings/{id}`、`/communities/{id}` |
+| `/api/v2/*` | `api/domains/` | 用户平台专属接口。已开放：`/health`、`/opportunities`、`/map/{districts,communities,buildings}`、`/buildings/{id}`、`/communities/{id}`、`/user/prefs` (GET + PATCH) |
 
 要直接打开研究台请访问 `http://127.0.0.1:8000/backstage/`。`/` 在 Phase 1 结束时是一个空的 D1 shell。
 
