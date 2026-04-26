@@ -209,9 +209,12 @@
   letter-spacing: 0.08em;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out;
 }
 
 .atlas-prefs-button:hover {
   color: var(--text-0);
   border-color: var(--up);
+  background: rgba(0, 214, 143, 0.06);
 }

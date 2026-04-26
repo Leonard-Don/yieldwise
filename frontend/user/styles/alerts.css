@@ -48,12 +48,20 @@
   letter-spacing: 0.06em;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out, transform 120ms ease-out;
 }
 
 .atlas-banner-toggle:hover,
 .atlas-banner-mark:hover {
   color: var(--text-0);
   border-color: var(--warn);
+  transform: translateY(-1px);
+}
+
+.atlas-banner-toggle:active,
+.atlas-banner-mark:active {
+  transform: translateY(0);
 }
 
 .atlas-banner-mark {
@@ -93,8 +101,14 @@
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   align-items: baseline;
-  padding: 4px 0;
+  padding: 4px 6px;
   border-bottom: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease-out;
+}
+
+.atlas-banner-row:hover {
+  background: rgba(255, 176, 32, 0.06);
 }
 
 .atlas-banner-row:last-child {

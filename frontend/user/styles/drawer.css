@@ -72,11 +72,15 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out, transform 120ms ease-out;
 }
 
 .atlas-drawer-close:hover {
-  color: var(--text-0);
-  border-color: var(--up);
+  color: var(--down);
+  border-color: var(--down);
+  background: rgba(255, 77, 77, 0.08);
+  transform: rotate(90deg);
 }
 
 .atlas-drawer-body {
@@ -239,6 +243,8 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out, transform 120ms ease-out;
 }
 
 .atlas-drawer-star[aria-pressed="true"] {
@@ -249,11 +255,17 @@
 
 .atlas-drawer-star:hover {
   color: var(--warn);
+  transform: scale(1.12);
+}
+
+.atlas-drawer-star:active {
+  transform: scale(0.94);
 }
 
 .atlas-drawer-star[disabled] {
   opacity: 0.5;
   cursor: progress;
+  transform: none;
 }
 
 .atlas-drawer-notes {
@@ -355,16 +367,20 @@
   letter-spacing: 0.06em;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out;
 }
 
 .atlas-note-actions button:hover {
   color: var(--text-0);
   border-color: var(--up);
+  background: rgba(0, 214, 143, 0.06);
 }
 
 .atlas-note-actions button[data-variant="danger"]:hover {
   color: var(--down);
   border-color: var(--down);
+  background: rgba(255, 77, 77, 0.06);
 }
 
 .atlas-note-edit {
@@ -447,12 +463,14 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color 80ms ease, background 80ms ease;
+  transition: border-color 120ms ease-out, background 120ms ease-out,
+    transform 120ms ease-out;
 }
 
 .atlas-district-row:hover {
   border-color: var(--up);
   background: rgba(0, 214, 143, 0.08);
+  transform: translateX(2px);
 }
 
 .atlas-district-name {

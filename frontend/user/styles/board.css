@@ -22,17 +22,21 @@
   align-items: baseline;
   padding: 8px 14px;
   border-bottom: 1px solid var(--line);
+  border-left: 2px solid transparent;
   cursor: pointer;
-  transition: background 80ms ease;
+  transition: background 120ms ease-out, border-left-color 120ms ease-out,
+    padding-left 120ms ease-out;
 }
 
 .atlas-board-row:hover {
   background: var(--bg-2);
+  border-left-color: rgba(0, 214, 143, 0.5);
+  padding-left: 12px;
 }
 
 .atlas-board-row[aria-selected="true"] {
   background: rgba(0, 214, 143, 0.06);
-  border-left: 2px solid var(--up);
+  border-left-color: var(--up);
   padding-left: 12px;
 }
 

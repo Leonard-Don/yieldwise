@@ -65,6 +65,15 @@
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out, transform 120ms ease-out;
+}
+
+.atlas-search-close:hover {
+  color: var(--down);
+  border-color: var(--down);
+  background: rgba(255, 77, 77, 0.08);
+  transform: rotate(90deg);
 }
 
 .atlas-search-input {
@@ -104,13 +113,17 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  transition: background 120ms ease-out, outline-color 120ms ease-out,
+    transform 120ms ease-out;
 }
 
 .atlas-search-row:hover,
 .atlas-search-row[aria-selected="true"] {
   background: var(--bg-2);
-  outline: 1px solid var(--up);
-  outline-offset: -1px;
+  outline-color: var(--up);
+  transform: translateX(2px);
 }
 
 .atlas-search-row .label {
