@@ -97,7 +97,20 @@
   text-transform: uppercase;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color 80ms ease, border-color 80ms ease, background 80ms ease;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out, transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.atlas-mode-chip:hover:not([aria-pressed="true"]) {
+  color: var(--text-0);
+  border-color: var(--up);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 214, 143, 0.12);
+}
+
+.atlas-mode-chip:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .atlas-mode-chip[aria-pressed="true"] {
@@ -160,10 +173,12 @@
   line-height: 1;
   padding: 0 2px;
   cursor: pointer;
+  transition: color 120ms ease-out, transform 120ms ease-out;
 }
 
 .atlas-filter-chip-clear:hover {
   color: var(--down);
+  transform: scale(1.15);
 }
 
 .atlas-filter-empty {
@@ -204,11 +219,15 @@
   line-height: 1;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out, transform 120ms ease-out;
 }
 
 .atlas-help-chip:hover {
   color: var(--text-0);
   border-color: var(--up);
+  background: rgba(0, 214, 143, 0.06);
+  transform: scale(1.08);
 }
 
 @keyframes atlas-skeleton-pulse {
