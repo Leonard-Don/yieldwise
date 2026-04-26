@@ -76,6 +76,12 @@ export const api = {
   mapDistricts: (params) => getJSON(`/api/v2/map/districts${buildQuery(params)}`),
   districtsAll: () => getJSON("/api/v2/map/districts"),
   runtimeConfig: () => getJSON("/api/runtime-config"),
+  search: (q, limit = 10) => {
+    const params = new URLSearchParams();
+    params.set("q", q);
+    params.set("limit", String(limit));
+    return getJSONFresh(`/api/v2/search?${params.toString()}`);
+  },
   userPrefs: {
     get: () => getJSONFresh("/api/v2/user/prefs"),
     patch: (payload) => patchJSON("/api/v2/user/prefs", payload),
