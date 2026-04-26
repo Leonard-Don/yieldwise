@@ -47,6 +47,8 @@ export function initShortcuts({ root, store }) {
       focusNoteInput();
     } else if (action === "help") {
       store.set({ helpOpen: !store.get().helpOpen });
+    } else if (action === "search") {
+      store.set({ searchOpen: true });
     }
   }
 
