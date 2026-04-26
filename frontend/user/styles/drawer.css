@@ -427,3 +427,52 @@
   letter-spacing: 0.06em;
   padding: 4px 0;
 }
+
+.atlas-district-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atlas-district-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, auto) minmax(0, auto);
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 80ms ease, background 80ms ease;
+}
+
+.atlas-district-row:hover {
+  border-color: var(--up);
+  background: rgba(0, 214, 143, 0.08);
+}
+
+.atlas-district-name {
+  color: var(--text-0);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-district-stat {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.atlas-district-empty {
+  color: var(--text-xs);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 8px 0;
+}
