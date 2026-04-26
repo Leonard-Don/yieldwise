@@ -128,3 +128,41 @@ def test_since_last_open_includes_target_name(
         # mock data exposes a building name distinct from the slug id
         assert item.get("target_name")
         assert item["target_name"] != item["target_id"]
+
+
+def test_since_last_open_emits_district_delta_alerts(
+    client, isolated_personal_dir: Path
+) -> None:
+    # No watchlist needed for district alerts; plant a stale district baseline.
+    state = {
+        "baselines": {
+            "pudong": {"yield": 0.5},
+        },
+        "last_open_at": "2026-04-20T10:00:00",
+    }
+    (isolated_personal_dir / "alerts_state.json").write_text(
+        json.dumps(state), encoding="utf-8"
+    )
+    response = client.get("/api/v2/alerts/since-last-open").json()
+    district_alerts = [it for it in response["items"] if it["target_type"] == "district"]
+    assert any(a["target_id"] == "pudong" for a in district_alerts)
+    pudong = next(a for a in district_alerts if a["target_id"] == "pudong")
+    assert pudong["kind"] in ("district_delta_up", "district_delta_down")
+    assert pudong.get("target_name")
+    assert pudong["target_name"] != pudong["target_id"]
+
+
+def test_mark_seen_captures_district_baselines(
+    client, isolated_personal_dir: Path
+) -> None:
+    response = client.post("/api/v2/alerts/mark-seen", json={})
+    assert response.status_code == 200
+    on_disk = json.loads(
+        (isolated_personal_dir / "alerts_state.json").read_text(encoding="utf-8")
+    )
+    # Districts get baselines even with empty watchlist
+    assert "pudong" in on_disk["baselines"]
+    # Following GET should produce no alerts because baselines == current
+    follow = client.get("/api/v2/alerts/since-last-open").json()
+    district_alerts = [it for it in follow["items"] if it["target_type"] == "district"]
+    assert district_alerts == []

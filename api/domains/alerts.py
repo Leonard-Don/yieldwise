@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from .. import personal_storage
 from ..schemas.alerts import AlertRules, AlertRulesPatch, AlertsState
 from ..schemas.watchlist import WatchlistEntry
-from ..service import get_building, get_community
+from ..service import get_building, get_community, list_districts
 from . import alerts_diff
 
 router = APIRouter(tags=["alerts"])
@@ -81,6 +81,20 @@ def _snapshot(target_id: str, target_type: str) -> dict[str, Any] | None:
     return None
 
 
+def _district_snapshots() -> dict[str, dict[str, Any]]:
+    rows = list_districts(district="all", min_yield=0, max_budget=10000, min_samples=0)
+    snapshots: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        district_id = row.get("id")
+        if not district_id:
+            continue
+        snapshots[district_id] = {
+            "name": row.get("name") or "",
+            "yield": row.get("yield"),
+        }
+    return snapshots
+
+
 def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -112,11 +126,13 @@ def since_last_open() -> dict[str, Any]:
         if not target_id or target_type not in ("building", "community"):
             continue
         snapshots[target_id] = _snapshot(target_id, target_type)
+    district_snapshots = _district_snapshots()
     alerts = alerts_diff.compute_alerts(
         watchlist_items=watchlist_items,
         baselines=state.baselines,
         snapshots=snapshots,
         rules=rules,
+        district_snapshots=district_snapshots,
     )
     return {
         "items": [a.model_dump() for a in alerts],
@@ -138,6 +154,11 @@ def mark_seen() -> dict[str, Any]:
         if snapshot is None:
             continue
         baselines[target_id] = snapshot
+        seen += 1
+    for district_id, snap in _district_snapshots().items():
+        if snap.get("yield") is None:
+            continue
+        baselines[district_id] = {"yield": snap.get("yield"), "name": snap.get("name")}
         seen += 1
     state = AlertsState(baselines=baselines, last_open_at=_now())
     personal_storage.write_json(ALERTS_STATE_FILE, state.model_dump())
