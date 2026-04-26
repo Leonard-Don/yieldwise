@@ -46,8 +46,16 @@
 }
 
 .atlas-board {
-  background: var(--bg-0);
   overflow-y: auto;
+  background:
+    linear-gradient(var(--bg-0) 30%, transparent),
+    linear-gradient(transparent, var(--bg-0) 70%) 0 100%,
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.45), transparent),
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.45), transparent) 0 100%;
+  background-repeat: no-repeat;
+  background-color: var(--bg-0);
+  background-size: 100% 28px, 100% 28px, 100% 10px, 100% 10px;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .atlas-statusbar {
@@ -201,4 +209,58 @@
 .atlas-help-chip:hover {
   color: var(--text-0);
   border-color: var(--up);
+}
+
+@keyframes atlas-skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+.atlas-skeleton-row,
+.atlas-skeleton-card,
+.atlas-skeleton-block {
+  background: linear-gradient(90deg, var(--bg-2), var(--line), var(--bg-2));
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: atlas-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.atlas-skeleton-row {
+  height: 12px;
+  margin-bottom: 6px;
+}
+
+.atlas-skeleton-card {
+  height: 48px;
+}
+
+.atlas-skeleton-block {
+  height: 80px;
+}
+
+.atlas-skeleton-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.atlas-skeleton-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.atlas-skeleton-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-skeleton-label {
+  height: 8px;
+  width: 60px;
+  background: var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  opacity: 0.5;
 }

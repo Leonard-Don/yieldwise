@@ -73,6 +73,15 @@
   gap: 12px;
   padding: 14px 16px 16px;
   overflow-y: auto;
+  background:
+    linear-gradient(var(--bg-1) 30%, transparent),
+    linear-gradient(transparent, var(--bg-1) 70%) 0 100%,
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.45), transparent),
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.45), transparent) 0 100%;
+  background-repeat: no-repeat;
+  background-color: var(--bg-1);
+  background-size: 100% 22px, 100% 22px, 100% 8px, 100% 8px;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .atlas-onboarding-fieldset {
