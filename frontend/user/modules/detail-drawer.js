@@ -82,7 +82,7 @@ export function initDrawer({ root, store }) {
   function renderLoading(sel) {
     titleEl.textContent = sel.props?.name || sel.props?.communityName || sel.id;
     subtitleEl.textContent = (sel.type || "").toUpperCase();
-    bodyEl.innerHTML = '<div class="atlas-drawer-status">加载详情中…</div>';
+    bodyEl.innerHTML = `<div class="atlas-skeleton-section"><div class="atlas-skeleton-label"></div><div class="atlas-skeleton-grid-3"><div class="atlas-skeleton-card"></div><div class="atlas-skeleton-card"></div><div class="atlas-skeleton-card"></div></div></div><div class="atlas-skeleton-section"><div class="atlas-skeleton-label"></div><div class="atlas-skeleton-block"></div></div><div class="atlas-skeleton-section"><div class="atlas-skeleton-label"></div><div class="atlas-skeleton-grid-2"><div class="atlas-skeleton-card"></div><div class="atlas-skeleton-card"></div></div></div>`;
   }
 
   function renderError(message) {
