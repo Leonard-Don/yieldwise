@@ -75,6 +75,7 @@ export const api = {
   mapBuildings: (params) => getJSON(`/api/v2/map/buildings${buildQuery(params)}`),
   mapDistricts: (params) => getJSON(`/api/v2/map/districts${buildQuery(params)}`),
   districtsAll: () => getJSON("/api/v2/map/districts"),
+  districtDetail: (id) => getJSONFresh(`/api/v2/districts/${encodeURIComponent(id)}`),
   runtimeConfig: () => getJSON("/api/runtime-config"),
   search: (q, limit = 10) => {
     const params = new URLSearchParams();

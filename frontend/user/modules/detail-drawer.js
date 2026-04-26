@@ -1,4 +1,11 @@
-import { bucketBars, formatWan, formatYuan, pickKpisFor } from "./drawer-data.js";
+import {
+  bucketBars,
+  formatPct,
+  formatWan,
+  formatYuan,
+  pickKpisFor,
+  topCommunitiesFromDistrict,
+} from "./drawer-data.js";
 
 export function initDrawer({ root, store }) {
   const drawer = root.querySelector('[data-component="drawer"]');
@@ -14,6 +21,19 @@ export function initDrawer({ root, store }) {
 
   closeButton.addEventListener("click", close);
   backdrop.addEventListener("click", close);
+  bodyEl.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-community-id]");
+    if (!row) return;
+    const communityId = row.dataset.communityId;
+    if (!communityId) return;
+    store.set({
+      selection: {
+        type: "community",
+        id: communityId,
+        props: { name: row.querySelector(".atlas-district-name")?.textContent || "" },
+      },
+    });
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && drawer.dataset.open === "true") {
       close();
@@ -25,7 +45,12 @@ export function initDrawer({ root, store }) {
 
   function handleStateChange(state) {
     const sel = state.selection;
-    if (!sel || (sel.type !== "building" && sel.type !== "community")) {
+    if (
+      !sel ||
+      (sel.type !== "building" &&
+        sel.type !== "community" &&
+        sel.type !== "district")
+    ) {
       if (lastSelectionId !== null) {
         renderClosed();
         lastSelectionId = null;
@@ -92,7 +117,7 @@ export function initDrawer({ root, store }) {
   function renderDetail({ sel, detail, mode }) {
     titleEl.textContent = detail.name || sel.props?.name || sel.id;
     subtitleEl.textContent = (detail.districtName || sel.props?.districtName || "").toString();
-    bodyEl.innerHTML = renderBody({ detail, mode });
+    bodyEl.innerHTML = renderBody({ sel, detail, mode });
     bodyEl.dataset.detailJson = JSON.stringify({
       yieldAvg: detail.yieldAvg,
       score: detail.score,
@@ -114,7 +139,10 @@ export function initDrawer({ root, store }) {
     }
   }
 
-  function renderBody({ detail, mode }) {
+  function renderBody({ sel, detail, mode }) {
+    if (sel && sel.type === "district") {
+      return renderDistrictBody({ detail });
+    }
     const kpis = pickKpisFor(mode, detail);
     const bars = bucketBars({
       low: detail.low ?? 0,
@@ -126,6 +154,33 @@ export function initDrawer({ root, store }) {
       renderFloorChart(bars),
       renderListingSummary(detail),
     ].join("");
+  }
+
+  function renderDistrictBody({ detail }) {
+    const kpis = pickKpisFor("city", {
+      yield: detail.yield,
+      score: detail.score,
+      sample: detail.sample,
+    });
+    const top = topCommunitiesFromDistrict(detail, 8);
+    return `${renderKpiRow(kpis)}<div><h3 class="atlas-section-title">区内小区（前 ${top.length}）</h3>${renderCommunityList(top)}</div>`;
+  }
+
+  function renderCommunityList(rows) {
+    if (rows.length === 0) {
+      return `<div class="atlas-district-empty">该区暂无小区数据</div>`;
+    }
+    return `<ol class="atlas-district-list">${rows
+      .map(
+        (row) =>
+          `<li class="atlas-district-row" data-community-id="${escapeText(row.id)}"><span class="atlas-district-name">${escapeText(row.name)}</span><span class="atlas-district-stat">${escapeText(formatPct(row.yield))}</span><span class="atlas-district-stat">${escapeText(formatScore(row.score))}</span></li>`,
+      )
+      .join("")}</ol>`;
+  }
+
+  function formatScore(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) return "—";
+    return String(Math.round(Number(value)));
   }
 
   function renderKpiRow(kpis) {
@@ -173,6 +228,9 @@ export function initDrawer({ root, store }) {
         return getJSON(`/api/v2/buildings/${encodeURIComponent(buildingId)}`);
       }
       return getJSON(`/api/v2/communities/${encodeURIComponent(sel.id)}`);
+    }
+    if (sel.type === "district") {
+      return getJSON(`/api/v2/districts/${encodeURIComponent(sel.id)}`);
     }
     throw new Error(`未知的选中类型：${sel.type}`);
   }
