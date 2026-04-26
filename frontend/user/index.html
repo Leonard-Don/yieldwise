@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/styles/onboarding.css" />
     <link rel="stylesheet" href="/styles/alerts.css" />
     <link rel="stylesheet" href="/styles/shortcuts.css" />
+    <link rel="stylesheet" href="/styles/search.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
@@ -126,6 +127,16 @@
             <dt><kbd>?</kbd></dt><dd>切换本帮助面板</dd>
             <dt><kbd>Esc</kbd></dt><dd>关闭抽屉 / 模态 / 帮助面板</dd>
           </dl>
+        </section>
+        <div class="atlas-search-backdrop" data-component="search-backdrop" data-open="false"></div>
+        <section class="atlas-search" data-component="search-overlay" data-open="false" aria-hidden="true" aria-labelledby="atlas-search-title">
+          <header class="atlas-search-header">
+            <h2 id="atlas-search-title" class="atlas-search-title">搜索</h2>
+            <button type="button" class="atlas-search-close" data-role="search-close" aria-label="关闭">×</button>
+          </header>
+          <input type="text" class="atlas-search-input" data-role="search-input" placeholder="输入区/小区/楼栋名…" autocomplete="off" />
+          <ol class="atlas-search-results" data-role="search-results"></ol>
+          <footer class="atlas-search-status mono dim" data-role="search-status">输入后按 ↑↓ 选择，Enter 打开</footer>
         </section>
       </main>
       <footer class="atlas-statusbar mono" data-component="statusbar">
