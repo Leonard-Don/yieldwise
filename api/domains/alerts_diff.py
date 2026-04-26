@@ -10,6 +10,7 @@ def compute_alerts(
     baselines: dict[str, dict[str, Any]],
     snapshots: dict[str, dict[str, Any] | None],
     rules: AlertRules,
+    district_snapshots: dict[str, dict[str, Any] | None] | None = None,
 ) -> list[Alert]:
     out: list[Alert] = []
     for entry in watchlist_items:
@@ -24,6 +25,18 @@ def compute_alerts(
         if not snapshot:
             continue
         out.extend(_diff_target(target_id, target_type, baseline, snapshot, rules))
+
+    if district_snapshots:
+        for district_id, district_snap in district_snapshots.items():
+            if not district_snap:
+                continue
+            baseline = baselines.get(district_id)
+            if not baseline:
+                continue
+            alert = _diff_district(district_id, baseline, district_snap, rules)
+            if alert is not None:
+                out.append(alert)
+
     return out
 
 
@@ -74,6 +87,33 @@ def _diff_target(
             )
 
     return out
+
+
+def _diff_district(
+    district_id: str,
+    baseline: dict[str, Any],
+    snapshot: dict[str, Any],
+    rules: AlertRules,
+) -> Alert | None:
+    base = _normalize_yield(baseline.get("yield"))
+    snap = _normalize_yield(snapshot.get("yield"))
+    if base is None or snap is None:
+        return None
+    delta = snap - base
+    if abs(delta) < rules.district_delta_abs:
+        return None
+    name_raw = snapshot.get("name")
+    target_name = str(name_raw) if name_raw else None
+    kind = "district_delta_up" if delta > 0 else "district_delta_down"
+    return Alert(
+        target_id=district_id,
+        target_name=target_name,
+        target_type="district",
+        kind=kind,
+        from_value=base,
+        to_value=snap,
+        delta=delta,
+    )
 
 
 def _normalize_yield(value: Any) -> float | None:

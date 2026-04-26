@@ -5,12 +5,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-AlertTargetType = Literal["building", "community"]
+AlertTargetType = Literal["building", "community", "district"]
 AlertKind = Literal[
     "yield_up",
     "yield_down",
     "price_drop",
     "score_jump",
+    "district_delta_up",
+    "district_delta_down",
 ]
 
 

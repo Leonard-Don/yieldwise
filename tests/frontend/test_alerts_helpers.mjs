@@ -72,3 +72,31 @@ test("severityFor: yield_down + price_drop + negative score → down", () => {
 test("severityFor: unknown kind → warn", () => {
   assert.equal(severityFor({ kind: "mystery" }), "warn");
 });
+
+test("formatAlertLine: district_delta_up renders pp delta", () => {
+  const line = formatAlertLine({
+    kind: "district_delta_up",
+    from_value: 4.0,
+    to_value: 5.2,
+    delta: 1.2,
+  });
+  assert.equal(line, "区均租售比 4.00% → 5.20% (+1.20)");
+});
+
+test("formatAlertLine: district_delta_down renders negative", () => {
+  const line = formatAlertLine({
+    kind: "district_delta_down",
+    from_value: 4.5,
+    to_value: 3.4,
+    delta: -1.1,
+  });
+  assert.equal(line, "区均租售比 4.50% → 3.40% (−1.10)");
+});
+
+test("severityFor: district_delta_up → up", () => {
+  assert.equal(severityFor({ kind: "district_delta_up" }), "up");
+});
+
+test("severityFor: district_delta_down → down", () => {
+  assert.equal(severityFor({ kind: "district_delta_down" }), "down");
+});

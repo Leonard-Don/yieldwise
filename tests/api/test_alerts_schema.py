@@ -83,3 +83,18 @@ def test_alert_target_name_defaults_to_none() -> None:
         }
     )
     assert alert.target_name is None
+
+
+def test_alert_accepts_district_target_type() -> None:
+    payload = {
+        "target_id": "pudong",
+        "target_name": "浦东新区",
+        "target_type": "district",
+        "kind": "district_delta_up",
+        "from_value": 4.0,
+        "to_value": 5.2,
+        "delta": 1.2,
+    }
+    alert = Alert.model_validate(payload)
+    assert alert.target_type == "district"
+    assert alert.kind == "district_delta_up"

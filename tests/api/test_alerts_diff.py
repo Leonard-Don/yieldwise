@@ -157,3 +157,44 @@ def test_compute_alerts_target_name_none_when_snapshot_lacks_name() -> None:
     )
     assert len(items) == 1
     assert items[0].target_name is None
+
+
+def test_compute_alerts_emits_district_delta_up_when_yield_rises_past_threshold() -> None:
+    items = compute_alerts(
+        watchlist_items=[],
+        baselines={"pudong": {"yield": 4.0}},
+        snapshots={},
+        rules=AlertRules(district_delta_abs=1.0),
+        district_snapshots={"pudong": {"name": "浦东新区", "yield": 5.2}},
+    )
+    assert len(items) == 1
+    a = items[0]
+    assert a.target_id == "pudong"
+    assert a.target_type == "district"
+    assert a.target_name == "浦东新区"
+    assert a.kind == "district_delta_up"
+    assert abs(a.delta - 1.2) < 0.001
+
+
+def test_compute_alerts_emits_district_delta_down_when_yield_drops_past_threshold() -> None:
+    items = compute_alerts(
+        watchlist_items=[],
+        baselines={"pudong": {"yield": 4.5}},
+        snapshots={},
+        rules=AlertRules(district_delta_abs=1.0),
+        district_snapshots={"pudong": {"name": "浦东新区", "yield": 3.4}},
+    )
+    assert len(items) == 1
+    assert items[0].kind == "district_delta_down"
+    assert items[0].delta < 0
+
+
+def test_compute_alerts_district_delta_within_dead_zone_emits_no_alert() -> None:
+    items = compute_alerts(
+        watchlist_items=[],
+        baselines={"pudong": {"yield": 4.0}},
+        snapshots={},
+        rules=AlertRules(district_delta_abs=1.0),
+        district_snapshots={"pudong": {"name": "浦东新区", "yield": 4.5}},
+    )
+    assert items == []

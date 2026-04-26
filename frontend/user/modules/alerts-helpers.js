@@ -23,6 +23,9 @@ export function formatAlertLine(alert) {
   if (kind === "yield_up" || kind === "yield_down") {
     return `租售比 ${fmt(from)}% → ${fmt(to)}% (${signed(delta)})`;
   }
+  if (kind === "district_delta_up" || kind === "district_delta_down") {
+    return `区均租售比 ${fmt(from)}% → ${fmt(to)}% (${signed(delta)})`;
+  }
   if (kind === "price_drop") {
     const fromNum = Number(from);
     const pct = fromNum > 0 ? ((Number(to) - fromNum) / fromNum) * 100 : 0;
@@ -39,8 +42,8 @@ export function formatAlertLine(alert) {
 export function severityFor(alert) {
   if (!alert) return "warn";
   const kind = alert.kind;
-  if (kind === "yield_up") return "up";
-  if (kind === "yield_down" || kind === "price_drop") return "down";
+  if (kind === "yield_up" || kind === "district_delta_up") return "up";
+  if (kind === "yield_down" || kind === "price_drop" || kind === "district_delta_down") return "down";
   if (kind === "score_jump") {
     return Number(alert.delta) >= 0 ? "up" : "down";
   }
