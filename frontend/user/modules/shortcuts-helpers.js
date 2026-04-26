@@ -18,6 +18,12 @@ export function parseShortcut(event) {
     return MODE_BY_DIGIT[key];
   }
 
+  // Search is also privileged across editable targets — users want ⌘K to
+  // open search even from inside a textarea / input.
+  if (modKey && !altKey && typeof key === "string" && key.toLowerCase() === "k") {
+    return "search";
+  }
+
   // All other shortcuts are suppressed inside editable targets.
   if (isEditableTarget(target)) return null;
 

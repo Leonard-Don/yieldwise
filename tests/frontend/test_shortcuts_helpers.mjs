@@ -75,6 +75,19 @@ test("parseShortcut: ⌘1 still works inside a textarea (mode switch is privileg
   assert.equal(action, "yield");
 });
 
+test("parseShortcut: ⌘K → search (privileged across form fields)", () => {
+  assert.equal(parseShortcut(makeEvent({ key: "k", metaKey: true })), "search");
+  assert.equal(parseShortcut(makeEvent({ key: "K", metaKey: true })), "search");
+  assert.equal(parseShortcut(makeEvent({ key: "k", ctrlKey: true })), "search");
+  // works inside a textarea — search is a global navigation shortcut
+  assert.equal(
+    parseShortcut(
+      makeEvent({ key: "k", metaKey: true, target: { tagName: "TEXTAREA", isContentEditable: false } }),
+    ),
+    "search",
+  );
+});
+
 test("parseShortcut: contenteditable target suppresses letter shortcuts", () => {
   assert.equal(
     parseShortcut(
