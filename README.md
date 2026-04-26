@@ -20,7 +20,7 @@
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
 - 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
 
-## 路由布局（Phase 6f 起）
+## 路由布局（Phase 6g 起）
 
 | 路径 | 绑定 | 说明 |
 | --- | --- | --- |
