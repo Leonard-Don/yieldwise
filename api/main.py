@@ -76,6 +76,7 @@ from .domains import (
     health as v2_health,
     map_tiles as v2_map_tiles,
     opportunities as v2_opportunities,
+    search as v2_search,
     user_prefs as v2_user_prefs,
     watchlist as v2_watchlist,
 )
@@ -112,6 +113,7 @@ app.include_router(v2_communities.router, prefix="/api/v2")
 app.include_router(v2_user_prefs.router, prefix="/api/v2")
 app.include_router(v2_watchlist.router, prefix="/api/v2")
 app.include_router(v2_annotations.router, prefix="/api/v2")
+app.include_router(v2_search.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
