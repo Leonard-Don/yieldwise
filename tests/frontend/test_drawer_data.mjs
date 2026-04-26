@@ -8,6 +8,7 @@ import {
   normalizeYieldPct,
   bucketBars,
   pickKpisFor,
+  topCommunitiesFromDistrict,
 } from "../../frontend/user/modules/drawer-data.js";
 
 test("formatPct: null/undefined/NaN → —", () => {
@@ -92,4 +93,35 @@ test("pickKpisFor: unknown mode falls back to yield mode kpis", () => {
   const detail = { yieldAvg: 0.04, score: 66, sampleSize: 13 };
   const kpis = pickKpisFor("nonsense", detail);
   assert.deepEqual(kpis.map((k) => k.key), ["yield", "score", "sample"]);
+});
+
+test("topCommunitiesFromDistrict: empty input → []", () => {
+  assert.deepEqual(topCommunitiesFromDistrict(null, 5), []);
+  assert.deepEqual(topCommunitiesFromDistrict({}, 5), []);
+  assert.deepEqual(topCommunitiesFromDistrict({ communities: [] }, 5), []);
+});
+
+test("topCommunitiesFromDistrict: returns up to limit rows preserving server order", () => {
+  const detail = {
+    communities: [
+      { id: "a", name: "A", yield: 5.0, score: 80 },
+      { id: "b", name: "B", yield: 4.5, score: 70 },
+      { id: "c", name: "C", yield: 4.0, score: 60 },
+      { id: "d", name: "D", yield: 3.5, score: 50 },
+    ],
+  };
+  const top2 = topCommunitiesFromDistrict(detail, 2);
+  assert.deepEqual(top2.map((row) => row.id), ["a", "b"]);
+});
+
+test("topCommunitiesFromDistrict: tolerates missing fields", () => {
+  const detail = {
+    communities: [
+      { id: "a", name: "A" },
+      { id: "b", yield: 4.0 },
+      { name: "C", yield: 3.0 }, // missing id — dropped
+    ],
+  };
+  const rows = topCommunitiesFromDistrict(detail, 5);
+  assert.deepEqual(rows.map((r) => r.id), ["a", "b"]);
 });

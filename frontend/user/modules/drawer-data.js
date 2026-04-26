@@ -62,3 +62,20 @@ const KPI_MAP = {
     { key: "sample", label: "样本量", value: formatInt(d.sample ?? d.sampleSize) },
   ],
 };
+
+export function topCommunitiesFromDistrict(detail, limit) {
+  if (!detail || typeof detail !== "object") return [];
+  const items = Array.isArray(detail.communities) ? detail.communities : [];
+  const out = [];
+  for (const row of items) {
+    if (!row || !row.id) continue;
+    out.push({
+      id: row.id,
+      name: row.name || row.id,
+      yield: row.yield ?? null,
+      score: row.score ?? null,
+    });
+    if (out.length >= Math.max(0, limit | 0)) break;
+  }
+  return out;
+}
