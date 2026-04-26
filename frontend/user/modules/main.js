@@ -11,6 +11,7 @@ import { initWatchlist } from "./watchlist.js";
 import { initAnnotations } from "./annotations.js";
 import { initAlerts } from "./alerts.js";
 import { initShortcuts } from "./shortcuts.js";
+import { initSearch } from "./search.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
 
@@ -43,6 +44,7 @@ async function bootstrap(root) {
     annotationsByTarget: {},
     alerts: { items: [], last_open_at: null },
     helpOpen: false,
+    searchOpen: false,
   });
 
   // Fire-and-forget: prefetch the user prefs (needed by the home onboarding
@@ -84,6 +86,7 @@ async function bootstrap(root) {
   initAnnotations({ root, store });
   initAlerts({ root, store });
   initShortcuts({ root, store });
+  initSearch({ root, store });
 
   // Auto-open the onboarding modal when a fresh user lands on home mode AND
   // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).
