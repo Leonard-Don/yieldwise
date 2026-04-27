@@ -18,9 +18,10 @@ from .persistence import database_has_real_data, postgres_data_snapshot, postgre
 from .provider_adapters import mock_enabled, provider_readiness_snapshot
 from .reference_catalog import load_reference_catalog
 
-# Phase 7a: run-state aggregation extracted to api/backstage/runs.py.
-# Re-exported here so existing call sites (api/main.py, persistence.py,
-# clear_runtime_caches, etc.) keep resolving the same function objects.
+# Phase 7a: run-state aggregation lives in api/backstage/runs.py.
+# Imported here for service.py's own body (helpers below still reference
+# list_*_runs, mode flags, and runtime_data_state). External callers
+# import directly from api.backstage.runs.
 from .backstage.runs import (  # noqa: E402,F401
     _list_geo_asset_runs_cached,
     _list_import_runs_cached,
@@ -47,8 +48,8 @@ from .backstage.runs import (  # noqa: E402,F401
     staged_mode_active,
 )
 
-# Phase 7f: anchor confirmation + audit history extracted to
-# api/backstage/anchors.py. Re-exported for back-compat.
+# Phase 7f: anchor confirmation + audit history lives in api/backstage/anchors.py.
+# Imported for service.py's internal helpers; external callers go direct.
 from .backstage.anchors import (  # noqa: E402,F401
     anchor_decision_state_for,
     anchor_watchlist_payload,
@@ -65,8 +66,8 @@ from .backstage.anchors import (  # noqa: E402,F401
 )
 
 # Phase 7e1+7e2+7e3: geo coverage task / work-order / detail / comparison /
-# watchlist + work-order CRUD helpers extracted to api/backstage/geo_qa.py.
-# Re-exported for back-compat.
+# watchlist + work-order CRUD lives in api/backstage/geo_qa.py.
+# Imported for service.py's internal helpers; external callers go direct.
 from .backstage.geo_qa import (  # noqa: E402,F401
     _geo_asset_run_comparison_cached,
     _geo_asset_run_detail_cached,
@@ -115,8 +116,8 @@ from .backstage.geo_qa import (  # noqa: E402,F401
 )
 
 # Phase 7b/7c/7d: browser sampling + capture-run + review-inbox + sampling-pack
-# / submit / update workflow helpers extracted to api/backstage/review.py.
-# Re-exported for back-compat.
+# / submit / update workflow lives in api/backstage/review.py.
+# Imported for service.py's internal helpers; external callers go direct.
 from .backstage.review import (  # noqa: E402,F401
     BROWSER_SAMPLING_REQUIRED_FIELDS,
     _browser_capture_run_detail_cached,
@@ -246,6 +247,25 @@ def read_json_file(path: Path | None) -> Any:
 
 
 def clear_runtime_caches() -> None:
+    from .backstage.geo_qa import (
+        _geo_asset_run_comparison_cached,
+        _geo_asset_run_detail_cached,
+        _geo_asset_run_detail_full_cached,
+    )
+    from .backstage.review import (
+        _browser_capture_run_detail_cached,
+        _browser_capture_task_history_index_cached,
+        _browser_review_inbox_all_cached,
+        _list_browser_capture_runs_cached,
+    )
+    from .backstage.runs import (
+        _list_geo_asset_runs_cached,
+        _list_import_runs_cached,
+        _list_metrics_runs_cached,
+        _list_reference_runs_cached,
+        _runtime_data_state_cached,
+    )
+
     _list_reference_runs_cached.cache_clear()
     _reference_run_detail_full_cached.cache_clear()
     _list_import_runs_cached.cache_clear()

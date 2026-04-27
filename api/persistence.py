@@ -253,7 +253,7 @@ def _load_service_detail(detail_type: str, run_id: str) -> dict[str, Any] | None
         from .service import import_run_detail_full
 
         return import_run_detail_full(run_id)
-    from .service import geo_asset_run_detail_full
+    from .backstage.geo_qa import geo_asset_run_detail_full
 
     return geo_asset_run_detail_full(run_id)
 

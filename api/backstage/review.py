@@ -683,8 +683,6 @@ def _browser_review_items_by_task_run(items: list[dict[str, Any]]) -> dict[tuple
 
 
 def _browser_review_current_task_fixture_candidate() -> dict[str, Any] | None:
-    from ..service import browser_sampling_pack
-
     review_inbox = browser_review_inbox_payload(limit=None)
     items = [item for item in (review_inbox.get("items") or []) if isinstance(item, dict)]
     items_by_task = _browser_review_items_by_task(items)
@@ -1491,7 +1489,7 @@ def build_browser_sampling_pack_csv(
 
 
 def latest_public_browser_import_run() -> dict[str, Any] | None:
-    from ..service import list_import_runs
+    from .runs import list_import_runs
 
     return next((item for item in list_import_runs() if item.get("providerId") == "public-browser-sampling"), None)
 
