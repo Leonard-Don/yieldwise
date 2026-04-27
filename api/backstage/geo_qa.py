@@ -1,14 +1,14 @@
 """
 Geo asset / coverage task / work-order helpers for the backstage tool.
 
-Phase 7e1+7e2 extraction from api/service.py — covers manifest path
+Phase 7e1+7e2+7e3 extraction from api/service.py — covers manifest path
 defaults, db_*_rows queries, baseline-run lookup, task derivation/
 summary/enrichment, work-order summary/sort/filter helpers, label/
-status/priority helpers, the impact-score enrichment pipeline, and the
-detail/comparison/watchlist cluster (db_geo_asset_run_detail_full,
-build_geo_asset_run_view, geometry_diff_summary, compare_geo_asset_run_details,
-geo_task_watchlist, plus their lru_cache wrappers). Re-exported from
-api.service for back-compat.
+status/priority helpers, the impact-score enrichment pipeline, the
+detail/comparison/watchlist cluster, and the work-order CRUD pipeline
+(rebuild_geo_asset_summary, update_geo_asset_task_review, geo_asset_work_orders,
+create/update_geo_asset_work_order). Re-exported from api.service for
+back-compat.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 from copy import deepcopy
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -1465,3 +1466,505 @@ def geo_task_watchlist(
         )
     )
     return items[:limit]
+
+
+def rebuild_geo_asset_summary(
+    detail: dict[str, Any],
+    *,
+    coverage_task_rows: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    feature_count = detail["featureCount"]
+    resolved_building_count = detail["resolvedBuildingCount"]
+    unresolved_features = list(detail.get("unresolvedFeatures", []))
+    task_summary = summarize_geo_asset_tasks(coverage_task_rows)
+    summary = {
+        "feature_count": feature_count,
+        "resolved_building_count": resolved_building_count,
+        "unresolved_feature_count": len(unresolved_features),
+        "community_count": detail["communityCount"],
+        "coverage_pct": detail["coveragePct"],
+        "coverage_task_count": task_summary["taskCount"],
+        "open_task_count": task_summary["openTaskCount"],
+        "review_task_count": task_summary["reviewTaskCount"],
+        "capture_task_count": task_summary["captureTaskCount"],
+        "scheduled_task_count": task_summary["scheduledTaskCount"],
+        "resolved_task_count": task_summary["resolvedTaskCount"],
+    }
+    attention = {
+        "unresolved_examples": unresolved_features[:12],
+        "open_task_examples": [
+            {
+                "task_id": item.get("task_id"),
+                "task_scope": item.get("task_scope"),
+                "community_name": item.get("community_name"),
+                "building_name": item.get("building_name"),
+                "status": item.get("status"),
+                "resolution_notes": item.get("resolution_notes"),
+            }
+            for item in coverage_task_rows
+            if item.get("status") in {"needs_review", "needs_capture", "scheduled"}
+        ][:12],
+    }
+    return summary, attention
+
+
+def update_geo_asset_task_review(
+    run_id: str,
+    task_id: str,
+    *,
+    status: str = "scheduled",
+    resolution_notes: str | None = None,
+    review_owner: str = "atlas-ui",
+) -> dict[str, Any] | None:
+    from ..service import write_json_file
+
+    if status not in {"needs_review", "needs_capture", "scheduled", "resolved", "captured"}:
+        raise ValueError("Unsupported geo asset task status")
+
+    detail = geo_asset_run_detail_full(run_id)
+    if not detail:
+        return None
+
+    coverage_task_rows = deepcopy(detail.get("coverageTaskRows", []))
+    review_history = deepcopy(detail.get("reviewHistoryRows", []))
+    target_task = next((item for item in coverage_task_rows if item.get("task_id") == task_id), None)
+    if not target_task:
+        return None
+
+    reviewed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    previous_status = target_task.get("status", "unknown")
+    review_note = resolution_notes or target_task.get("resolution_notes") or "已由工作台更新几何任务状态。"
+    target_task["status"] = status
+    target_task["resolution_notes"] = review_note
+    target_task["review_owner"] = review_owner
+    target_task["reviewed_at"] = reviewed_at
+    target_task["updated_at"] = reviewed_at
+
+    summary, attention = rebuild_geo_asset_summary(detail, coverage_task_rows=coverage_task_rows)
+    manifest = deepcopy(detail["manifest"])
+    manifest.setdefault("outputs", {})
+    manifest["outputs"]["coverage_tasks"] = str(detail["outputPaths"]["coverageTaskPath"])
+    manifest["outputs"]["review_history"] = str(detail["outputPaths"]["reviewHistoryPath"])
+    manifest["summary"] = summary
+    manifest["attention"] = attention
+
+    review_event = {
+        "eventId": f"{task_id}::{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        "taskId": task_id,
+        "taskScope": target_task.get("task_scope"),
+        "communityId": target_task.get("community_id"),
+        "communityName": target_task.get("community_name"),
+        "buildingId": target_task.get("building_id"),
+        "buildingName": target_task.get("building_name"),
+        "sourceRef": target_task.get("source_ref"),
+        "previousStatus": previous_status,
+        "newStatus": status,
+        "reviewOwner": review_owner,
+        "reviewedAt": reviewed_at,
+        "resolutionNotes": review_note,
+    }
+    review_history.insert(0, review_event)
+
+    write_json_file(detail["outputPaths"]["coverageTaskPath"], coverage_task_rows)
+    write_json_file(detail["outputPaths"]["reviewHistoryPath"], review_history)
+    if detail["outputPaths"].get("summaryPath"):
+        write_json_file(detail["outputPaths"]["summaryPath"], summary)
+    write_json_file(detail["manifestPath"], manifest)
+
+    database_sync = {"status": "skipped", "message": "未配置 PostgreSQL，同步仅写回本地几何批次文件。"}
+    try:
+        from ..persistence import persist_geo_asset_run_to_postgres, postgres_runtime_status
+
+        if postgres_runtime_status()["hasPostgresDsn"]:
+            persist_summary = persist_geo_asset_run_to_postgres(run_id)
+            database_sync = {
+                "status": "synced",
+                "message": "已同步到 PostgreSQL。",
+                "summary": persist_summary,
+            }
+    except Exception as exc:  # pragma: no cover - best effort sync
+        database_sync = {
+            "status": "error",
+            "message": f"本地几何批次已更新，但 PostgreSQL 同步失败: {exc}",
+        }
+
+    updated_detail = geo_asset_run_detail(run_id)
+    return {
+        "runId": run_id,
+        "taskId": task_id,
+        "status": status,
+        "reviewOwner": review_owner,
+        "reviewedAt": reviewed_at,
+        "detail": updated_detail,
+        "databaseSync": database_sync,
+    }
+
+
+def geo_asset_work_orders(
+    run_id: str,
+    *,
+    district: str | None = None,
+    status: str | None = None,
+    assignee: str | None = None,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    detail = geo_asset_run_detail(run_id)
+    if not detail:
+        return []
+    work_orders = [
+        deepcopy(item)
+        for item in detail.get("workOrders", [])
+        if geo_work_order_matches_filters(
+            item,
+            district=district,
+            status=status,
+            assignee=assignee,
+        )
+    ]
+    work_orders.sort(
+        key=lambda item: (
+            geo_work_order_status_sort_key(item.get("status")),
+            -float(item.get("impactScore") or 0),
+            -int(item.get("watchlistHits") or 0),
+            item.get("dueAt") or "9999-12-31T23:59:59+08:00",
+            str(item.get("communityName") or ""),
+            str(item.get("buildingName") or ""),
+        )
+    )
+    return work_orders[:limit]
+
+
+def create_geo_asset_work_order(
+    run_id: str,
+    *,
+    task_ids: list[str],
+    assignee: str = "gis-team",
+    due_at: str | None = None,
+    notes: str | None = None,
+    created_by: str = "atlas-ui",
+) -> dict[str, Any] | None:
+    from ..service import write_json_file
+
+    detail = geo_asset_run_detail_full(run_id)
+    if not detail:
+        return None
+
+    current_view = build_geo_asset_run_view(detail)
+    task_index = {
+        item.get("taskId"): item
+        for item in current_view.get("coverageTasks", [])
+        if item.get("taskId")
+    }
+    normalized_task_ids = [str(task_id) for task_id in task_ids if str(task_id).strip()]
+    normalized_task_ids = list(dict.fromkeys(normalized_task_ids))
+    if not normalized_task_ids:
+        raise ValueError("至少需要选择一条几何任务来生成工单。")
+
+    active_task_ids = {
+        str(task_id)
+        for item in current_view.get("workOrders", [])
+        if item.get("status") != "closed"
+        for task_id in item.get("taskIds", [])
+        if task_id
+    }
+    for task_id in normalized_task_ids:
+        if task_id not in task_index:
+            raise ValueError(f"几何任务不存在: {task_id}")
+        if task_id in active_task_ids:
+            raise ValueError(f"几何任务已在打开中的工单里: {task_id}")
+
+    selected_tasks = [task_index[task_id] for task_id in normalized_task_ids]
+    selected_tasks.sort(
+        key=lambda item: (
+            -float(item.get("impactScore") or 0),
+            -int(item.get("watchlistHits") or 0),
+            str(item.get("communityName") or ""),
+        )
+    )
+    primary_task = selected_tasks[0]
+    created_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    work_order_id = f"{run_id}::wo::{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
+    coverage_task_rows = deepcopy(detail.get("coverageTaskRows", []))
+    review_history = deepcopy(detail.get("reviewHistoryRows", []))
+    work_order_rows = deepcopy(detail.get("workOrderRows", []))
+    work_order_event_rows = deepcopy(detail.get("workOrderEventRows", []))
+
+    work_order_row = {
+        "work_order_id": work_order_id,
+        "status": "assigned",
+        "assignee": assignee or "gis-team",
+        "title": f"{primary_task.get('communityName', '待识别小区')} · {primary_task.get('buildingName', '待识别楼栋')} 几何补采",
+        "task_ids": normalized_task_ids,
+        "task_count": len(normalized_task_ids),
+        "provider_id": detail.get("providerId"),
+        "district_id": primary_task.get("districtId"),
+        "district_name": primary_task.get("districtName"),
+        "community_id": primary_task.get("communityId"),
+        "community_name": primary_task.get("communityName"),
+        "building_id": primary_task.get("buildingId"),
+        "building_name": primary_task.get("buildingName"),
+        "primary_task_id": primary_task.get("taskId"),
+        "focus_floor_no": primary_task.get("focusFloorNo"),
+        "focus_yield_pct": primary_task.get("focusYieldPct"),
+        "watchlist_hits": max((int(item.get("watchlistHits") or 0) for item in selected_tasks), default=0),
+        "impact_score": max((float(item.get("impactScore") or 0) for item in selected_tasks), default=0.0),
+        "impact_band": primary_task.get("impactBand"),
+        "notes": notes or primary_task.get("recommendedAction") or "已从 Geo Ops 工作台生成补采工单。",
+        "created_by": created_by,
+        "created_at": created_at,
+        "updated_at": created_at,
+        "due_at": due_at,
+    }
+    work_order_rows.insert(0, work_order_row)
+    work_order_event_rows.insert(
+        0,
+        {
+            "event_id": f"{work_order_id}::{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+            "work_order_id": work_order_id,
+            "previous_status": None,
+            "new_status": "assigned",
+            "changed_by": created_by,
+            "changed_at": created_at,
+            "notes": work_order_row["notes"],
+        },
+    )
+
+    for task_row in coverage_task_rows:
+        if task_row.get("task_id") not in normalized_task_ids:
+            continue
+        if task_row.get("status") != "needs_capture":
+            continue
+        previous_status = task_row.get("status")
+        task_row["status"] = "scheduled"
+        task_row["review_owner"] = created_by
+        task_row["reviewed_at"] = created_at
+        task_row["updated_at"] = created_at
+        task_row["resolution_notes"] = f"已生成补采工单 {work_order_id}，等待 GIS 执行。"
+        review_history.insert(
+            0,
+            {
+                "eventId": f"{task_row.get('task_id')}::{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+                "taskId": task_row.get("task_id"),
+                "taskScope": task_row.get("task_scope"),
+                "communityId": task_row.get("community_id"),
+                "communityName": task_row.get("community_name"),
+                "buildingId": task_row.get("building_id"),
+                "buildingName": task_row.get("building_name"),
+                "sourceRef": task_row.get("source_ref"),
+                "previousStatus": previous_status,
+                "newStatus": "scheduled",
+                "reviewOwner": created_by,
+                "reviewedAt": created_at,
+                "resolutionNotes": task_row["resolution_notes"],
+            },
+        )
+
+    summary, attention = rebuild_geo_asset_summary(detail, coverage_task_rows=coverage_task_rows)
+    manifest = deepcopy(detail["manifest"])
+    manifest.setdefault("outputs", {})
+    manifest["outputs"]["coverage_tasks"] = str(detail["outputPaths"]["coverageTaskPath"])
+    manifest["outputs"]["review_history"] = str(detail["outputPaths"]["reviewHistoryPath"])
+    manifest["outputs"]["work_orders"] = str(detail["outputPaths"]["workOrderPath"])
+    manifest["outputs"]["work_order_events"] = str(detail["outputPaths"]["workOrderEventPath"])
+    manifest["summary"] = summary
+    manifest["attention"] = attention
+
+    write_json_file(detail["outputPaths"]["coverageTaskPath"], coverage_task_rows)
+    write_json_file(detail["outputPaths"]["reviewHistoryPath"], review_history)
+    if detail["outputPaths"].get("summaryPath"):
+        write_json_file(detail["outputPaths"]["summaryPath"], summary)
+    write_json_file(detail["outputPaths"]["workOrderPath"], work_order_rows)
+    write_json_file(detail["outputPaths"]["workOrderEventPath"], work_order_event_rows)
+    write_json_file(detail["manifestPath"], manifest)
+
+    database_sync = {"status": "skipped", "message": "未配置 PostgreSQL，同步仅写回本地几何工单文件。"}
+    try:
+        from ..persistence import persist_geo_asset_run_to_postgres, postgres_runtime_status
+
+        if postgres_runtime_status()["hasPostgresDsn"]:
+            persist_summary = persist_geo_asset_run_to_postgres(run_id)
+            database_sync = {
+                "status": "synced",
+                "message": "几何工单已同步到 PostgreSQL。",
+                "summary": persist_summary,
+            }
+    except Exception as exc:  # pragma: no cover - best effort sync
+        database_sync = {
+            "status": "error",
+            "message": f"本地几何工单已创建，但 PostgreSQL 同步失败: {exc}",
+        }
+
+    updated_detail = geo_asset_run_detail(run_id)
+    created_order = next(
+        (item for item in (updated_detail or {}).get("workOrders", []) if item.get("workOrderId") == work_order_id),
+        None,
+    )
+    return {
+        "runId": run_id,
+        "workOrderId": work_order_id,
+        "workOrder": created_order,
+        "detail": updated_detail,
+        "databaseSync": database_sync,
+    }
+
+
+def update_geo_asset_work_order(
+    run_id: str,
+    work_order_id: str,
+    *,
+    status: str,
+    assignee: str | None = None,
+    notes: str | None = None,
+    changed_by: str = "atlas-ui",
+) -> dict[str, Any] | None:
+    from ..service import write_json_file
+
+    if status not in {"assigned", "in_progress", "delivered", "closed"}:
+        raise ValueError("Unsupported geo work order status")
+
+    detail = geo_asset_run_detail_full(run_id)
+    if not detail:
+        return None
+
+    coverage_task_rows = deepcopy(detail.get("coverageTaskRows", []))
+    review_history = deepcopy(detail.get("reviewHistoryRows", []))
+    work_order_rows = deepcopy(detail.get("workOrderRows", []))
+    work_order_event_rows = deepcopy(detail.get("workOrderEventRows", []))
+    target_order = next(
+        (
+            item
+            for item in work_order_rows
+            if (item.get("work_order_id") or item.get("workOrderId")) == work_order_id
+        ),
+        None,
+    )
+    if not target_order:
+        return None
+
+    changed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    previous_status = target_order.get("status") or "assigned"
+    target_order["status"] = status
+    target_order["assignee"] = assignee or target_order.get("assignee") or "gis-team"
+    if notes:
+        target_order["notes"] = notes
+    target_order["updated_at"] = changed_at
+
+    task_ids = {
+        str(task_id)
+        for task_id in (target_order.get("task_ids") or target_order.get("taskIds") or [])
+        if task_id
+    }
+    for task_row in coverage_task_rows:
+        if str(task_row.get("task_id")) not in task_ids:
+            continue
+        if status in {"assigned", "in_progress", "delivered"} and task_row.get("status") == "needs_capture":
+            previous_task_status = task_row.get("status")
+            task_row["status"] = "scheduled"
+            task_row["review_owner"] = changed_by
+            task_row["reviewed_at"] = changed_at
+            task_row["updated_at"] = changed_at
+            task_row["resolution_notes"] = f"工单 {work_order_id} 已进入 {geo_work_order_status_label(status)}。"
+            review_history.insert(
+                0,
+                {
+                    "eventId": f"{task_row.get('task_id')}::{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+                    "taskId": task_row.get("task_id"),
+                    "taskScope": task_row.get("task_scope"),
+                    "communityId": task_row.get("community_id"),
+                    "communityName": task_row.get("community_name"),
+                    "buildingId": task_row.get("building_id"),
+                    "buildingName": task_row.get("building_name"),
+                    "sourceRef": task_row.get("source_ref"),
+                    "previousStatus": previous_task_status,
+                    "newStatus": "scheduled",
+                    "reviewOwner": changed_by,
+                    "reviewedAt": changed_at,
+                    "resolutionNotes": task_row["resolution_notes"],
+                },
+            )
+        if status == "closed" and task_row.get("status") == "scheduled":
+            task_row["status"] = "captured"
+            task_row["review_owner"] = changed_by
+            task_row["reviewed_at"] = changed_at
+            task_row["updated_at"] = changed_at
+            task_row["resolution_notes"] = f"工单 {work_order_id} 已关闭，下一版 footprint 视为已补齐。"
+            review_history.insert(
+                0,
+                {
+                    "eventId": f"{task_row.get('task_id')}::{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+                    "taskId": task_row.get("task_id"),
+                    "taskScope": task_row.get("task_scope"),
+                    "communityId": task_row.get("community_id"),
+                    "communityName": task_row.get("community_name"),
+                    "buildingId": task_row.get("building_id"),
+                    "buildingName": task_row.get("building_name"),
+                    "sourceRef": task_row.get("source_ref"),
+                    "previousStatus": "scheduled",
+                    "newStatus": "captured",
+                    "reviewOwner": changed_by,
+                    "reviewedAt": changed_at,
+                    "resolutionNotes": task_row["resolution_notes"],
+                },
+            )
+
+    work_order_event_rows.insert(
+        0,
+        {
+            "event_id": f"{work_order_id}::{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+            "work_order_id": work_order_id,
+            "previous_status": previous_status,
+            "new_status": status,
+            "changed_by": changed_by,
+            "changed_at": changed_at,
+            "notes": notes or f"工单状态更新为 {geo_work_order_status_label(status)}。",
+        },
+    )
+
+    summary, attention = rebuild_geo_asset_summary(detail, coverage_task_rows=coverage_task_rows)
+    manifest = deepcopy(detail["manifest"])
+    manifest.setdefault("outputs", {})
+    manifest["outputs"]["coverage_tasks"] = str(detail["outputPaths"]["coverageTaskPath"])
+    manifest["outputs"]["review_history"] = str(detail["outputPaths"]["reviewHistoryPath"])
+    manifest["outputs"]["work_orders"] = str(detail["outputPaths"]["workOrderPath"])
+    manifest["outputs"]["work_order_events"] = str(detail["outputPaths"]["workOrderEventPath"])
+    manifest["summary"] = summary
+    manifest["attention"] = attention
+
+    write_json_file(detail["outputPaths"]["coverageTaskPath"], coverage_task_rows)
+    write_json_file(detail["outputPaths"]["reviewHistoryPath"], review_history)
+    if detail["outputPaths"].get("summaryPath"):
+        write_json_file(detail["outputPaths"]["summaryPath"], summary)
+    write_json_file(detail["outputPaths"]["workOrderPath"], work_order_rows)
+    write_json_file(detail["outputPaths"]["workOrderEventPath"], work_order_event_rows)
+    write_json_file(detail["manifestPath"], manifest)
+
+    database_sync = {"status": "skipped", "message": "未配置 PostgreSQL，同步仅写回本地几何工单文件。"}
+    try:
+        from ..persistence import persist_geo_asset_run_to_postgres, postgres_runtime_status
+
+        if postgres_runtime_status()["hasPostgresDsn"]:
+            persist_summary = persist_geo_asset_run_to_postgres(run_id)
+            database_sync = {
+                "status": "synced",
+                "message": "几何工单状态已同步到 PostgreSQL。",
+                "summary": persist_summary,
+            }
+    except Exception as exc:  # pragma: no cover - best effort sync
+        database_sync = {
+            "status": "error",
+            "message": f"本地几何工单已更新，但 PostgreSQL 同步失败: {exc}",
+        }
+
+    updated_detail = geo_asset_run_detail(run_id)
+    updated_order = next(
+        (item for item in (updated_detail or {}).get("workOrders", []) if item.get("workOrderId") == work_order_id),
+        None,
+    )
+    return {
+        "runId": run_id,
+        "workOrderId": work_order_id,
+        "workOrder": updated_order,
+        "detail": updated_detail,
+        "databaseSync": database_sync,
+    }
