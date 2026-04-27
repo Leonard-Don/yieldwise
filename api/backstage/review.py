@@ -389,3 +389,536 @@ def browser_sampling_task_display_label(task: dict[str, Any] | None) -> str:
     if floor_no not in (None, ""):
         parts.append(f"{floor_no}层")
     return " · ".join(parts)
+
+
+def browser_review_inbox_summary(items: list[dict[str, Any]] | None) -> dict[str, Any]:
+    from ..service import comparable_created_at_value
+
+    normalized_items = [item for item in (items or []) if isinstance(item, dict)]
+    timestamps = sorted(
+        [str(item.get("runCreatedAt") or "") for item in normalized_items if item.get("runCreatedAt")],
+        key=comparable_created_at_value,
+    )
+    task_ids = {str(item.get("taskId") or "") for item in normalized_items if item.get("taskId")}
+    district_ids = {str(item.get("districtId") or "") for item in normalized_items if item.get("districtId")}
+    return {
+        "pendingQueueCount": len(normalized_items),
+        "pendingTaskCount": len(task_ids),
+        "pendingDistrictCount": len(district_ids),
+        "oldestPendingAt": min(timestamps) if timestamps else None,
+        "latestPendingAt": max(timestamps) if timestamps else None,
+    }
+
+
+def browser_capture_review_workflow_item_payload(
+    *,
+    run_id: str,
+    run_created_at: str | None,
+    review_item: dict[str, Any] | None,
+    task_snapshot: dict[str, Any] | None,
+    run_pending_count: int,
+    task_pending_count: int,
+) -> dict[str, Any] | None:
+    if not isinstance(review_item, dict):
+        return None
+    queue_id = str(review_item.get("queueId") or "").strip()
+    if not queue_id:
+        return None
+    normalized_task = deepcopy(task_snapshot or {})
+    task_id = str(normalized_task.get("taskId") or "").strip()
+    if task_id:
+        normalized_task["taskId"] = task_id
+    normalized_task.setdefault("taskTypeLabel", browser_sampling_task_type_label(str(normalized_task.get("taskType") or "")))
+    normalized_task["taskLifecycleStatus"] = "needs_review"
+    normalized_task["taskLifecycleLabel"] = "已采待复核"
+    return {
+        "inboxItemId": f"{run_id}:{queue_id}",
+        "runId": run_id,
+        "queueId": queue_id,
+        "taskId": normalized_task.get("taskId"),
+        "taskLabel": browser_sampling_task_display_label(normalized_task),
+        "districtId": normalized_task.get("districtId"),
+        "districtName": normalized_task.get("districtName"),
+        "communityId": normalized_task.get("communityId"),
+        "communityName": normalized_task.get("communityName"),
+        "buildingId": normalized_task.get("buildingId"),
+        "buildingName": normalized_task.get("buildingName"),
+        "floorNo": normalized_task.get("floorNo"),
+        "taskType": normalized_task.get("taskType"),
+        "taskTypeLabel": normalized_task.get("taskTypeLabel"),
+        "targetGranularity": normalized_task.get("targetGranularity"),
+        "focusScope": normalized_task.get("focusScope"),
+        "priorityScore": normalized_task.get("priorityScore"),
+        "priorityLabel": normalized_task.get("priorityLabel"),
+        "taskLifecycleStatus": normalized_task.get("taskLifecycleStatus"),
+        "taskLifecycleLabel": normalized_task.get("taskLifecycleLabel"),
+        "businessType": review_item.get("businessType"),
+        "businessTypeLabel": review_item.get("businessTypeLabel"),
+        "sourceListingId": review_item.get("sourceListingId"),
+        "attention": review_item.get("attention") or [],
+        "buildingText": review_item.get("buildingText"),
+        "unitText": review_item.get("unitText"),
+        "floorText": review_item.get("floorText"),
+        "totalFloors": review_item.get("totalFloors"),
+        "areaSqm": review_item.get("areaSqm"),
+        "url": review_item.get("url"),
+        "publishedAt": review_item.get("publishedAt"),
+        "rawText": review_item.get("rawText"),
+        "captureNotes": review_item.get("captureNotes"),
+        "runCreatedAt": run_created_at,
+        "taskPendingAttentionCount": task_pending_count,
+        "runPendingCount": run_pending_count,
+        "task": deepcopy(normalized_task),
+    }
+
+
+def browser_capture_review_workflow_payload(
+    action: str,
+    reason: str,
+    *,
+    task: dict[str, Any] | None = None,
+    item: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    workflow_item = deepcopy(item) if isinstance(item, dict) else None
+    workflow_task = deepcopy((workflow_item or {}).get("task") or task or {})
+    if workflow_item:
+        workflow_task.setdefault("taskId", workflow_item.get("taskId"))
+        workflow_task.setdefault("districtId", workflow_item.get("districtId"))
+        workflow_task.setdefault("districtName", workflow_item.get("districtName"))
+        workflow_task.setdefault("communityId", workflow_item.get("communityId"))
+        workflow_task.setdefault("communityName", workflow_item.get("communityName"))
+        workflow_task.setdefault("buildingId", workflow_item.get("buildingId"))
+        workflow_task.setdefault("buildingName", workflow_item.get("buildingName"))
+        workflow_task.setdefault("floorNo", workflow_item.get("floorNo"))
+        workflow_task.setdefault("taskType", workflow_item.get("taskType"))
+        workflow_task.setdefault("taskTypeLabel", workflow_item.get("taskTypeLabel"))
+        workflow_task.setdefault("targetGranularity", workflow_item.get("targetGranularity"))
+        workflow_task.setdefault("focusScope", workflow_item.get("focusScope"))
+        workflow_task.setdefault("priorityScore", workflow_item.get("priorityScore"))
+        workflow_task.setdefault("priorityLabel", workflow_item.get("priorityLabel"))
+        workflow_task.setdefault("taskLifecycleStatus", workflow_item.get("taskLifecycleStatus"))
+        workflow_task.setdefault("taskLifecycleLabel", workflow_item.get("taskLifecycleLabel"))
+        workflow_task.setdefault("pendingReviewRunId", workflow_item.get("runId"))
+        workflow_task.setdefault("pendingReviewQueueId", workflow_item.get("queueId"))
+        workflow_task.setdefault("pendingAttentionCount", workflow_item.get("taskPendingAttentionCount"))
+    return {
+        "action": action,
+        "reason": reason,
+        "runId": (workflow_item or {}).get("runId") or workflow_task.get("pendingReviewRunId"),
+        "queueId": (workflow_item or {}).get("queueId") or workflow_task.get("pendingReviewQueueId"),
+        "taskId": workflow_task.get("taskId"),
+        "task": workflow_task or None,
+        "item": workflow_item,
+    }
+
+
+@lru_cache(maxsize=1)
+def _browser_review_inbox_all_cached() -> dict[str, Any]:
+    from ..service import comparable_created_at_value
+
+    task_type_rank = {"floor_pair_capture": 0, "building_depth_capture": 1, "community_profile_capture": 2}
+    items: list[dict[str, Any]] = []
+    for run in list_browser_capture_runs(limit=80):
+        run_id = str(run.get("runId") or "")
+        if not run_id or int((run.get("reviewSummary") or {}).get("pendingCount") or 0) <= 0:
+            continue
+        detail = browser_capture_run_detail(run_id)
+        if not detail:
+            continue
+        task_id = str(detail.get("task", {}).get("taskId") or run.get("taskId") or "")
+        task_snapshot = deepcopy(detail.get("task") or {})
+        if task_id:
+            task_snapshot.setdefault("taskId", task_id)
+        task_snapshot.setdefault("districtId", run.get("districtId"))
+        task_snapshot.setdefault("districtName", run.get("districtName"))
+        task_snapshot.setdefault("communityId", run.get("communityId"))
+        task_snapshot.setdefault("communityName", run.get("communityName"))
+        task_snapshot.setdefault("buildingId", run.get("buildingId"))
+        task_snapshot.setdefault("buildingName", run.get("buildingName"))
+        task_snapshot.setdefault("floorNo", run.get("floorNo"))
+        task_snapshot.setdefault("taskType", run.get("taskType"))
+        task_snapshot.setdefault(
+            "taskTypeLabel",
+            run.get("taskTypeLabel") or browser_sampling_task_type_label(str(run.get("taskType") or "")),
+        )
+        task_snapshot["taskLifecycleStatus"] = "needs_review"
+        task_snapshot["taskLifecycleLabel"] = "已采待复核"
+        run_pending_count = int((detail.get("reviewSummary") or {}).get("pendingCount") or 0)
+        task_pending_count = int(task_snapshot.get("pendingAttentionCount") or run_pending_count)
+        for queue_index, review_item in enumerate(detail.get("reviewQueue") or []):
+            if str(review_item.get("status") or "pending") != "pending":
+                continue
+            queue_id = str(review_item.get("queueId") or "")
+            if not queue_id:
+                continue
+            item = {
+                "inboxItemId": f"{run_id}:{queue_id}",
+                "runId": run_id,
+                "queueId": queue_id,
+                "taskId": task_snapshot.get("taskId"),
+                "taskLabel": browser_sampling_task_display_label(task_snapshot),
+                "districtId": task_snapshot.get("districtId"),
+                "districtName": task_snapshot.get("districtName"),
+                "communityId": task_snapshot.get("communityId"),
+                "communityName": task_snapshot.get("communityName"),
+                "buildingId": task_snapshot.get("buildingId"),
+                "buildingName": task_snapshot.get("buildingName"),
+                "floorNo": task_snapshot.get("floorNo"),
+                "taskType": task_snapshot.get("taskType"),
+                "taskTypeLabel": task_snapshot.get("taskTypeLabel"),
+                "targetGranularity": task_snapshot.get("targetGranularity"),
+                "focusScope": task_snapshot.get("focusScope"),
+                "priorityScore": task_snapshot.get("priorityScore"),
+                "priorityLabel": task_snapshot.get("priorityLabel"),
+                "taskLifecycleStatus": task_snapshot.get("taskLifecycleStatus"),
+                "taskLifecycleLabel": task_snapshot.get("taskLifecycleLabel"),
+                "businessType": review_item.get("businessType"),
+                "businessTypeLabel": review_item.get("businessTypeLabel"),
+                "sourceListingId": review_item.get("sourceListingId"),
+                "attention": review_item.get("attention") or [],
+                "buildingText": review_item.get("buildingText"),
+                "unitText": review_item.get("unitText"),
+                "floorText": review_item.get("floorText"),
+                "totalFloors": review_item.get("totalFloors"),
+                "areaSqm": review_item.get("areaSqm"),
+                "url": review_item.get("url"),
+                "publishedAt": review_item.get("publishedAt"),
+                "rawText": review_item.get("rawText"),
+                "captureNotes": review_item.get("captureNotes"),
+                "runCreatedAt": run.get("createdAt"),
+                "taskPendingAttentionCount": task_pending_count,
+                "runPendingCount": run_pending_count,
+                "task": deepcopy(task_snapshot),
+                "__queueIndex": queue_index,
+            }
+            items.append(item)
+
+    items.sort(key=lambda item: int(item.get("__queueIndex") or 0))
+    items.sort(key=lambda item: comparable_created_at_value(item.get("runCreatedAt")), reverse=True)
+    items.sort(
+        key=lambda item: (
+            -float(item.get("priorityScore") or 0),
+            task_type_rank.get(str(item.get("taskType") or ""), 9),
+            str(item.get("districtName") or ""),
+            str(item.get("communityName") or ""),
+            str(item.get("buildingName") or ""),
+            str(item.get("taskId") or ""),
+        )
+    )
+    task_pending_counts: dict[str, int] = {}
+    for item in items:
+        task_id = str(item.get("taskId") or "")
+        if task_id:
+            task_pending_counts[task_id] = task_pending_counts.get(task_id, 0) + 1
+    for item in items:
+        task_id = str(item.get("taskId") or "")
+        if task_id:
+            item["taskPendingAttentionCount"] = task_pending_counts.get(task_id, item.get("taskPendingAttentionCount") or 0)
+    public_items = []
+    for item in items:
+        public_item = deepcopy(item)
+        public_item.pop("__queueIndex", None)
+        public_items.append(public_item)
+    return {
+        "items": public_items,
+        "summary": browser_review_inbox_summary(public_items),
+    }
+
+
+def browser_review_inbox_payload(
+    *,
+    district: str | None = None,
+    limit: int | None = 20,
+) -> dict[str, Any]:
+    cached = _browser_review_inbox_all_cached()
+    filtered_items = [
+        deepcopy(item)
+        for item in cached.get("items") or []
+        if district in (None, "", "all") or item.get("districtId") == district
+    ]
+    summary = browser_review_inbox_summary(filtered_items)
+    if limit is not None:
+        filtered_items = filtered_items[:limit]
+    return {
+        "summary": summary,
+        "items": filtered_items,
+    }
+
+
+def browser_review_fixture_root() -> Path:
+    from ..service import ROOT_DIR
+
+    return ROOT_DIR / "tmp" / "browser-review-fixtures"
+
+
+def _browser_review_items_by_task(items: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    items_by_task: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        task_id = str(item.get("taskId") or "")
+        if not task_id:
+            continue
+        items_by_task.setdefault(task_id, []).append(item)
+    return items_by_task
+
+
+def _browser_review_items_by_task_run(items: list[dict[str, Any]]) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    items_by_task_run: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        task_id = str(item.get("taskId") or "")
+        run_id = str(item.get("runId") or "")
+        if not task_id or not run_id:
+            continue
+        items_by_task_run.setdefault((task_id, run_id), []).append(item)
+    return items_by_task_run
+
+
+def _browser_review_current_task_fixture_candidate() -> dict[str, Any] | None:
+    from ..service import browser_sampling_pack
+
+    review_inbox = browser_review_inbox_payload(limit=None)
+    items = [item for item in (review_inbox.get("items") or []) if isinstance(item, dict)]
+    items_by_task = _browser_review_items_by_task(items)
+    items_by_task_run = _browser_review_items_by_task_run(items)
+    pack_items = browser_sampling_pack(limit=200)
+    for task_snapshot in pack_items:
+        task_id = str(task_snapshot.get("taskId") or "")
+        if not task_id or int(task_snapshot.get("pendingAttentionCount") or 0) < 3:
+            continue
+        preferred_run_id = str(task_snapshot.get("pendingReviewRunId") or "")
+        task_items = items_by_task.get(task_id) or []
+        if len(task_items) < 3:
+            continue
+        task_run_ids = []
+        seen_task_runs: set[str] = set()
+        for item in task_items:
+            run_id = str(item.get("runId") or "")
+            if not run_id or run_id in seen_task_runs:
+                continue
+            seen_task_runs.add(run_id)
+            task_run_ids.append(run_id)
+        if len(task_run_ids) < 2:
+            continue
+        candidate_run_ids = []
+        if preferred_run_id:
+            candidate_run_ids.append(preferred_run_id)
+        candidate_run_ids.extend(run_id for run_id in task_run_ids if run_id != preferred_run_id)
+        for run_id in candidate_run_ids:
+            run_items = items_by_task_run.get((task_id, run_id)) or []
+            other_task_items = [item for item in task_items if str(item.get("runId") or "") != run_id]
+            if len(run_items) < 2 or not other_task_items:
+                continue
+            source_item = deepcopy(run_items[0])
+            seeded_items = [deepcopy(item) for item in run_items[1:]]
+            return {
+                "task": deepcopy(task_snapshot),
+                "taskId": task_id,
+                "sourceItem": source_item,
+                "seededItems": seeded_items,
+                "otherTaskItems": [deepcopy(item) for item in other_task_items],
+            }
+    return None
+
+
+def create_browser_review_current_task_fixture() -> dict[str, Any]:
+    from ..service import (
+        browser_sampling_task_lookup,
+        default_browser_capture_review_queue_path,
+        read_json_file,
+        resolve_artifact_path,
+        write_json_file,
+    )
+
+    candidate = _browser_review_current_task_fixture_candidate()
+    if not candidate:
+        raise ValueError("当前没有可用于 review_current_task 的 browser review fixture 候选。")
+
+    source_item = deepcopy(candidate.get("sourceItem") or {})
+    seeded_items = [deepcopy(item) for item in (candidate.get("seededItems") or []) if isinstance(item, dict)]
+    source_run_id = str(source_item.get("runId") or "")
+    source_queue_id = str(source_item.get("queueId") or "")
+    task_id = str(candidate.get("taskId") or "")
+    if not source_run_id or not source_queue_id or not task_id or not seeded_items:
+        raise ValueError("review_current_task fixture 候选缺少必要字段。")
+
+    detail = browser_capture_run_detail(source_run_id)
+    if not detail:
+        raise ValueError(f"找不到 source run 详情：{source_run_id}")
+    review_queue_path = resolve_artifact_path(detail.get("reviewQueuePath")) or default_browser_capture_review_queue_path(
+        Path(str(detail.get("manifestPath") or ""))
+    )
+    if not review_queue_path or not review_queue_path.exists():
+        raise ValueError(f"找不到 source run 的 review_queue.json：{source_run_id}")
+    original_review_queue = read_json_file(review_queue_path)
+    if not isinstance(original_review_queue, list):
+        raise ValueError(f"source run 的 review_queue.json 无法读取：{review_queue_path}")
+
+    seed_queue_ids = {str(item.get("queueId") or "") for item in seeded_items if item.get("queueId")}
+    if not seed_queue_ids:
+        raise ValueError("review_current_task fixture 没有可预处理的 queue。")
+
+    seeded_review_queue = deepcopy(original_review_queue)
+    reviewed_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    for item in seeded_review_queue:
+        queue_id = str(item.get("queueId") or "")
+        if queue_id not in seed_queue_ids:
+            continue
+        item["status"] = "resolved"
+        item["resolutionNotes"] = "browser review smoke fixture: 预先收口同 run attention，制造 current-task relay 场景。"
+        item["reviewOwner"] = "atlas-smoke-fixture"
+        item["reviewedAt"] = reviewed_at
+        item["replacementRunId"] = None
+    write_json_file(review_queue_path, seeded_review_queue)
+
+    try:
+        refreshed_inbox = browser_review_inbox_payload(limit=None)
+        refreshed_items = [item for item in (refreshed_inbox.get("items") or []) if isinstance(item, dict)]
+        expected_target_item = next(
+            (
+                deepcopy(item)
+                for item in refreshed_items
+                if str(item.get("taskId") or "") == task_id and str(item.get("queueId") or "") != source_queue_id
+            ),
+            None,
+        )
+        if not expected_target_item:
+            raise ValueError("fixture 写入后仍然找不到 review_current_task 的接力目标。")
+        refreshed_source_detail = browser_capture_run_detail(source_run_id) or {}
+        refreshed_pending_count = int((refreshed_source_detail.get("reviewSummary") or {}).get("pendingCount") or 0)
+        if refreshed_pending_count != 1:
+            raise ValueError(f"fixture 写入后 source run pendingCount 不是 1：{refreshed_pending_count}")
+        task_snapshot = browser_sampling_task_lookup(task_id)
+        if not task_snapshot or int(task_snapshot.get("pendingAttentionCount") or 0) <= 0:
+            raise ValueError("fixture 写入后 task snapshot 没有保留 pending review 状态。")
+
+        fixture_id = f"browser-review-current-task-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        fixture_manifest_path = browser_review_fixture_root() / f"{fixture_id}.json"
+        fixture_manifest = {
+            "fixtureId": fixture_id,
+            "fixtureType": "review_current_task",
+            "createdAt": reviewed_at,
+            "sourceItem": source_item,
+            "expectedTargetItem": expected_target_item,
+            "seededQueueIds": sorted(seed_queue_ids),
+            "task": deepcopy(task_snapshot),
+            "reviewQueueBackup": {
+                "runId": source_run_id,
+                "reviewQueuePath": str(review_queue_path),
+                "reviewQueue": original_review_queue,
+            },
+        }
+        write_json_file(fixture_manifest_path, fixture_manifest)
+        return {
+            "fixtureId": fixture_id,
+            "fixtureType": "review_current_task",
+            "selectionReason": "seeded_review_current_task_fixture",
+            "sourceItem": source_item,
+            "expectedTargetItem": expected_target_item,
+            "seededQueueIds": sorted(seed_queue_ids),
+            "task": deepcopy(task_snapshot),
+            "reviewInboxSummary": refreshed_inbox.get("summary") or {},
+        }
+    except Exception:
+        write_json_file(review_queue_path, original_review_queue)
+        raise
+
+
+def restore_browser_review_fixture(fixture_id: str) -> dict[str, Any]:
+    from ..service import clear_runtime_caches, read_json_file, write_json_file
+
+    normalized_fixture_id = str(fixture_id or "").strip()
+    if not normalized_fixture_id:
+        raise ValueError("fixture_id 不能为空。")
+    fixture_manifest_path = browser_review_fixture_root() / f"{normalized_fixture_id}.json"
+    fixture_manifest = read_json_file(fixture_manifest_path)
+    if not isinstance(fixture_manifest, dict):
+        raise ValueError(f"找不到 browser review fixture：{normalized_fixture_id}")
+
+    review_queue_backup = fixture_manifest.get("reviewQueueBackup") or {}
+    review_queue_path = Path(str(review_queue_backup.get("reviewQueuePath") or ""))
+    review_queue_payload = review_queue_backup.get("reviewQueue")
+    if not review_queue_path or not isinstance(review_queue_payload, list):
+        raise ValueError(f"browser review fixture 缺少有效备份：{normalized_fixture_id}")
+
+    write_json_file(review_queue_path, review_queue_payload)
+    try:
+        fixture_manifest_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    clear_runtime_caches()
+    return {
+        "fixtureId": normalized_fixture_id,
+        "fixtureType": fixture_manifest.get("fixtureType"),
+        "restored": True,
+        "runId": review_queue_backup.get("runId"),
+        "reviewQueuePath": str(review_queue_path),
+    }
+
+
+@lru_cache(maxsize=1)
+def _browser_capture_task_history_index_cached() -> dict[str, dict[str, Any]]:
+    from ..service import created_at_is_before
+
+    latest_by_task: dict[str, dict[str, Any]] = {}
+    capture_runs = list_browser_capture_runs(limit=80)
+    grouped_counts: dict[str, int] = {}
+    for item in capture_runs:
+        task_id = str(item.get("taskId") or "")
+        if not task_id:
+            continue
+        grouped_counts[task_id] = grouped_counts.get(task_id, 0) + 1
+        current = latest_by_task.get(task_id)
+        if current and not created_at_is_before(current.get("createdAt"), item.get("createdAt")):
+            pass
+        else:
+            latest_by_task[task_id] = deepcopy(item)
+    pending_by_task: dict[str, dict[str, Any]] = {}
+    for inbox_item in browser_review_inbox_payload(limit=None).get("items") or []:
+        task_id = str(inbox_item.get("taskId") or "")
+        if not task_id:
+            continue
+        aggregate = pending_by_task.setdefault(
+            task_id,
+            {
+                "pendingAttentionCount": 0,
+                "pendingAttentionPreview": [],
+                "pendingReviewRunId": None,
+                "pendingReviewQueueId": None,
+            },
+        )
+        aggregate["pendingAttentionCount"] += 1
+        preview = aggregate["pendingAttentionPreview"]
+        if len(preview) < 3:
+            preview.append(
+                {
+                    "queueId": inbox_item.get("queueId"),
+                    "runId": inbox_item.get("runId"),
+                    "businessType": inbox_item.get("businessType"),
+                    "businessTypeLabel": inbox_item.get("businessTypeLabel"),
+                    "sourceListingId": inbox_item.get("sourceListingId"),
+                    "attention": inbox_item.get("attention") or [],
+                    "publishedAt": inbox_item.get("publishedAt"),
+                }
+            )
+        if not aggregate.get("pendingReviewRunId"):
+            aggregate["pendingReviewRunId"] = inbox_item.get("runId")
+            aggregate["pendingReviewQueueId"] = inbox_item.get("queueId")
+    for task_id, item in latest_by_task.items():
+        history_count = grouped_counts.get(task_id, 0)
+        pending_state = pending_by_task.get(task_id) or {}
+        pending_attention_count = int(pending_state.get("pendingAttentionCount") or 0)
+        item["captureHistoryCount"] = history_count
+        item["pendingAttentionCount"] = pending_attention_count
+        item["pendingAttentionPreview"] = pending_state.get("pendingAttentionPreview") or []
+        item["pendingReviewRunId"] = pending_state.get("pendingReviewRunId")
+        item["pendingReviewQueueId"] = pending_state.get("pendingReviewQueueId")
+        item["taskLifecycleStatus"] = "needs_review" if pending_attention_count > 0 else "captured"
+        item["taskLifecycleLabel"] = "已采待复核" if pending_attention_count > 0 else "已采仍需补采"
+    return latest_by_task
+
+
+def browser_capture_task_history_index() -> dict[str, dict[str, Any]]:
+    return deepcopy(_browser_capture_task_history_index_cached())
