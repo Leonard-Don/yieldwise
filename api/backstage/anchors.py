@@ -28,7 +28,8 @@ def default_reference_anchor_report_path(manifest_path: Path) -> Path:
 
 
 def latest_reference_anchor_review_lookup() -> dict[str, dict[str, Any]]:
-    from ..service import list_reference_runs, reference_run_detail_full
+    from ..service import reference_run_detail_full
+    from .runs import list_reference_runs
 
     reference_runs = list_reference_runs()
     if not reference_runs:
@@ -68,7 +69,8 @@ def anchor_decision_state_for(
 
 
 def latest_reference_anchor_report_lookup() -> dict[str, dict[str, Any]]:
-    from ..service import list_reference_runs, reference_run_detail_full
+    from ..service import reference_run_detail_full
+    from .runs import list_reference_runs
 
     reference_runs = list_reference_runs()
     if not reference_runs:
@@ -133,7 +135,7 @@ def latest_anchor_review_at(review_history: list[dict[str, Any]]) -> str | None:
 
 
 def target_reference_run_id(reference_run_id: str | None = None) -> str | None:
-    from ..service import list_reference_runs
+    from .runs import list_reference_runs
 
     if reference_run_id:
         return reference_run_id
@@ -453,11 +455,11 @@ def anchor_watchlist_payload(
 ) -> dict[str, Any]:
     from ..service import (
         current_community_dataset,
-        list_reference_runs,
         priority_districts,
         reference_catalog_indices,
         sample_status_label,
     )
+    from .runs import list_reference_runs
 
     reference_index = reference_catalog_indices()
     community_dataset = {item["id"]: item for item in current_community_dataset()}

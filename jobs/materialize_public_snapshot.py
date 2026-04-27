@@ -15,10 +15,10 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from api.backstage.anchors import rebuild_reference_anchor_report
 from api.service import (
     normalize_alias_list,
     read_csv_rows,
-    rebuild_reference_anchor_report,
     rebuild_reference_summary,
     reference_run_detail_full,
     write_csv_rows,

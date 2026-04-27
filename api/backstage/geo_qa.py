@@ -165,7 +165,8 @@ def db_geo_work_order_rows(geo_run_id: str | None = None) -> list[dict[str, Any]
 
 
 def available_geo_baseline_runs_for(run_id: str) -> list[dict[str, Any]]:
-    from ..service import created_at_is_before, list_geo_asset_runs
+    from ..service import created_at_is_before
+    from .runs import list_geo_asset_runs
 
     runs = list_geo_asset_runs()
     selected_run = next((item for item in runs if item.get("runId") == run_id), None)
@@ -914,11 +915,8 @@ def db_geo_asset_run_detail_full(run_id: str) -> dict[str, Any] | None:
 
 @lru_cache(maxsize=64)
 def _geo_asset_run_detail_full_cached(run_id: str) -> dict[str, Any] | None:
-    from ..service import (
-        geo_asset_run_summary_from_manifest,
-        read_json_file,
-        resolve_artifact_path,
-    )
+    from ..service import read_json_file, resolve_artifact_path
+    from .runs import geo_asset_run_summary_from_manifest
 
     manifest_path = geo_manifest_path_for_run(run_id)
     if manifest_path:
@@ -1330,14 +1328,8 @@ def geo_task_watchlist(
     limit: int = 12,
     include_resolved: bool = False,
 ) -> list[dict[str, Any]]:
-    from ..service import (
-        clamp,
-        database_mode_active,
-        floor_watchlist,
-        get_building,
-        get_community,
-        list_geo_asset_runs,
-    )
+    from ..service import clamp, floor_watchlist, get_building, get_community
+    from .runs import database_mode_active, list_geo_asset_runs
 
     if database_mode_active():
         watchlist_by_building = {
