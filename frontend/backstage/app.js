@@ -14,86 +14,16 @@ const amapState = {
 };
 
 
-function normalizeWorkspaceView(value) {
-  return workspaceViews.includes(value) ? value : "frontstage";
-}
 
-function normalizeBackstageTab(value) {
-  return backstageTabs.includes(value) ? value : "operations";
-}
 
-function normalizeOperationsHistoryTab(value) {
-  return operationsHistoryTabs.includes(value) ? value : "reference";
-}
 
-function normalizeOperationsDetailTab(value) {
-  return operationsDetailTabs.includes(value) ? value : "geo";
-}
 
-function normalizeOperationsQualityTab(value) {
-  return operationsQualityTabs.includes(value) ? value : "workbench";
-}
 
-function initialWorkspaceViewFromLocation() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeWorkspaceView(params.get("view"));
-  } catch (error) {
-    return "frontstage";
-  }
-}
 
-function initialBackstageTabFromLocation() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeBackstageTab(params.get("backstage"));
-  } catch (error) {
-    return "operations";
-  }
-}
 
-function initialOperationsHistoryTabFromLocation() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeOperationsHistoryTab(params.get("opsHistory"));
-  } catch (error) {
-    return "reference";
-  }
-}
 
-function initialOperationsDetailTabFromLocation() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeOperationsDetailTab(params.get("opsDetail"));
-  } catch (error) {
-    return "geo";
-  }
-}
 
-function initialOperationsQualityTabFromLocation() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeOperationsQualityTab(params.get("opsQuality"));
-  } catch (error) {
-    return "workbench";
-  }
-}
 
-function initialOperationsSelectionParamFromLocation(name) {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (
-      normalizeWorkspaceView(params.get("view")) !== "backstage"
-      || normalizeBackstageTab(params.get("backstage")) !== "operations"
-    ) {
-      return null;
-    }
-    const value = params.get(name);
-    return value && value.trim() ? value.trim() : null;
-  } catch (error) {
-    return null;
-  }
-}
 
 function shouldInitializeMapExperienceForCurrentView() {
   return normalizeWorkspaceView(state.workspaceView) === "frontstage";
@@ -235,36 +165,7 @@ function effectiveOperationsOverview() {
 }
 
 
-function hydrateDistrictsPayload(rawDistricts) {
-  return (rawDistricts ?? []).map((district) => ({
-    ...district,
-    communities: (district.communities ?? []).map(hydrateCommunity)
-  }));
-}
 
-function hydrateCommunity(community) {
-  const buildings = (community.buildings ?? []).map((building, index) => hydrateBuilding(community, building, index));
-  const focusMatch = buildings.find((building) => building.name === community.buildingFocus);
-  return {
-    ...community,
-    centerLng: community.centerLng ?? community.center_lng ?? null,
-    centerLat: community.centerLat ?? community.center_lat ?? null,
-    anchorSource: community.anchorSource ?? community.anchor_source ?? null,
-    anchorQuality: community.anchorQuality ?? community.anchor_quality ?? null,
-    previewCenterLng: community.previewCenterLng ?? community.preview_center_lng ?? null,
-    previewCenterLat: community.previewCenterLat ?? community.preview_center_lat ?? null,
-    previewAnchorSource: community.previewAnchorSource ?? community.preview_anchor_source ?? null,
-    previewAnchorQuality: community.previewAnchorQuality ?? community.preview_anchor_quality ?? null,
-    previewAnchorName: community.previewAnchorName ?? community.preview_anchor_name ?? null,
-    previewAnchorAddress: community.previewAnchorAddress ?? community.preview_anchor_address ?? null,
-    anchorDecisionState: community.anchorDecisionState ?? community.anchor_decision_state ?? null,
-    latestAnchorReview: community.latestAnchorReview ?? community.latest_anchor_review ?? null,
-    sampleStatus: community.sampleStatus ?? community.sample_status ?? (community.sample > 0 ? "active_metrics" : "dictionary_only"),
-    sampleStatusLabel: community.sampleStatusLabel ?? community.sample_status_label ?? "状态待补",
-    buildings,
-    primaryBuildingId: community.primaryBuildingId ?? focusMatch?.id ?? buildings[0]?.id ?? null
-  };
-}
 
 
 function districtDirectory() {
