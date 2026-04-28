@@ -14,19 +14,34 @@
 
 ## 这个仓库现在是什么
 
-- 一个可直接运行的前端研究台：支持小区、楼栋、楼层三级 drill-down
-- 一个 FastAPI 驱动的本地工作台：页面、接口和 staged/database 运行态保持一致
+- 一个面向单用户研究的产品化平台 `/`（Phase 6 完工）：三模式（收益猎手 / 自住找房 / 全市观察）+ 关注夹 + 笔记 + 变化提醒 + ⌘K 全局搜索 + 区抽屉
+- 一个 FastAPI 本地工作台：页面、接口和 staged/database 运行态保持一致
 - 一条 staged 优先的数据流水线：reference / import / geo / metrics 可逐批落盘
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
 - 一套几何补采与质量控制面板：覆盖缺口、工单、基线对比、导出接口都在同一页
 
-## 路由布局（Phase 6g 起）
+### 当前能力 / 已知限制
+
+**能力**
+- 用户平台 `/`：三模式（Yield / Home / City）+ 抽屉 KPI + 关注夹（★）+ 笔记 + 变化横幅 + ⌘K 搜索 + 区下钻
+- 研究台 `/backstage`：原研究台整体保留，运营/复核/几何 QA 都在此
+- 三态运行（staged / database / mock），`ATLAS_ENABLE_DEMO_MOCK=1` 控制 mock fallback
+- 浏览器回归 25/25 步全绿，pytest 123 项 + smoke 21 路由 + `node --check` 全套 JS 文件全绿
+
+**已知限制（spec 之后的增量，不在当前交付范围）**
+- **自住模式通勤分钟尚未接入**：地图色按预算 / 总价着色，但通勤栏位是占位；要接高德路线 API（需要 API key + 限流策略）
+- **全市模式街道聚合粒度未补**：当前按行政区聚合，spec 提到的「街道作为后续升级项」还在 Phase 6 之后
+- **`frontend/backstage/app.js` 还有 10077 行未拆分**：Phase 8 已抽出 9 个独立模块（`data/` × 3 + `lib/` × 8），但 `app.js` 主体仍然是经典脚本而非 ES module；继续按机械切片可推进，或者后续做一次 ES module 改造（spec 没有强制要求）
+- **`tmp/browser-capture-runs/` 状态不可逆**：`reviewBrowserCaptureQueueItem` 会修改 `review_queue.json` 把 attention 标记为 resolved；`browser-review-fixtures/` 里的 fixture 删除会回滚原状，但不要批量手动删除 capture run 目录
+- **pwcli 默认 30s 单次 eval 上限**：在更慢的机器上请用 `ATLAS_PWCLI_EVAL_TIMEOUT=60` 等覆盖
+
+## 路由布局（Phase 8i 起）
 
 | 路径 | 绑定 | 说明 |
 | --- | --- | --- |
 | `/` | `frontend/user/` | 用户平台。收益模式 + 详情抽屉（含区级 KPI + 区内小区下钻）+ 筛选条 + 自住模式 + 全市模式 + 关注夹（★）+ 笔记 + 变化横幅（含目标名解析）+ 键盘快捷键（⌘K 搜索、⌘1/2/3 切模式、F 关注、N 笔记、? 帮助）。 |
 | `/backstage` | `frontend/backstage/` | 原研究台，所有运营/复核/几何 QA 在此 |
-| `/api/*` | `api/service.py` + `api/backstage/`（Phase 2 迁移） | 传统接口，backstage 前端使用 |
+| `/api/*` | `api/service.py` + `api/backstage/{runs,review,geo_qa,anchors}.py`（Phase 7 完工） | 传统接口，backstage 前端使用 |
 | `/api/v2/*` | `api/domains/` | 用户平台专属接口。已开放：`/health`、`/opportunities`、`/map/{districts,communities,buildings}`、`/buildings/{id}`、`/communities/{id}`、`/districts/{id}`、`/user/prefs` (GET + PATCH)、`/watchlist` (GET + POST + DELETE)、`/annotations` (GET-by-target + POST + PATCH + DELETE)、`/alerts/{rules,since-last-open,mark-seen}` (GET + PATCH + POST)、`/search` (GET) |
 
 要直接打开研究台请访问 `http://127.0.0.1:8000/backstage/`。`/` 在 Phase 1 结束时是一个空的 D1 shell。
@@ -54,7 +69,7 @@ uvicorn api.main:app --reload --port 8000
 
 ```bash
 python3 -m compileall api jobs scripts
-node --check frontend/backstage/app.js
+for f in frontend/backstage/{data,lib}/*.js frontend/backstage/app.js frontend/user/modules/*.js; do node --check "$f" || break; done
 python3 scripts/phase1_smoke.py
 python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage/
 ```
@@ -63,13 +78,19 @@ python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage
 
 | 路径 | 用途 |
 | --- | --- |
-| `index.html` / `styles.css` / `app.js` | 当前 Atlas 研究台前端壳与交互逻辑 |
-| `api/` | FastAPI 接口、领域查询、runtime 状态和 review / relay contract |
+| `frontend/user/` | 用户平台（Phase 6）：D1 终端风格 shell + 三模式 + 抽屉 + 关注夹 + 笔记 + alerts + ⌘K 搜索 |
+| `frontend/backstage/` | 研究台（迁自原主页），`app.js` 已抽出 `data/`（3 文件，常量 + DOM handle）和 `lib/`（8 模块，纯辅助）；`app.js` 仍含运行时与渲染主体 |
+| `api/` | FastAPI 接口、领域查询、runtime 状态、review / relay contract |
+| `api/domains/` | 用户平台 v2 接口（opportunities / map / buildings / communities / districts / user_prefs / watchlist / annotations / alerts / search） |
+| `api/backstage/` | spec §4 Phase 7 拆分产物：`runs.py`（411）+ `review.py`（2235）+ `geo_qa.py`（1970）+ `anchors.py`（525）；service.py 仅保留共享业务逻辑 |
+| `api/service.py` | 后台共享业务逻辑（5927 行，从 10674 减下来），顶部 import 把 backstage 模块拉回供自身内部使用 |
 | `jobs/` | reference / import / geo / metrics / materialize 等离线任务 |
 | `scripts/` | browser smoke、full regression、本地联调辅助脚本 |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Phase 6 起的迭代节奏，按时间倒序 |
 | [`docs/api-contract.md`](docs/api-contract.md) | 页面与后端 contract、workflow / relay 字段说明 |
 | [`docs/import-public-browser-capture.md`](docs/import-public-browser-capture.md) | 公开页补样导入、review queue、回归脚本说明 |
 | [`docs/strategy.md`](docs/strategy.md) | 研究台定位、阶段路线与数据策略 |
+| [`docs/superpowers/`](docs/superpowers/) | 当前迭代周期的 spec / plan / 子阶段任务底稿 |
 
 ## 当前运行原则
 
