@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+# ──────────────────────────────────────────────────────────────────────
+# RED LINE — DO NOT GROW THIS FILE.
+# service.py shrank from 10674 → 5947 lines by Phase 7 (backstage split).
+# The re-exports below exist to keep historical `from api.service import …`
+# call-sites working; they are NOT an invitation to add new logic here.
+#
+# New backend code MUST go to:
+#   • api/domains/   — v2 user-platform endpoints
+#   • api/backstage/ — workbench domain logic (runs / review / geo_qa / anchors)
+# Only put a helper here if it is genuinely shared by ≥2 backstage modules
+# AND has no natural home in any of them. When in doubt, do not add.
+# ──────────────────────────────────────────────────────────────────────
+
 import csv
 import io
 import json

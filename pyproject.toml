@@ -1,0 +1,29 @@
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = [
+    "tmp",
+    ".playwright-cli",
+    ".pytest_cache",
+    ".ruff_cache",
+    "output",
+    "data/public-snapshot",
+]
+
+[tool.ruff.lint]
+# Start narrow: only pyflakes (real bug indicators). Style/import-order rules
+# can be added later once the codebase is clean enough to enforce them.
+select = ["F"]
+
+[tool.ruff.lint.per-file-ignores]
+# service.py is the Phase 7 re-export hub. F401 covers intentional re-exports;
+# F811 covers redefinitions where backstage-imported names are shadowed by
+# legacy definitions still in this file (separate cleanup tracked outside CI).
+"api/service.py" = ["F401", "F811"]
+# Each of the remaining baselines flags a single F841/F401 left over from
+# refactors. They are not blocking and will be cleaned up incrementally.
+"api/backstage/review.py" = ["F841"]
+"jobs/import_authorized_listings.py" = ["F401"]
+"scripts/browser_capture_smoke.py" = ["F841"]
+"scripts/full_browser_regression.py" = ["F841"]
+"tests/api/test_personal_storage.py" = ["F401"]

@@ -46,13 +46,50 @@ def _load_psycopg():
     return psycopg, dict_row, Jsonb
 
 
+# Per-DSN connection pool registry. Pools are lazily created on first use and
+# kept for the process lifetime — FastAPI keeps a single process per worker, so
+# this acts as a long-lived pool without requiring a startup hook.
+_POOL_REGISTRY: dict[str, Any] = {}
+
+
+def _get_pool(dsn: str) -> Any:
+    pool = _POOL_REGISTRY.get(dsn)
+    if pool is not None:
+        return pool
+    try:
+        from psycopg_pool import ConnectionPool
+    except ImportError as exc:  # pragma: no cover - depends on local env
+        raise RuntimeError("缺少 psycopg-pool，请先安装 api/requirements.txt 里的依赖。") from exc
+    _, dict_row, _ = _load_psycopg()
+    pool = ConnectionPool(
+        conninfo=dsn,
+        min_size=1,
+        max_size=8,
+        kwargs={"row_factory": dict_row},
+        open=True,
+    )
+    _POOL_REGISTRY[dsn] = pool
+    return pool
+
+
 @contextmanager
-def postgres_cursor(*, dsn: str | None = None) -> Iterator[Any]:
+def postgres_connection(*, dsn: str | None = None) -> Iterator[Any]:
+    """Acquire a pooled connection. Caller may use it for cursors and explicit commits.
+
+    All callers (read-path cursors and write-path multi-statement transactions)
+    route through here so connection lifecycle stays in one place.
+    """
     resolved_dsn = dsn or postgres_dsn()
     if not resolved_dsn:
         raise RuntimeError("未配置 POSTGRES_DSN。")
-    psycopg, dict_row, _ = _load_psycopg()
-    with psycopg.connect(resolved_dsn, row_factory=dict_row) as conn:
+    pool = _get_pool(resolved_dsn)
+    with pool.connection() as conn:
+        yield conn
+
+
+@contextmanager
+def postgres_cursor(*, dsn: str | None = None) -> Iterator[Any]:
+    with postgres_connection(dsn=dsn) as conn:
         with conn.cursor() as cur:
             yield cur
 
@@ -1347,7 +1384,7 @@ def sync_anchor_confirmation_to_postgres(
     if not district_id:
         raise RuntimeError("缺少 district_id，无法同步锚点确认。")
 
-    with psycopg.connect(resolved_dsn) as conn:
+    with postgres_connection(dsn=resolved_dsn) as conn:
         with conn.cursor() as cur:
             if apply_schema:
                 _apply_schema_if_needed(cur)
@@ -1514,7 +1551,7 @@ def persist_import_run_to_postgres(run_id: str, *, dsn: str | None = None, apply
     communities, buildings = _collect_reference_catalog_from_import_detail(detail)
     district_rows = _district_rows_from_catalog(communities)
 
-    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+    with postgres_connection(dsn=dsn) as conn:
         with conn.cursor() as cur:
             if apply_schema:
                 _apply_schema_if_needed(cur)
@@ -1569,7 +1606,7 @@ def persist_geo_asset_run_to_postgres(run_id: str, *, dsn: str | None = None, ap
     communities, buildings = _collect_reference_catalog_from_geo_detail(detail)
     district_rows = _district_rows_from_catalog(communities)
 
-    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+    with postgres_connection(dsn=dsn) as conn:
         with conn.cursor() as cur:
             if apply_schema:
                 _apply_schema_if_needed(cur)
@@ -1622,7 +1659,7 @@ def persist_reference_dictionary_manifest_to_postgres(
         raise RuntimeError("未配置 POSTGRES_DSN，无法写入 PostgreSQL。")
 
     psycopg, dict_row, Jsonb = _load_psycopg()
-    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+    with postgres_connection(dsn=dsn) as conn:
         with conn.cursor() as cur:
             if apply_schema:
                 _apply_schema_if_needed(cur)
@@ -1656,7 +1693,7 @@ def persist_metrics_snapshot_to_postgres(
     building_floor_metrics = list(snapshot.get("building_floor_metrics") or [])
 
     psycopg, dict_row, _ = _load_psycopg()
-    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+    with postgres_connection(dsn=dsn) as conn:
         with conn.cursor() as cur:
             if apply_schema:
                 _apply_schema_if_needed(cur)

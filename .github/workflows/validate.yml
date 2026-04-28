@@ -30,6 +30,9 @@ jobs:
       - name: Python compile check
         run: python3 -m compileall api jobs scripts
 
+      - name: Ruff lint
+        run: python3 -m ruff check .
+
       - name: Backstage JS syntax check
         run: node --check frontend/backstage/app.js
 
