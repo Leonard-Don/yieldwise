@@ -9,6 +9,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -50,10 +51,15 @@ def main() -> int:
     args = parser.parse_args()
     base = f"http://127.0.0.1:{args.port}"
 
+    # Smoke runs against demo data — CI has no DB and no staged tmp/ runs, so
+    # without this flag list_districts() returns [] and /api/v2/districts/{id}
+    # 404s. The flag is per-subprocess; the parent shell is untouched.
+    smoke_env = {**os.environ, "ATLAS_ENABLE_DEMO_MOCK": "true"}
     proc = subprocess.Popen(
         ["uvicorn", "api.main:app", "--port", str(args.port), "--log-level", "warning"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=smoke_env,
     )
     try:
         wait_for_server(f"{base}/api/health")
