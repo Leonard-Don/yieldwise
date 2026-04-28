@@ -291,3 +291,16 @@ function slugifyExportName(value, fallback = "latest") {
     .replace(/[^a-z0-9一-龥]+/gi, "-")
     .replace(/^-+|-+$/g, "") || fallback;
 }
+
+function mapWaypointTone(source) {
+  if (["browser_sampling", "coverage", "capture_run"].includes(source)) {
+    return "sampling";
+  }
+  if (source === "geo_task") {
+    return "geo";
+  }
+  if (source === "search") {
+    return "district-active";
+  }
+  return "yield";
+}
