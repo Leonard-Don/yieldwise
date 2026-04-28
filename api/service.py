@@ -260,25 +260,6 @@ def read_json_file(path: Path | None) -> Any:
 
 
 def clear_runtime_caches() -> None:
-    from .backstage.geo_qa import (
-        _geo_asset_run_comparison_cached,
-        _geo_asset_run_detail_cached,
-        _geo_asset_run_detail_full_cached,
-    )
-    from .backstage.review import (
-        _browser_capture_run_detail_cached,
-        _browser_capture_task_history_index_cached,
-        _browser_review_inbox_all_cached,
-        _list_browser_capture_runs_cached,
-    )
-    from .backstage.runs import (
-        _list_geo_asset_runs_cached,
-        _list_import_runs_cached,
-        _list_metrics_runs_cached,
-        _list_reference_runs_cached,
-        _runtime_data_state_cached,
-    )
-
     _list_reference_runs_cached.cache_clear()
     _reference_run_detail_full_cached.cache_clear()
     _list_import_runs_cached.cache_clear()
@@ -2982,7 +2963,7 @@ def update_import_queue_review(
 
     database_sync = {"status": "skipped", "message": "未配置 PostgreSQL，同步仅写回本地批次文件。"}
     try:
-        from .persistence import postgres_runtime_status, persist_import_run_to_postgres
+        from .persistence import persist_import_run_to_postgres
 
         if postgres_runtime_status()["hasPostgresDsn"]:
             persist_summary = persist_import_run_to_postgres(run_id)
@@ -4145,7 +4126,6 @@ def bootstrap_local_database(
         persist_import_run_to_postgres,
         persist_metrics_snapshot_to_postgres,
         persist_reference_dictionary_manifest_to_postgres,
-        postgres_runtime_status,
     )
     from jobs.refresh_metrics import build_snapshot
 

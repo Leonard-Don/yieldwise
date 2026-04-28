@@ -16,10 +16,9 @@ extend-exclude = [
 select = ["F"]
 
 [tool.ruff.lint.per-file-ignores]
-# service.py is the Phase 7 re-export hub. F401 covers intentional re-exports;
-# F811 covers redefinitions where backstage-imported names are shadowed by
-# legacy definitions still in this file (separate cleanup tracked outside CI).
-"api/service.py" = ["F401", "F811"]
+# service.py is the Phase 7 re-export hub. F401 covers intentional re-exports
+# of backstage symbols + a few unused-import leftovers (separate cleanup).
+"api/service.py" = ["F401"]
 # Each of the remaining baselines flags a single F841/F401 left over from
 # refactors. They are not blocking and will be cleaned up incrementally.
 "api/backstage/review.py" = ["F841"]
