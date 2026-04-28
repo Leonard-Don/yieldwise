@@ -23,6 +23,11 @@ IMPORT_RUNS_DIR = ROOT_DIR / "tmp" / "import-runs"
 METRICS_RUNS_DIR = ROOT_DIR / "tmp" / "metrics-runs"
 PWCLI_MAX_SESSION_LENGTH = 17
 PWCLI_COMMAND_TIMEOUT_SECONDS = 60.0
+# Per-eval cap: each pwcli invocation has ~5s baseline overhead from
+# `npx --yes --package @playwright/cli`, so the cap below must leave
+# enough headroom for the actual page.evaluate work. Override via
+# ATLAS_PWCLI_EVAL_TIMEOUT env var when running on slower machines.
+PWCLI_EVAL_TIMEOUT_SECONDS = float(os.environ.get("ATLAS_PWCLI_EVAL_TIMEOUT", "30"))
 
 
 def snapshot_stage_candidates(session: str, target_name: str) -> list[Path]:
@@ -141,7 +146,7 @@ def eval_json(session: str, script: str, *, timeout_seconds: float = 30.0):
         remaining = max(1.0, deadline - time.time())
         try:
             return extract_playwright_result(
-                run_pwcli(session, "eval", script, timeout_seconds=min(remaining, 8.0))
+                run_pwcli(session, "eval", script, timeout_seconds=min(remaining, PWCLI_EVAL_TIMEOUT_SECONDS))
             )
         except subprocess.TimeoutExpired as error:
             last_error = error

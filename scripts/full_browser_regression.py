@@ -90,7 +90,7 @@ def wait_for(session: str, script: str, *, timeout_seconds: float = 15.0, interv
             last_value = eval_json_with_timeout(
                 session,
                 script,
-                timeout_seconds=min(remaining, max(5.0, interval_seconds * 8)),
+                timeout_seconds=min(remaining, max(pw.PWCLI_EVAL_TIMEOUT_SECONDS, interval_seconds * 8)),
             )
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError) as error:
             last_error = error

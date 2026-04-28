@@ -120,7 +120,7 @@ def eval_json_with_timeout(session: str, script: str, *, timeout_seconds: float)
         remaining = max(1.0, deadline - time.time())
         try:
             return pw.extract_playwright_result(
-                pw.run_pwcli(session, "eval", script, timeout_seconds=min(remaining, 8.0))
+                pw.run_pwcli(session, "eval", script, timeout_seconds=min(remaining, pw.PWCLI_EVAL_TIMEOUT_SECONDS))
             )
         except subprocess.TimeoutExpired as error:
             last_error = error
