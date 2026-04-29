@@ -8,6 +8,7 @@ from fastapi import Body, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from .persistence import (
     persist_geo_asset_run_to_postgres,
@@ -76,6 +77,7 @@ from .service import (
 from .domains import (
     alerts as v2_alerts,
     annotations as v2_annotations,
+    auth as v2_auth,
     buildings as v2_buildings,
     communities as v2_communities,
     config as v2_config,
@@ -105,12 +107,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_SESSION_SECRET = os.environ.get("SESSION_SECRET")
+if not _SESSION_SECRET:
+    # In dev/staged solo mode, allow boot with a noisy fallback. Production
+    # MUST set SESSION_SECRET (an admin-seed warning is logged on first boot).
+    import secrets as _secrets
+    _SESSION_SECRET = _secrets.token_urlsafe(32)
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "SESSION_SECRET not set; using ephemeral random secret. "
+        "All sessions will be invalidated on app restart. "
+        "Set SESSION_SECRET in production."
+    )
+
+_HTTPS_ONLY = os.environ.get("ATLAS_HTTPS_ONLY", "").lower() in ("1", "true", "yes")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_SESSION_SECRET,
+    session_cookie="yieldwise_session",
+    same_site="lax",
+    https_only=_HTTPS_ONLY,
+    max_age=60 * 60 * 24 * 14,  # 14 days
+)
+
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(v2_auth.router, prefix="/api")
 app.include_router(v2_alerts.router, prefix="/api/v2")
 app.include_router(v2_health.router, prefix="/api/v2")
 app.include_router(v2_config.router, prefix="/api/v2")
