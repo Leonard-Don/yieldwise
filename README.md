@@ -45,6 +45,15 @@
 
 > 提交到 `main` 之前确认改动不依赖被剥离的公开页采集模块。
 
+## 认证 / Auth（v0.2 起）
+
+`/`、`/backstage/`、`/admin/users` 都需要登录；`/api/v2/*` 也走 session cookie 鉴权（除 `/api/v2/health` 公共）。
+
+- 首次部署：设置 `SESSION_SECRET` + `ATLAS_ADMIN_USERNAME` + `ATLAS_ADMIN_PASSWORD`（≥8 字符），启动后用初始 admin 登录 `/login`，再到 `/admin/users` 改密 / 加成员
+- 角色：`admin`（含用户管理）/ `analyst`（读写数据）/ `viewer`（只读）
+- 详细部署：`docs/deployment/auth-setup.md`
+- 安全姿态（CSRF / 审计 / 限流 / legacy `/api/*` 暴露面）：`docs/security.md`
+
 ## 路由布局（Phase 8i 起）
 
 | 路径 | 绑定 | 说明 |
