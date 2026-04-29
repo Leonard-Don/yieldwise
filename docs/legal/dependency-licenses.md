@@ -13,21 +13,25 @@
 
 (Auto-generated table from pip-licenses. Rows with UNKNOWN license cross-checked via `pip show` and reported in the LGPL section below.)
 
-| Name         | Version | License     | URL                                |
-|--------------|---------|-------------|------------------------------------|
-| fastapi      | 0.116.1 | MIT License | https://github.com/fastapi/fastapi |
-| psycopg      | 3.3.3   | UNKNOWN     | https://psycopg.org/               |
-| psycopg-pool | 3.3.0   | UNKNOWN     | https://psycopg.org/               |
-| PyYAML       | 6.0.2   | MIT License | https://pyyaml.org/                |
-| uvicorn      | 0.35.0  | BSD License | https://www.uvicorn.org/           |
+| Name             | Version | License                 | URL                                        |
+|------------------|---------|-------------------------|--------------------------------------------|
+| fastapi          | 0.116.1 | MIT License             | https://github.com/fastapi/fastapi         |
+| psycopg          | 3.3.3   | UNKNOWN                 | https://psycopg.org/                       |
+| psycopg-pool     | 3.3.0   | UNKNOWN                 | https://psycopg.org/                       |
+| PyYAML           | 6.0.2   | MIT License             | https://pyyaml.org/                        |
+| uvicorn          | 0.35.0  | BSD License             | https://www.uvicorn.org/                   |
+| bcrypt           | 4.3.0   | Apache Software License | https://github.com/pyca/bcrypt/            |
+| python-multipart | 0.0.20  | Apache Software License | https://github.com/Kludex/python-multipart |
 
 `pip show` cross-check for UNKNOWN / underspecified rows:
 
-| Package      | `License-Expression` (PEP 639) |
-|--------------|--------------------------------|
-| psycopg      | LGPL-3.0-only                  |
-| psycopg-pool | LGPL-3.0-only                  |
-| uvicorn      | BSD-3-Clause                   |
+| Package          | `License` / `License-Expression` (PEP 639) |
+|------------------|--------------------------------------------|
+| psycopg          | LGPL-3.0-only                              |
+| psycopg-pool     | LGPL-3.0-only                              |
+| uvicorn          | BSD-3-Clause                               |
+| bcrypt           | Apache-2.0 (License field)                 |
+| python-multipart | Apache-2.0 (License-Expression, PEP 639)   |
 
 ## LGPL Components (Dynamic Import)
 

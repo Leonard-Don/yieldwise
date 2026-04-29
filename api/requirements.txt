@@ -3,3 +3,5 @@ uvicorn>=0.32,<1.0
 psycopg[binary]>=3.2,<4.0
 psycopg-pool>=3.2,<4.0
 pyyaml>=6.0,<7.0
+bcrypt>=4.2,<5.0
+python-multipart>=0.0.20,<1.0
