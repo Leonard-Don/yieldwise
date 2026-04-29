@@ -22,6 +22,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from api.config.cities.loader import load_active_city
+
 
 BROWSER_SAMPLING_REQUIRED_FIELDS = {
     "floor_pair_capture": [
@@ -94,7 +96,7 @@ def browser_sampling_query(
     floor_no: int | None = None,
     business_type: str | None = None,
 ) -> str:
-    parts = ["上海"]
+    parts = [load_active_city().display_name]
     if district_name:
         parts.append(str(district_name))
     parts.append(str(community_name))
