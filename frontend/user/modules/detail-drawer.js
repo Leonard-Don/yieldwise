@@ -127,6 +127,7 @@ export function initDrawer({ root, store }) {
       yield: detail.yield,
       paybackYears: detail.paybackYears,
       sample: detail.sample,
+      osmFootprintCount: detail.osmFootprintCount,
     });
   }
 

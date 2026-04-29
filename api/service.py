@@ -4465,6 +4465,11 @@ def get_community(community_id: str) -> dict[str, Any] | None:
         district = next((item for item in db_district_dataset() if item["id"] == community["districtId"]), None)
         return {
             **community,
+            "osmFootprintCount": osm_community_building_count(
+                community_id,
+                community_name=str(community.get("name") or ""),
+                district_id=str(community.get("districtId") or ""),
+            ),
             "districtMetrics": {
                 "yield": district["yield"] if district else 0,
                 "paybackYears": district.get("paybackYears", 0) if district else 0,
@@ -4480,6 +4485,11 @@ def get_community(community_id: str) -> dict[str, Any] | None:
         district = next((item for item in staged_district_dataset() if item["id"] == community["districtId"]), None)
         return {
             **community,
+            "osmFootprintCount": osm_community_building_count(
+                community_id,
+                community_name=str(community.get("name") or ""),
+                district_id=str(community.get("districtId") or ""),
+            ),
             "districtMetrics": {
                 "yield": district["yield"] if district else 0,
                 "paybackYears": district.get("paybackYears", 0) if district else 0,
@@ -4496,6 +4506,11 @@ def get_community(community_id: str) -> dict[str, Any] | None:
                 enriched = enrich_community(community, district_item)
                 return {
                     **enriched,
+                    "osmFootprintCount": osm_community_building_count(
+                        community_id,
+                        community_name=str(community.get("name") or ""),
+                        district_id=str(district_item.get("id") or ""),
+                    ),
                     "districtMetrics": {
                         "yield": district_item["yield"],
                         "paybackYears": compute_payback_years(district_item.get("budget"), district_item.get("rent")),
@@ -5207,6 +5222,58 @@ def imported_building_geo_asset_index(geo_run_id: str | None = None) -> dict[str
                 "properties": properties,
             }
     return index
+
+
+# OSM-matched community footprint counts: a side-file written by
+# jobs/match_osm_to_communities.py. Surfaces "OSM 实拍楼栋数" on the user
+# platform without parsing the 81 MB GeoJSON each request.
+#
+# Note on ID-system fallback: staged catalogs sometimes carry semantic IDs
+# (`songjiang-daxuecheng`) while my AMAP-discovered catalog uses hash IDs
+# (`songjiang-<digest>`) — both refer to the same real community. The
+# matcher keys by AMAP id; we read with a name+district fallback so the
+# user platform's semantic-ID community detail still finds its count.
+@lru_cache(maxsize=1)
+def _osm_community_building_counts_cached() -> dict[str, dict[str, int]]:
+    import glob
+    pattern = str(ROOT_DIR / "tmp" / "geo-assets" / "osm-matched-*" / "community_building_counts.json")
+    candidates = sorted(glob.glob(pattern), reverse=True)
+    if not candidates:
+        return {"by_id": {}, "by_name": {}}
+    try:
+        rows = json.loads(Path(candidates[0]).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"by_id": {}, "by_name": {}}
+    by_id: dict[str, int] = {}
+    by_name: dict[str, int] = {}
+    for row in rows:
+        cid = row.get("communityId") or row.get("community_id")
+        name = row.get("communityName") or row.get("community_name")
+        district = row.get("districtId") or row.get("district_id") or ""
+        cnt = int(row.get("buildingCount") or row.get("building_count") or 0)
+        if cid:
+            by_id[str(cid)] = cnt
+        if name:
+            # Take the larger count if multiple AMAP IDs collapse to the same name+district
+            key = f"{district}::{name}"
+            by_name[key] = max(by_name.get(key, 0), cnt)
+    return {"by_id": by_id, "by_name": by_name}
+
+
+def osm_community_building_count(community_id: str, community_name: str = "", district_id: str = "") -> int:
+    """OSM-derived footprint count for a community, 0 if no matched run yet.
+
+    Looks up by community_id first; falls back to (district_id, community_name)
+    so callers using a different ID system (e.g. staged shanghai-open-data IDs
+    vs AMAP hash IDs) still resolve.
+    """
+    counts = _osm_community_building_counts_cached()
+    direct = counts["by_id"].get(str(community_id))
+    if direct:
+        return direct
+    if community_name:
+        return counts["by_name"].get(f"{district_id}::{community_name}", 0)
+    return 0
 
 
 def database_geo_asset_index(geo_run_id: str | None = None) -> dict[str, dict[str, Any]]:

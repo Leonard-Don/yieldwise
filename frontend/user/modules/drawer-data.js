@@ -18,6 +18,13 @@ export function formatYears(value) {
   return `${num.toFixed(1)} 年`;
 }
 
+export function formatBuildingCount(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  const n = Math.round(Number(value));
+  if (n <= 0) return "—";
+  return `${n} 栋`;
+}
+
 export function formatWan(value) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   return `${Number(value).toFixed(2)} 万`;
@@ -53,18 +60,32 @@ export function pickKpisFor(modeId, detail) {
 }
 
 const KPI_MAP = {
-  yield: (d) => [
-    { key: "yield", label: "租售比", value: formatPct(normalizeYieldPct(d.yieldAvg)) },
-    { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
-    { key: "score", label: "机会分", value: formatInt(d.score) },
-    { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
-  ],
-  home: (d) => [
-    { key: "price", label: "中位总价", value: formatWan(d.saleMedianWan) },
-    { key: "rent", label: "中位月租", value: formatYuan(d.rentMedianMonthly) },
-    { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
-    { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
-  ],
+  yield: (d) => {
+    const tiles = [
+      { key: "yield", label: "租售比", value: formatPct(normalizeYieldPct(d.yieldAvg)) },
+      { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
+      { key: "score", label: "机会分", value: formatInt(d.score) },
+      { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
+    ];
+    if (d.osmFootprintCount > 0) {
+      // Insert "实拍楼栋" between payback and score so it sits next to the
+      // other quantitative tiles, not at the end.
+      tiles.splice(2, 0, { key: "footprints", label: "实拍楼栋", value: formatBuildingCount(d.osmFootprintCount) });
+    }
+    return tiles;
+  },
+  home: (d) => {
+    const tiles = [
+      { key: "price", label: "中位总价", value: formatWan(d.saleMedianWan) },
+      { key: "rent", label: "中位月租", value: formatYuan(d.rentMedianMonthly) },
+      { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
+      { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
+    ];
+    if (d.osmFootprintCount > 0) {
+      tiles.splice(3, 0, { key: "footprints", label: "实拍楼栋", value: formatBuildingCount(d.osmFootprintCount) });
+    }
+    return tiles;
+  },
   city: (d) => [
     { key: "yield", label: "均租售比", value: formatPct(normalizeYieldPct(d.yield ?? d.yieldAvg)) },
     { key: "payback", label: "均回本年限", value: formatYears(d.paybackYears) },
