@@ -12,6 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from api.auth.deps import current_user as _current_user_dep
 from api.auth.middleware import StaticShellAuthGate
+from api.auth.seed import seed_initial_admin as _seed_initial_admin
 
 from .persistence import (
     persist_geo_asset_run_to_postgres,
@@ -139,6 +140,13 @@ app.add_middleware(
     https_only=_HTTPS_ONLY,
     max_age=60 * 60 * 24 * 14,  # 14 days
 )
+
+
+@app.on_event("startup")
+def _yieldwise_startup() -> None:
+    # Seed an admin user on first boot when ATLAS_ADMIN_USERNAME +
+    # ATLAS_ADMIN_PASSWORD are set. Idempotent; safe to call on every boot.
+    _seed_initial_admin()
 
 
 @app.get("/api/health")
