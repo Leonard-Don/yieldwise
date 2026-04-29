@@ -1,6 +1,7 @@
 # Yieldwise · 租知
 
 [![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
+[![Docker](https://github.com/Leonard-Don/yieldwise/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Open-source workbench for analyzing rental-yield, pipeline, and comp-set data across Chinese cities — on a single map, in your browser.**

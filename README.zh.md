@@ -1,6 +1,7 @@
 # Yieldwise · 租知
 
 [![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
+[![Docker](https://github.com/Leonard-Don/yieldwise/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **开源租赁资产分析工作台 —— 把你的房源、候选标的、市场比准数据放在同一张地图上。**
