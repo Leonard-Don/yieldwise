@@ -25,3 +25,47 @@
   font-size: 12px;
   z-index: 3;
 }
+
+/* OSM footprint popup (zoom ≥ 15 click target). InfoWindow content. */
+.atlas-osm-pop {
+  font-family: var(--font-body, system-ui), sans-serif;
+  font-size: 12px;
+  color: #0c1117;
+  min-width: 200px;
+  line-height: 1.4;
+}
+.atlas-osm-pop-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding-bottom: 4px;
+}
+.atlas-osm-pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.atlas-osm-pop-row > span {
+  color: #6b7280;
+}
+.atlas-osm-pop-row > strong {
+  font-weight: 500;
+  color: #0c1117;
+}
+.atlas-osm-pop-unmatched > strong {
+  color: #9ca3af;
+  font-weight: 400;
+}
+.atlas-osm-pop-meta {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+}
+.atlas-osm-pop-meta > span,
+.atlas-osm-pop-meta > strong {
+  color: #6b7280;
+  font-weight: 400;
+}

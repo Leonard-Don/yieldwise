@@ -105,11 +105,60 @@ const FOOTPRINT_REQUEST_LIMIT = 1500;
 function attachOsmFootprintLayer({ map, AMap }) {
   let overlays = [];
   let pendingToken = 0;
+  // One reusable InfoWindow — opens at the click point on each polygon.
+  const infoWindow = new AMap.InfoWindow({
+    isCustom: false,
+    autoMove: true,
+    offset: new AMap.Pixel(0, -4),
+  });
 
   function clear() {
     if (overlays.length === 0) return;
     map.remove(overlays);
     overlays = [];
+  }
+
+  function polygonCentroidLngLat(path) {
+    if (!Array.isArray(path) || path.length === 0) return null;
+    let sx = 0;
+    let sy = 0;
+    for (const p of path) {
+      sx += Number(p[0]);
+      sy += Number(p[1]);
+    }
+    return [sx / path.length, sy / path.length];
+  }
+
+  function buildPopupHtml(props) {
+    const district = props.districtName || "—";
+    const community = props.communityName;
+    const distance = props.matchDistanceM;
+    const buildingName = props.buildingName;
+    const osmId = props.osmId || "";
+    const matchLine = community
+      ? `<div class="atlas-osm-pop-row"><span>归属小区</span><strong>${escape(community)}</strong></div>` +
+        (distance != null
+          ? `<div class="atlas-osm-pop-row"><span>centroid 距离</span><strong>${Number(distance).toFixed(1)} m</strong></div>`
+          : "")
+      : `<div class="atlas-osm-pop-row atlas-osm-pop-unmatched"><span>归属小区</span><strong>未匹配（200m 内无目录小区）</strong></div>`;
+    const buildingLine = buildingName
+      ? `<div class="atlas-osm-pop-row"><span>OSM 名称</span><strong>${escape(buildingName)}</strong></div>`
+      : "";
+    return `
+      <div class="atlas-osm-pop">
+        <div class="atlas-osm-pop-title">楼栋足迹</div>
+        <div class="atlas-osm-pop-row"><span>所属区</span><strong>${escape(district)}</strong></div>
+        ${matchLine}
+        ${buildingLine}
+        <div class="atlas-osm-pop-row atlas-osm-pop-meta"><span>来源</span><strong>OpenStreetMap (${escape(osmId)})</strong></div>
+      </div>
+    `;
+  }
+
+  function escape(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]),
+    );
   }
 
   async function refresh() {
@@ -137,8 +186,9 @@ function attachOsmFootprintLayer({ map, AMap }) {
       const geom = feat.geometry;
       const props = feat.properties || {};
       if (!geom || geom.type !== "Polygon") continue;
+      const ring = geom.coordinates[0];
       const poly = new AMap.Polygon({
-        path: geom.coordinates[0],
+        path: ring,
         strokeColor: "#7a8da0",
         strokeWeight: 0.6,
         strokeOpacity: 0.55,
@@ -146,6 +196,13 @@ function attachOsmFootprintLayer({ map, AMap }) {
         fillOpacity: 0.18,
         bubble: true,
         zIndex: 5,
+        cursor: "pointer",
+      });
+      poly.on("click", (event) => {
+        const center = polygonCentroidLngLat(ring);
+        const position = event?.lnglat || (center ? new AMap.LngLat(center[0], center[1]) : null);
+        infoWindow.setContent(buildPopupHtml(props));
+        if (position) infoWindow.open(map, position);
       });
       next.push(poly);
     }
