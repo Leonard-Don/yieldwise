@@ -78,6 +78,7 @@ from .domains import (
     annotations as v2_annotations,
     buildings as v2_buildings,
     communities as v2_communities,
+    config as v2_config,
     districts as v2_districts,
     health as v2_health,
     map_tiles as v2_map_tiles,
@@ -112,6 +113,7 @@ def health() -> dict[str, str]:
 
 app.include_router(v2_alerts.router, prefix="/api/v2")
 app.include_router(v2_health.router, prefix="/api/v2")
+app.include_router(v2_config.router, prefix="/api/v2")
 app.include_router(v2_opportunities.router, prefix="/api/v2")
 app.include_router(v2_map_tiles.router, prefix="/api/v2")
 app.include_router(v2_buildings.router, prefix="/api/v2")
