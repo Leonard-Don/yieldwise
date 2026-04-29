@@ -18,6 +18,7 @@
 | fastapi      | 0.116.1 | MIT License | https://github.com/fastapi/fastapi |
 | psycopg      | 3.3.3   | UNKNOWN     | https://psycopg.org/               |
 | psycopg-pool | 3.3.0   | UNKNOWN     | https://psycopg.org/               |
+| PyYAML       | 6.0.2   | MIT License | https://pyyaml.org/                |
 | uvicorn      | 0.35.0  | BSD License | https://www.uvicorn.org/           |
 
 `pip show` cross-check for UNKNOWN / underspecified rows:
