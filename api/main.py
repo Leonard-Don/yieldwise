@@ -937,6 +937,19 @@ app.mount(
     name="backstage",
 )
 
+LOGIN_DIR = FRONTEND_DIR / "login"
+
+
+@app.get("/login")
+def serve_login() -> FileResponse:
+    return FileResponse(LOGIN_DIR / "index.html")
+
+
+# Mount login assets at /static so the HTML can reference /static/login.css
+# and /static/login.js. Must be registered BEFORE the catch-all `/` mount
+# so the user-shell static mount doesn't swallow `/static/*`.
+app.mount("/static", StaticFiles(directory=LOGIN_DIR), name="login-static")
+
 app.mount(
     "/",
     StaticFiles(directory=FRONTEND_DIR / "user", html=True),
