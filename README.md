@@ -36,22 +36,39 @@ No scraping, no compliance grey area — you bring authorized data, the tool hel
 
 ## Quick start
 
-Requires Python 3.11+ and a local Postgres+PostGIS (Docker is fine).
+Requires Docker + Docker Compose. One command brings up Postgres+PostGIS and the app:
 
 ```bash
-git clone https://github.com/Leonard-Don/yieldwise.git yieldwise
+git clone https://github.com/Leonard-Don/yieldwise.git
 cd yieldwise
-docker compose up -d           # spins up postgis on :5432
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r api/requirements.txt
-export SESSION_SECRET=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')
-export ATLAS_ADMIN_USERNAME=admin
-export ATLAS_ADMIN_PASSWORD=$(python3 -c 'import secrets;print(secrets.token_urlsafe(16))')
-echo "Admin password: $ATLAS_ADMIN_PASSWORD"
-uvicorn api.main:app --reload --port 8000
+cp .env.example .env             # edit .env to set AMAP_API_KEY (free, see below)
+docker compose up -d --build     # ~2 min first build, ~10s subsequent runs
 ```
 
-Then open `http://localhost:8000`, log in with the admin credentials, and upload a CSV at `/admin/customer-data`.
+Then open `http://localhost:8000` and log in with the credentials in `.env` (default `admin` / `changeme-after-first-login` — change before exposing the port to the network).
+
+Try the customer-data upload at `/admin/customer-data`:
+1. Click 下载模板 → save `portfolio.csv`
+2. Fill in 5–10 rows with your sample data
+3. Upload
+4. The map populates with your points
+
+Need a free AMAP key for the map to render? Get one at [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites). For commercial use, request a commercial key (personal keys violate AMAP ToS).
+
+Prefer to run without Docker?
+
+<details>
+<summary>Native Python setup</summary>
+
+```bash
+docker compose up -d postgis      # postgis only
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r api/requirements.txt
+export $(grep -v '^#' .env | xargs)
+export POSTGRES_DSN=postgresql://atlas:atlas_local_dev@127.0.0.1:5432/yieldwise
+uvicorn api.main:app --reload --port 8000
+```
+</details>
 
 CSV templates: `/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.csv` — see [docs/customer-data-csv-spec.md](docs/customer-data-csv-spec.md).
 

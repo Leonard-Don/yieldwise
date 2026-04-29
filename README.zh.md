@@ -36,22 +36,39 @@ Yieldwise 是一个**个人级**的房地产分析工具。你导入自己的 CS
 
 ## 快速开始
 
-需要 Python 3.11+ 和本地 Postgres+PostGIS（Docker 即可）。
+需要 Docker + Docker Compose。一条命令同时起 Postgres+PostGIS 和 app：
 
 ```bash
-git clone https://github.com/Leonard-Don/yieldwise.git yieldwise
+git clone https://github.com/Leonard-Don/yieldwise.git
 cd yieldwise
-docker compose up -d           # 起 postgis 在 :5432
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r api/requirements.txt
-export SESSION_SECRET=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')
-export ATLAS_ADMIN_USERNAME=admin
-export ATLAS_ADMIN_PASSWORD=$(python3 -c 'import secrets;print(secrets.token_urlsafe(16))')
-echo "管理员密码：$ATLAS_ADMIN_PASSWORD"
-uvicorn api.main:app --reload --port 8000
+cp .env.example .env             # 编辑 .env 填入 AMAP_API_KEY（免费，见下方）
+docker compose up -d --build     # 首次 build ~2 分钟，后续 ~10 秒起
 ```
 
-打开 `http://localhost:8000`，用管理员账号登录，到 `/admin/customer-data` 上传 CSV。
+打开 `http://localhost:8000`，用 `.env` 里的账号登录（默认 `admin` / `changeme-after-first-login` —— 暴露端口到网络前请改）。
+
+到 `/admin/customer-data` 试上传：
+1. 点 **下载模板** → 存 `portfolio.csv`
+2. 填 5–10 行你的样本数据
+3. 上传
+4. 地图自动出你的点
+
+需要免费高德 key 才能渲染地图？去 [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites) 申请。商业部署请申请商用 key（个人 key 商用违 ToS）。
+
+不想用 Docker？
+
+<details>
+<summary>原生 Python 启动</summary>
+
+```bash
+docker compose up -d postgis      # 只起 postgis
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r api/requirements.txt
+export $(grep -v '^#' .env | xargs)
+export POSTGRES_DSN=postgresql://atlas:atlas_local_dev@127.0.0.1:5432/yieldwise
+uvicorn api.main:app --reload --port 8000
+```
+</details>
 
 CSV 模板：`/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.csv` —— 列规范见 [docs/customer-data-csv-spec.md](docs/customer-data-csv-spec.md)。
 
