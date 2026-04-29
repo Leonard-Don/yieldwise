@@ -35,6 +35,14 @@
 - **`tmp/browser-capture-runs/` 状态不可逆**：`reviewBrowserCaptureQueueItem` 会修改 `review_queue.json` 把 attention 标记为 resolved；`browser-review-fixtures/` 里的 fixture 删除会回滚原状，但不要批量手动删除 capture run 目录
 - **pwcli 默认 30s 单次 eval 上限**：在更慢的机器上请用 `ATLAS_PWCLI_EVAL_TIMEOUT=60` 等覆盖
 
+## 分支策略
+
+- `main` — Yieldwise 商业版（剥离公开页采集，可对外交付）
+- `research-private` — 内研分支，保留 browser-capture / 公开页采样 / 全部研究流。每半年从 `main` cherry-pick 非合规改进。
+- `release/yieldwise-v1.x` — 私部署 frozen 标签（v1 ship 后建立）
+
+> 提交到 `main` 之前确认改动不依赖被剥离的公开页采集模块。
+
 ## 路由布局（Phase 8i 起）
 
 | 路径 | 绑定 | 说明 |
