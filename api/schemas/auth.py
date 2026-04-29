@@ -21,6 +21,8 @@ class CurrentUser(BaseModel):
 
 class LoginRequest(BaseModel):
     username: str
+    # min_length=1 (not 8) so submissions go through to bcrypt for verification.
+    # AdminUserCreate enforces 8 for new passwords; legacy rows may exist.
     password: str = Field(..., min_length=1)
 
 

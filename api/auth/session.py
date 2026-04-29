@@ -14,6 +14,11 @@ _SESSION_KEY = "yw"  # short to keep cookie compact
 
 
 def store_session(request: Request, user: CurrentUser) -> None:
+    if not isinstance(user, CurrentUser):
+        raise TypeError(
+            f"store_session expects CurrentUser, got {type(user).__name__} "
+            "— pass the public-safe schema, not storage.User (which carries password_hash)"
+        )
     request.session[_SESSION_KEY] = {
         "user_id": user.id,
         "username": user.username,
