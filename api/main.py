@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from api.auth.deps import current_user as _current_user_dep
+from api.auth.middleware import StaticShellAuthGate
 
 from .persistence import (
     persist_geo_asset_run_to_postgres,
@@ -123,6 +124,13 @@ if not _SESSION_SECRET:
     )
 
 _HTTPS_ONLY = os.environ.get("ATLAS_HTTPS_ONLY", "").lower() in ("1", "true", "yes")
+# StaticShellAuthGate must run with request.session already populated, so
+# SessionMiddleware needs to be the outermost layer. Starlette wraps the
+# LAST `add_middleware` call as the outermost, so the StaticShellAuthGate
+# add_middleware call comes BEFORE SessionMiddleware in code; this puts
+# SessionMiddleware on the outside at execution time.
+app.add_middleware(StaticShellAuthGate)
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=_SESSION_SECRET,
