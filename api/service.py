@@ -1406,6 +1406,8 @@ def clamp(value: float, minimum: float, maximum: float) -> float:
 
 def enrich_community(community: dict[str, Any], district_item: dict[str, Any]) -> dict[str, Any]:
     data = deepcopy(community)
+    if data.get("avgPriceWan") and data.get("monthlyRent"):
+        data["paybackYears"] = compute_payback_years(data["avgPriceWan"], data["monthlyRent"])
     buildings = []
     for index, building in enumerate(data.get("buildings", [])):
         building_copy = deepcopy(building)
@@ -3161,6 +3163,22 @@ def compute_yield_pct(sale_median_wan: float | int | None, rent_median_monthly: 
     return round(rent_value * 12 / (sale_value * 10000) * 100, 2)
 
 
+def compute_payback_years(sale_median_wan: float | int | None, rent_median_monthly: float | int | None) -> float:
+    """How many years of rent at the current monthly rate equal the sale price.
+
+    payback_years = (sale_wan * 10_000) / (rent_monthly * 12)
+                  = 100 / yield_pct  (when yield is non-zero)
+
+    Returns 0.0 when either input is missing — same null-convention as
+    compute_yield_pct so downstream code can treat 0 as "no signal".
+    """
+    sale_value = float(sale_median_wan or 0)
+    rent_value = float(rent_median_monthly or 0)
+    if sale_value <= 0 or rent_value <= 0:
+        return 0.0
+    return round(sale_value * 10_000 / (rent_value * 12), 1)
+
+
 def compute_opportunity_score(yield_pct: float, sample_size: int, *, freshness_days: float | None = None) -> int:
     freshness_penalty = min(max((freshness_days or 0) * 1.2, 0), 18)
     return round(clamp(yield_pct * 24 + min(sample_size, 40) * 1.3 - freshness_penalty, 0, 99))
@@ -3267,6 +3285,7 @@ def db_community_dataset() -> list[dict[str, Any]]:
                 "avgPriceWan": round(sale_median_wan, 1) if sale_median_wan else 0,
                 "monthlyRent": round(rent_median_monthly) if rent_median_monthly else 0,
                 "yield": yield_pct,
+                "paybackYears": compute_payback_years(sale_median_wan, rent_median_monthly),
                 "score": community_score,
                 "sample": sample_size,
                 "saleSample": sale_sample,
@@ -3618,6 +3637,7 @@ def staged_community_dataset(*, use_metrics_overlay: bool = True) -> list[dict[s
                     "avgPriceWan": round(sale_median_wan, 1),
                     "monthlyRent": round(rent_median_monthly),
                     "yield": yield_pct,
+                    "paybackYears": compute_payback_years(sale_median_wan, rent_median_monthly),
                     "score": int(round(float(community_metric.get("opportunity_score") or 0))) if community_metric.get("opportunity_score") not in (None, "") else compute_opportunity_score(yield_pct, sample_size, freshness_days=freshness_days),
                     "sample": sample_size,
                     "saleSample": sale_sample,
@@ -3712,6 +3732,7 @@ def staged_district_dataset(
         district_item["yield"] = round(sum(item["yield"] for item in district_item["communities"]) / community_count, 2)
         district_item["budget"] = round(sum(item["avgPriceWan"] for item in district_item["communities"]) / community_count, 1)
         district_item["rent"] = round(sum(item["monthlyRent"] for item in district_item["communities"]) / community_count)
+        district_item["paybackYears"] = compute_payback_years(district_item["budget"], district_item["rent"])
         district_item["saleSample"] = sum(int(item.get("saleSample") or 0) for item in district_item["communities"])
         district_item["rentSample"] = sum(int(item.get("rentSample") or 0) for item in district_item["communities"])
         district_item["score"] = max(int(item["score"]) for item in district_item["communities"])
@@ -3767,6 +3788,7 @@ def db_district_dataset(
         district_item["yield"] = round(sum(item["yield"] for item in district_item["communities"]) / community_count, 2)
         district_item["budget"] = round(sum(item["avgPriceWan"] for item in district_item["communities"]) / community_count, 1)
         district_item["rent"] = round(sum(item["monthlyRent"] for item in district_item["communities"]) / community_count)
+        district_item["paybackYears"] = compute_payback_years(district_item["budget"], district_item["rent"])
         district_item["saleSample"] = sum(int(item.get("saleSample") or 0) for item in district_item["communities"])
         district_item["rentSample"] = sum(int(item.get("rentSample") or 0) for item in district_item["communities"])
         district_item["score"] = max(int(item["score"]) for item in district_item["communities"])
@@ -4428,6 +4450,7 @@ def get_community(community_id: str) -> dict[str, Any] | None:
             **community,
             "districtMetrics": {
                 "yield": district["yield"] if district else 0,
+                "paybackYears": district.get("paybackYears", 0) if district else 0,
                 "score": district["score"] if district else 0,
                 "saleSample": district.get("saleSample", 0) if district else 0,
                 "rentSample": district.get("rentSample", 0) if district else 0,
@@ -4442,6 +4465,7 @@ def get_community(community_id: str) -> dict[str, Any] | None:
             **community,
             "districtMetrics": {
                 "yield": district["yield"] if district else 0,
+                "paybackYears": district.get("paybackYears", 0) if district else 0,
                 "score": district["score"] if district else 0,
                 "saleSample": district.get("saleSample", 0) if district else 0,
                 "rentSample": district.get("rentSample", 0) if district else 0,
@@ -4457,6 +4481,7 @@ def get_community(community_id: str) -> dict[str, Any] | None:
                     **enriched,
                     "districtMetrics": {
                         "yield": district_item["yield"],
+                        "paybackYears": compute_payback_years(district_item.get("budget"), district_item.get("rent")),
                         "score": district_item["score"],
                         "saleSample": district_item["saleSample"],
                         "rentSample": district_item["rentSample"],

@@ -125,6 +125,7 @@ export function initDrawer({ root, store }) {
       saleMedianWan: detail.saleMedianWan ?? detail.avgPriceWan,
       rentMedianMonthly: detail.rentMedianMonthly ?? detail.monthlyRent,
       yield: detail.yield,
+      paybackYears: detail.paybackYears,
       sample: detail.sample,
     });
   }
@@ -159,6 +160,7 @@ export function initDrawer({ root, store }) {
   function renderDistrictBody({ detail }) {
     const kpis = pickKpisFor("city", {
       yield: detail.yield,
+      paybackYears: detail.paybackYears,
       score: detail.score,
       sample: detail.sample,
     });

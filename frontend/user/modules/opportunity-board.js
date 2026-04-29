@@ -132,6 +132,10 @@ function formatCell(item, col) {
 function formatValue(value, format) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   if (format === "pct") return `${Number(value).toFixed(2)}%`;
+  if (format === "years") {
+    const n = Number(value);
+    return n > 0 ? `${n.toFixed(1)} 年` : "—";
+  }
   if (format === "wan") return Number(value).toLocaleString("en-US");
   if (format === "int") return String(Math.round(Number(value)));
   return String(value);

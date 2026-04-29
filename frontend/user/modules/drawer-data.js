@@ -11,6 +11,13 @@ export function formatPct(value) {
   return `${Number(value).toFixed(2)}%`;
 }
 
+export function formatYears(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  const num = Number(value);
+  if (num <= 0) return "—";
+  return `${num.toFixed(1)} 年`;
+}
+
 export function formatWan(value) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   return `${Number(value).toFixed(2)} 万`;
@@ -48,16 +55,19 @@ export function pickKpisFor(modeId, detail) {
 const KPI_MAP = {
   yield: (d) => [
     { key: "yield", label: "租售比", value: formatPct(normalizeYieldPct(d.yieldAvg)) },
+    { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
     { key: "score", label: "机会分", value: formatInt(d.score) },
     { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
   ],
   home: (d) => [
     { key: "price", label: "中位总价", value: formatWan(d.saleMedianWan) },
     { key: "rent", label: "中位月租", value: formatYuan(d.rentMedianMonthly) },
+    { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
     { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
   ],
   city: (d) => [
     { key: "yield", label: "均租售比", value: formatPct(normalizeYieldPct(d.yield ?? d.yieldAvg)) },
+    { key: "payback", label: "均回本年限", value: formatYears(d.paybackYears) },
     { key: "score", label: "均机会分", value: formatInt(d.score) },
     { key: "sample", label: "样本量", value: formatInt(d.sample ?? d.sampleSize) },
   ],
@@ -73,6 +83,7 @@ export function topCommunitiesFromDistrict(detail, limit) {
       id: row.id,
       name: row.name || row.id,
       yield: row.yield ?? null,
+      paybackYears: row.paybackYears ?? null,
       score: row.score ?? null,
     });
     if (out.length >= Math.max(0, limit | 0)) break;

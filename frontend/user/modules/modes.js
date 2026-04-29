@@ -6,6 +6,7 @@ export const MODES = [
     boardColumns: [
       { key: "name", label: "名称" },
       { key: "yield", label: "租售比", format: "pct" },
+      { key: "paybackYears", label: "回本年限", format: "years" },
       { key: "score", label: "机会分", format: "int" },
     ],
     defaultSort: { key: "yield", direction: "desc" },
@@ -32,6 +33,7 @@ export const MODES = [
     boardColumns: [
       { key: "name", label: "区" },
       { key: "yield", label: "均租售比", format: "pct" },
+      { key: "paybackYears", label: "均回本年限", format: "years" },
       { key: "score", label: "机会分", format: "int" },
     ],
     defaultSort: { key: "yield", direction: "desc" },
