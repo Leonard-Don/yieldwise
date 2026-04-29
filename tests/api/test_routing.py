@@ -5,7 +5,7 @@ def test_backstage_index_serves_workbench(client) -> None:
     response = client.get("/backstage/")
     assert response.status_code == 200, response.text
     body = response.text
-    assert "<title>Shanghai Yield Atlas</title>" in body
+    assert "<title>Yieldwise Workbench · 租知</title>" in body
     assert 'src="./app.js"' in body, "backstage page must load the legacy app bundle"
 
 
@@ -19,7 +19,7 @@ def test_user_shell_serves_html(client) -> None:
     assert response.status_code == 200, response.text
     body = response.text
     assert "<title>" in body
-    assert "Shanghai Yield Atlas" in body
+    assert "Yieldwise · 租知" in body
     assert 'data-user-shell="atlas"' in body, "user shell must mark its root element"
 
 

@@ -91,9 +91,9 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
-    title="Shanghai Yield Atlas API",
+    title="Yieldwise API",
     version="0.1.0",
-    description="Internal research backend for the Shanghai yield atlas beta.",
+    description="Yieldwise · 租知 — 租赁资产投研工作台后端。",
 )
 
 app.add_middleware(
