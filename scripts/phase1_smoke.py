@@ -179,6 +179,8 @@ def main() -> int:
             (f"{base}/api/v2/search?q=%E6%B5%A6%E4%B8%9C", '"items"'),
             (f"{base}/api/v2/districts/pudong", '"communities"'),
             (f"{base}/api/auth/whoami", '"username":"smoke"'),
+            (f"{base}/api/v2/customer-data/templates/portfolio.csv", "project_name,address"),
+            (f"{base}/api/v2/customer-data/imports", "[]"),
         ]
         for url, expected_substring in authed_checks:
             status, body = fetch(url)
