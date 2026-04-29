@@ -1,11 +1,8 @@
 """GET /api/v2/config/city — returns active city manifest summary."""
-from fastapi.testclient import TestClient
-
-from api.main import app
+from __future__ import annotations
 
 
-def test_get_city_config_returns_shanghai_by_default():
-    client = TestClient(app)
+def test_get_city_config_returns_shanghai_by_default(client):
     resp = client.get("/api/v2/config/city")
     assert resp.status_code == 200
     data = resp.json()

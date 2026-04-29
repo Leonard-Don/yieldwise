@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def sample_community_id(client) -> str:
     """Derive a real community id from the legacy map/buildings GeoJSON properties.
 

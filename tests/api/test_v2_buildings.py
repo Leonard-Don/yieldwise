@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def sample_building_id(client) -> str:
     """Pull a real building id from the legacy map/buildings GeoJSON FeatureCollection."""
     response = client.get("/api/map/buildings")

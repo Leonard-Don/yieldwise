@@ -4,11 +4,13 @@ import os
 from datetime import date
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException, Query, Response
+from fastapi import Body, Depends as _Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+
+from api.auth.deps import current_user as _current_user_dep
 
 from .persistence import (
     persist_geo_asset_run_to_postgres,
@@ -136,19 +138,24 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+_AUTH_REQUIRED = [_Depends(_current_user_dep)]
+
+# v2_auth router stays public — login itself must be reachable. Admin
+# endpoints inside it self-gate via require_role("admin").
 app.include_router(v2_auth.router, prefix="/api")
-app.include_router(v2_alerts.router, prefix="/api/v2")
+# v2_health stays public — load balancers / uptime probes hit it anonymously.
 app.include_router(v2_health.router, prefix="/api/v2")
-app.include_router(v2_config.router, prefix="/api/v2")
-app.include_router(v2_opportunities.router, prefix="/api/v2")
-app.include_router(v2_map_tiles.router, prefix="/api/v2")
-app.include_router(v2_buildings.router, prefix="/api/v2")
-app.include_router(v2_communities.router, prefix="/api/v2")
-app.include_router(v2_districts.router, prefix="/api/v2")
-app.include_router(v2_user_prefs.router, prefix="/api/v2")
-app.include_router(v2_watchlist.router, prefix="/api/v2")
-app.include_router(v2_annotations.router, prefix="/api/v2")
-app.include_router(v2_search.router, prefix="/api/v2")
+app.include_router(v2_alerts.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_config.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_opportunities.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_map_tiles.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_buildings.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_communities.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_districts.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_user_prefs.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_watchlist.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_annotations.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_search.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
 
 
 @app.get("/api/bootstrap")
