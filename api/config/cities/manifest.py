@@ -48,12 +48,20 @@ def parse_manifest_yaml(yaml_text: str) -> CityManifest:
     center_raw = _require(raw, "center")
     if not (isinstance(center_raw, list) and len(center_raw) == 2):
         raise ValueError("city manifest 'center' must be [lng, lat]")
-    center = (float(center_raw[0]), float(center_raw[1]))
+    try:
+        center = (float(center_raw[0]), float(center_raw[1]))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"city manifest 'center' values must be numeric: {center_raw!r}") from exc
+
+    try:
+        default_zoom = float(_require(raw, "default_zoom"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"city manifest 'default_zoom' must be numeric: {raw.get('default_zoom')!r}") from exc
 
     districts = tuple(
         CityDistrict(
-            district_code=int(d["district_code"]),
-            display_name=str(d["display_name"]),
+            district_code=int(_require(d, "district_code")),
+            display_name=str(_require(d, "display_name")),
         )
         for d in raw.get("districts", []) or []
     )
@@ -63,6 +71,6 @@ def parse_manifest_yaml(yaml_text: str) -> CityManifest:
         display_name=str(_require(raw, "display_name")),
         country_code=str(_require(raw, "country_code")),
         center=center,
-        default_zoom=float(_require(raw, "default_zoom")),
+        default_zoom=default_zoom,
         districts=districts,
     )

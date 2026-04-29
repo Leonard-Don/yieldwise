@@ -50,3 +50,48 @@ districts: []
 """
     with pytest.raises(ValueError, match="center"):
         parse_manifest_yaml(yaml_text)
+
+
+def test_yaml_root_must_be_mapping():
+    with pytest.raises(ValueError, match="mapping at the top level"):
+        parse_manifest_yaml("[1, 2, 3]")
+
+
+def test_manifest_center_values_must_be_numeric():
+    yaml_text = """
+city_id: bad_center
+display_name: 中心非数字
+country_code: CN
+center: ["abc", "def"]
+default_zoom: 10
+districts: []
+"""
+    with pytest.raises(ValueError, match="center"):
+        parse_manifest_yaml(yaml_text)
+
+
+def test_manifest_district_missing_required_field():
+    yaml_text = """
+city_id: bad_district
+display_name: 区缺字段
+country_code: CN
+center: [121.0, 31.0]
+default_zoom: 10
+districts:
+  - {}
+"""
+    with pytest.raises(ValueError, match="district_code"):
+        parse_manifest_yaml(yaml_text)
+
+
+def test_manifest_default_zoom_must_be_numeric():
+    yaml_text = """
+city_id: bad_zoom
+display_name: zoom非数字
+country_code: CN
+center: [121.0, 31.0]
+default_zoom: "abc"
+districts: []
+"""
+    with pytest.raises(ValueError, match="default_zoom"):
+        parse_manifest_yaml(yaml_text)
