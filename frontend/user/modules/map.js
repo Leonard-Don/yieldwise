@@ -84,8 +84,79 @@ export async function initMap({ container, store }) {
   });
 
   syncSelectionHighlight({ map, AMap, store });
+  attachOsmFootprintLayer({ map, AMap });
 
   return map;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// OSM building-footprint background layer.
+//
+// Renders polygons from /api/v2/map/osm-footprints when the user has zoomed
+// in enough that footprints are large enough to read (zoom ≥ 15). Each
+// move/zoom event re-fetches with the current viewport bbox so we never
+// load the full 69k city-wide payload. Polygons are subtle (low fill alpha,
+// 1px stroke) so they sit BEHIND the district / building / community
+// overlays, not on top of them.
+// ─────────────────────────────────────────────────────────────────────
+const FOOTPRINT_MIN_ZOOM = 15;
+const FOOTPRINT_REQUEST_LIMIT = 1500;
+
+function attachOsmFootprintLayer({ map, AMap }) {
+  let overlays = [];
+  let pendingToken = 0;
+
+  function clear() {
+    if (overlays.length === 0) return;
+    map.remove(overlays);
+    overlays = [];
+  }
+
+  async function refresh() {
+    const myToken = ++pendingToken;
+    const zoom = map.getZoom();
+    if (zoom < FOOTPRINT_MIN_ZOOM) {
+      clear();
+      return;
+    }
+    const bounds = map.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const viewport = `${sw.getLng().toFixed(4)},${sw.getLat().toFixed(4)},${ne.getLng().toFixed(4)},${ne.getLat().toFixed(4)}`;
+    let payload;
+    try {
+      payload = await api.mapOsmFootprints({ viewport, limit: FOOTPRINT_REQUEST_LIMIT });
+    } catch (err) {
+      console.warn("[atlas:map] osm-footprints fetch failed", err);
+      return;
+    }
+    if (myToken !== pendingToken) return; // newer request superseded us
+    clear();
+    const next = [];
+    for (const feat of payload.features || []) {
+      const geom = feat.geometry;
+      const props = feat.properties || {};
+      if (!geom || geom.type !== "Polygon") continue;
+      const poly = new AMap.Polygon({
+        path: geom.coordinates[0],
+        strokeColor: "#7a8da0",
+        strokeWeight: 0.6,
+        strokeOpacity: 0.55,
+        fillColor: props.communityId ? "#5d8aa8" : "#3b4754",
+        fillOpacity: 0.18,
+        bubble: true,
+        zIndex: 5,
+      });
+      next.push(poly);
+    }
+    if (next.length > 0) map.add(next);
+    overlays = next;
+  }
+
+  map.on("moveend", refresh);
+  map.on("zoomend", refresh);
+  // initial pass after slight delay so the renderForMode pass paints first
+  setTimeout(refresh, 150);
 }
 
 function showError(container, message) {

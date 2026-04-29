@@ -5171,9 +5171,20 @@ def floor_ring_from_building_ring(
 
 def imported_building_geo_asset_index(geo_run_id: str | None = None) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
-    run_ids = [geo_run_id] if geo_run_id else [run_summary["runId"] for run_summary in list_geo_asset_runs()]
-    for run_id in run_ids:
-        detail = geo_asset_run_detail_full(run_id)
+    if geo_run_id:
+        run_summaries = [r for r in list_geo_asset_runs() if r.get("runId") == geo_run_id]
+    else:
+        # Skip provider runs whose features inherently lack building_id — those
+        # runs would be loaded into memory only to be filtered out feature-by-
+        # feature inside the loop. The biggest offender is the OSM-derived run
+        # (81 MB / 69k features, all building_id=None). Excluding by provider
+        # turns a 4-second cold load into instant work.
+        run_summaries = [
+            r for r in list_geo_asset_runs()
+            if str(r.get("providerId") or "") not in {"openstreetmap"}
+        ]
+    for run_summary in run_summaries:
+        detail = geo_asset_run_detail_full(run_summary["runId"])
         if not detail:
             continue
         for feature in detail["features"]:
