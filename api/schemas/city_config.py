@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class DistrictSummary(BaseModel):
+class CityDistrictSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     district_code: int = Field(serialization_alias="districtCode")
@@ -18,4 +18,4 @@ class CityConfigResponse(BaseModel):
     country_code: str = Field(serialization_alias="countryCode")
     center: tuple[float, float]
     default_zoom: float = Field(serialization_alias="defaultZoom")
-    districts: list[DistrictSummary]
+    districts: list[CityDistrictSummary]
