@@ -87,3 +87,27 @@ def test_get_import_status_unknown_returns_404(monkeypatch, tmp_path):
     _login(client, "u", "hunter22")
     r = client.get("/api/v2/customer-data/imports/does-not-exist")
     assert r.status_code == 404
+
+
+def test_persist_without_postgres_returns_503(monkeypatch, tmp_path):
+    monkeypatch.setenv("ATLAS_CUSTOMER_DATA_RUNS_DIR", str(tmp_path / "runs"))
+    monkeypatch.delenv("POSTGRES_DSN", raising=False)
+    user_store.create_user(username="al", password="hunter22", role="analyst")
+    client = TestClient(app)
+    _login(client, "al", "hunter22")
+    # Stage a good run
+    csv_body = (
+        "project_name,address,building_no,unit_type,monthly_rent_cny,"
+        "occupancy_rate_pct,move_in_date,longitude,latitude\n"
+        "Alpha,addr,1,2-1,7800,95,2024-09-01,121.59,31.21\n"
+    ).encode("utf-8")
+    upload = client.post(
+        "/api/v2/customer-data/imports",
+        data={"type": "portfolio"},
+        files={"file": ("p.csv", csv_body, "text/csv")},
+    )
+    assert upload.status_code == 201
+    run_id = upload.json()["run"]["runId"]
+    persist = client.post(f"/api/v2/customer-data/imports/{run_id}/persist")
+    assert persist.status_code == 503
+    assert "POSTGRES_DSN" in persist.text

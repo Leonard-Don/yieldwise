@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from api.auth.deps import current_user, require_role
 from api.customer_data import staging
 from api.customer_data.parser import parse_csv
+from api.customer_data.persistence import persist_run as _persist_run
 from api.schemas.auth import CurrentUser
 from api.schemas.customer_data import (
     CustomerDataType,
@@ -112,3 +113,34 @@ def get_import_status(run_id: str, _: CurrentUser = Depends(current_user)) -> St
 )
 def list_imports(_: CurrentUser = Depends(current_user)) -> list[StagedRunSummary]:
     return [_summary_to_schema(r) for r in staging.list_runs()]
+
+
+@router.post(
+    "/customer-data/imports/{run_id}/persist",
+    status_code=status.HTTP_200_OK,
+)
+def persist_import(
+    run_id: str,
+    force: bool = False,
+    user: CurrentUser = Depends(require_role("admin", "analyst")),
+) -> dict:
+    run = staging.load_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    if run.error_count > 0 and not force:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"run has {run.error_count} errors; pass ?force=true to persist anyway",
+        )
+    if not os.environ.get("POSTGRES_DSN"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="no database configured; set POSTGRES_DSN",
+        )
+    try:
+        result = _persist_run(run.run_id, client_id=user.username)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run vanished")
+    return {"runId": run.run_id, **result}
