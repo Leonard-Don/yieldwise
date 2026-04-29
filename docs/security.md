@@ -13,6 +13,26 @@
 - `/`, `/backstage/`, `/admin/*` — gated by `StaticShellAuthGate`. Anonymous visits redirect to `/login?next=<path>`.
 - Legacy `/api/*` (non-v2) routes from `api/service.py` re-exports are **NOT** gated in v0.2. A logged-out caller can still reach them. These will be rebuilt or gated in a later milestone (M6 backstage workflow pivot). Treat them as semi-public until then.
 
+### ⚠️ Legacy `/api/*` exposure (action required for production)
+
+Routes from `api/service.py` re-exports are NOT gated by the Plan 2 auth layer.
+Plan 5 (M6) will rebuild them. Until then, **do not expose port 8000 directly
+to the public internet**. Bind to `127.0.0.1` and put it behind a TLS-terminating
+reverse proxy that enforces network-level auth (mTLS, OIDC, IP allowlist).
+
+Specific dangerous endpoints currently reachable anonymously:
+
+- `POST /api/database/bootstrap-local` — provisions schema, drops + recreates tables
+- `POST /api/jobs/refresh-metrics` — kicks off long-running compute
+- `POST /api/import-runs/{run_id}/persist` — writes to PostgreSQL
+- `POST /api/reference-runs/{run_id}/persist` — writes to PostgreSQL
+- `POST /api/communities/{community_id}/anchor-confirmation` — mutates community anchor records
+- `POST /api/geo-assets/runs/{run_id}/*` — mutates geometry queue (work-orders, persist, tasks)
+- `POST /api/browser-capture-runs/{run_id}/review-queue/*` — mutates capture queue
+- `POST /api/browser-sampling-captures` — mutates capture queue (research-only branch should remove this entirely on main)
+
+This list is conservative; assume any non-GET legacy `/api/*` route is a mutation.
+
 ## CSRF
 
 We rely on `SameSite=Lax` cookie + same-origin SPA. **No separate CSRF token in v0.2.**

@@ -37,6 +37,11 @@ Yieldwise auth: seeded initial admin user 'ops'
 
 Visit `/login`, sign in as `ops`, change the password via `/admin/users`.
 
+> **Note (until P2-B5 lands):** the `/admin/users` page is not yet shipped. To
+> change the seed admin password before P2-B5 lands, stop the server, delete
+> `data/personal/auth_users.json`, set new `ATLAS_ADMIN_PASSWORD`, restart. The
+> seed will run again with the new password.
+
 ## Adding More Users
 
 1. Sign in as admin.

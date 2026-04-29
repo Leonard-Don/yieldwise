@@ -36,5 +36,14 @@ def seed_initial_admin() -> None:
             "Yieldwise auth: ATLAS_ADMIN_PASSWORD must be at least 8 chars; refusing to seed."
         )
         return
-    user_store.create_user(username=username, password=password, role="admin")
+    try:
+        user_store.create_user(username=username, password=password, role="admin")
+    except ValueError as exc:
+        # Another worker seeded concurrently — idempotent no-op.
+        _logger.info(
+            "Yieldwise auth: admin %r already exists (likely seeded by another worker): %s",
+            username,
+            exc,
+        )
+        return
     _logger.info("Yieldwise auth: seeded initial admin user %r", username)

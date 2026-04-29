@@ -1,9 +1,11 @@
-"""Static-shell auth gate. Anonymous visits to /, /backstage/, /admin/ get
-redirected to /login. Public exceptions: /login, /api/*, /api/health,
-favicon, static assets.
+"""Static-shell auth gate. Anonymous visits to /, /backstage/, /admin/* get
+redirected to /login. Public exceptions match the _PUBLIC_PREFIXES tuple
+below: /login, /api/, /favicon, /assets/.
 
 This runs as a Starlette BaseHTTPMiddleware. It reads request.session
-(populated by SessionMiddleware, which MUST be added BEFORE this).
+(populated by SessionMiddleware, which MUST be added BEFORE this in code
+order — Starlette add_middleware prepends, so SessionMiddleware ends up
+outermost and runs first at request time).
 """
 from __future__ import annotations
 
