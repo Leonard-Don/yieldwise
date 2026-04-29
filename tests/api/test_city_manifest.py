@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from api.config.cities.loader import load_active_city, load_city
 from api.config.cities.manifest import CityManifest, parse_manifest_yaml
 
 
@@ -95,3 +96,29 @@ districts: []
 """
     with pytest.raises(ValueError, match="default_zoom"):
         parse_manifest_yaml(yaml_text)
+
+
+def test_load_shanghai_manifest_from_disk():
+    load_city.cache_clear()
+    m = load_city("shanghai")
+    assert m.city_id == "shanghai"
+    assert m.display_name == "上海"
+    assert m.center == (121.4737, 31.2304)
+    assert m.default_zoom == 10.8
+    assert len(m.districts) == 16
+    codes = {d.district_code for d in m.districts}
+    assert 310101 in codes  # 黄浦
+    assert 310115 in codes  # 浦东
+
+
+def test_load_active_city_defaults_to_shanghai(monkeypatch):
+    monkeypatch.delenv("ATLAS_CITY", raising=False)
+    load_city.cache_clear()
+    m = load_active_city()
+    assert m.city_id == "shanghai"
+
+
+def test_load_unknown_city_raises():
+    load_city.cache_clear()
+    with pytest.raises(FileNotFoundError):
+        load_city("atlantis")
