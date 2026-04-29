@@ -961,6 +961,11 @@ def serve_admin_users() -> FileResponse:
     return FileResponse(ADMIN_DIR / "index.html")
 
 
+@app.get("/admin/customer-data")
+def serve_admin_customer_data() -> FileResponse:
+    return FileResponse(ADMIN_DIR / "customer-data.html")
+
+
 # Admin assets at /static-admin (separate from login's /static so the HTML
 # files can reference their own CSS/JS without clashing).
 app.mount("/static-admin", StaticFiles(directory=ADMIN_DIR), name="admin-static")

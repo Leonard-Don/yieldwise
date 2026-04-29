@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Yieldwise · 客户数据导入</title>
+  <link rel="stylesheet" href="/static-admin/customer-data.css">
+</head>
+<body>
+  <header class="cd-topbar">
+    <h1>客户数据导入</h1>
+    <div class="cd-meta">
+      <span data-role="me-name"></span>
+      <a class="cd-link" href="/admin/users">用户管理</a>
+      <button type="button" data-role="logout">登出</button>
+    </div>
+  </header>
+  <main class="cd-shell">
+    <section class="cd-card">
+      <h2>下载模板</h2>
+      <p class="cd-help">填好后用对应类型上传。CSV 必须带 UTF-8 BOM（Excel 默认即可）和 longitude / latitude 列（GCJ-02）。</p>
+      <ul class="cd-templates">
+        <li><a href="/api/v2/customer-data/templates/portfolio.csv">portfolio.csv（在管房源）</a></li>
+        <li><a href="/api/v2/customer-data/templates/pipeline.csv">pipeline.csv（候选标的）</a></li>
+        <li><a href="/api/v2/customer-data/templates/comp_set.csv">comp_set.csv（比准数据）</a></li>
+      </ul>
+    </section>
+    <section class="cd-card">
+      <h2>上传</h2>
+      <form id="upload-form" class="cd-form" novalidate>
+        <label>
+          <span>类型</span>
+          <select name="type" required>
+            <option value="portfolio">portfolio · 在管房源</option>
+            <option value="pipeline">pipeline · 候选标的</option>
+            <option value="comp_set">comp_set · 比准数据</option>
+          </select>
+        </label>
+        <label>
+          <span>CSV 文件</span>
+          <input type="file" name="file" accept=".csv,text/csv" required>
+        </label>
+        <button type="submit">上传并入暂存区</button>
+        <p class="cd-error" data-role="upload-error" hidden></p>
+      </form>
+    </section>
+    <section class="cd-card">
+      <h2>暂存区</h2>
+      <table class="cd-runs">
+        <thead><tr><th>Run</th><th>类型</th><th>行数</th><th>错误</th><th>时间</th><th>操作</th></tr></thead>
+        <tbody data-role="runs"></tbody>
+      </table>
+    </section>
+    <section class="cd-card cd-errors" hidden data-role="errors-card">
+      <h2>错误明细（最近上传）</h2>
+      <table class="cd-error-table">
+        <thead><tr><th>行</th><th>错误</th></tr></thead>
+        <tbody data-role="errors-body"></tbody>
+      </table>
+    </section>
+  </main>
+  <script type="module" src="/static-admin/customer-data.js"></script>
+</body>
+</html>
