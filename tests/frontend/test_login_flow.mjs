@@ -15,7 +15,15 @@ import assert from "node:assert/strict";
 function pickNext(query) {
   const params = new URLSearchParams(query);
   const next = params.get("next");
-  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  if (
+    next &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.startsWith("/\\") &&
+    !next.startsWith("\\")
+  ) {
+    return next;
+  }
   return "/";
 }
 
@@ -29,4 +37,11 @@ test("pickNext rejects external URLs and protocol-relative URLs", () => {
   assert.equal(pickNext("?next=https://evil.example/"), "/");
   assert.equal(pickNext("?next="), "/");
   assert.equal(pickNext(""), "/");
+});
+
+test("pickNext rejects backslash open-redirect bypasses", () => {
+  // Modern browsers normalize \ to / per WHATWG URL, so /\\evil.com resolves as
+  // //evil.com (host-relative redirect). Defend against it explicitly.
+  assert.equal(pickNext("?next=/\\evil.example/"), "/");
+  assert.equal(pickNext("?next=\\\\evil.example/"), "/");
 });

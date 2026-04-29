@@ -5,7 +5,15 @@ function getNextUrl() {
   const params = new URLSearchParams(window.location.search);
   const next = params.get("next");
   // Allow only same-origin paths to defeat open-redirect attacks.
-  if (next && next.startsWith("/") && !next.startsWith("//")) {
+  // Reject `//host`, `\\host`, `/\host` — modern browsers normalize backslashes
+  // to forward slashes per WHATWG URL, making `/\\evil.com` resolve as `//evil.com`.
+  if (
+    next &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.startsWith("/\\") &&
+    !next.startsWith("\\")
+  ) {
     return next;
   }
   return "/";
