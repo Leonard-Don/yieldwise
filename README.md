@@ -54,6 +54,15 @@
 - 详细部署：`docs/deployment/auth-setup.md`
 - 安全姿态（CSRF / 审计 / 限流 / legacy `/api/*` 暴露面）：`docs/security.md`
 
+## 客户数据导入 / Customer Data (v0.3 起)
+
+`/admin/customer-data` 让 admin / analyst 上传三类 CSV：在管房源 / 候选标的 / 比准数据。
+
+- 模板下载：`/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.csv`
+- 上传走暂存区（`tmp/customer-data-runs/<run_id>/`），按 run 单独持久化到 Postgres
+- 部署细节：`docs/deployment/customer-data-import.md`
+- CSV 列规范：`docs/customer-data-csv-spec.md`
+
 ## 路由布局（Phase 8i 起）
 
 | 路径 | 绑定 | 说明 |
