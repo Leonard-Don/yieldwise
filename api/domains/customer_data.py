@@ -144,3 +144,27 @@ def persist_import(
     except FileNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run vanished")
     return {"runId": run.run_id, **result}
+
+
+@router.get("/customer-data/portfolio", response_model=list[dict])
+def list_portfolio(_: CurrentUser = Depends(current_user)) -> list[dict]:
+    return _read_table("customer_data.portfolio")
+
+
+@router.get("/customer-data/pipeline", response_model=list[dict])
+def list_pipeline(_: CurrentUser = Depends(current_user)) -> list[dict]:
+    return _read_table("customer_data.pipeline")
+
+
+@router.get("/customer-data/comp_set", response_model=list[dict])
+def list_comp_set(_: CurrentUser = Depends(current_user)) -> list[dict]:
+    return _read_table("customer_data.comp_set")
+
+
+def _read_table(qualified_name: str) -> list[dict]:
+    # qualified_name is a closed-enum literal owned by this module — never user input.
+    if not os.environ.get("POSTGRES_DSN"):
+        return []
+    from api.persistence import query_rows
+    sql = f"SELECT * FROM {qualified_name} ORDER BY imported_at DESC LIMIT 5000"
+    return query_rows(sql)
