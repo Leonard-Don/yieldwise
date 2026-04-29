@@ -40,7 +40,7 @@ CITY_NAME_BY_ID: dict[int, str] = {
     7: "天津", 8: "重庆", 9: "苏州", 10: "杭州",
 }
 
-USER_AGENT = "Mozilla/5.0 (compatible; ShanghaiYieldAtlas/0.1; +internal-research)"
+USER_AGENT = "Mozilla/5.0 (compatible; Yieldwise/0.1; +internal-research)"
 
 
 def fetch_html(url: str, *, timeout: float = 15.0) -> str:

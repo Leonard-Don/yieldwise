@@ -1286,7 +1286,7 @@ function attachEvents() {
       "导出中…",
       "KML 已导出",
       "/api/export/kml",
-      "shanghai-yield-atlas.kml",
+      "yieldwise.kml",
       buildKml,
       "application/vnd.google-earth.kml+xml"
     );
@@ -1298,7 +1298,7 @@ function attachEvents() {
       "导出中…",
       "GeoJSON 已导出",
       "/api/export/geojson",
-      "shanghai-yield-atlas.geojson",
+      "yieldwise.geojson",
       buildGeoJson,
       "application/geo+json"
     );
@@ -9390,7 +9390,7 @@ function buildGeoJson() {
   return JSON.stringify(
     {
       type: "FeatureCollection",
-      name: "ShanghaiYieldAtlas",
+      name: "Yieldwise",
       features
     },
     null,
@@ -9864,7 +9864,7 @@ function buildFloorWatchlistKml() {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Shanghai Yield Floor Watchlist</name>
+    <name>Yieldwise Floor Watchlist</name>
     ${placemarks}
   </Document>
 </kml>`;
@@ -9895,7 +9895,7 @@ function buildKml() {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Shanghai Yield Atlas</name>
+    <name>Yieldwise</name>
     ${placemarks}
   </Document>
 </kml>`;

@@ -776,7 +776,7 @@ def export_kml(
         max_budget=max_budget,
         min_samples=min_samples,
     )
-    headers = {"Content-Disposition": 'attachment; filename="shanghai-yield-atlas.kml"'}
+    headers = {"Content-Disposition": 'attachment; filename="yieldwise.kml"'}
     return Response(content=content, media_type="application/vnd.google-earth.kml+xml", headers=headers)
 
 

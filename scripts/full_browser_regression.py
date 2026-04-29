@@ -1583,7 +1583,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run a full browser regression for Shanghai Yield Atlas.")
+    parser = argparse.ArgumentParser(description="Run a full browser regression for Yieldwise.")
     parser.add_argument("--session", default="atlas-full-regression", help="Playwright browser session")
     parser.add_argument("--label", default=f"atlas-full-regression-{datetime.now().strftime('%Y%m%d%H%M%S')}")
     parser.add_argument("--url", default="http://127.0.0.1:8013/backstage/")

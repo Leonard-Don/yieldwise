@@ -4,7 +4,7 @@ services:
     container_name: atlas-postgis
     restart: unless-stopped
     environment:
-      POSTGRES_DB: shanghai_yield_atlas
+      POSTGRES_DB: yieldwise
       POSTGRES_USER: atlas
       POSTGRES_PASSWORD: atlas_local_dev
       TZ: Asia/Shanghai
@@ -14,7 +14,7 @@ services:
     volumes:
       - atlas-postgis-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U atlas -d shanghai_yield_atlas"]
+      test: ["CMD-SHELL", "pg_isready -U atlas -d yieldwise"]
       interval: 5s
       timeout: 5s
       retries: 20

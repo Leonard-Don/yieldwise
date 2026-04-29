@@ -13,7 +13,7 @@ from api.service import bootstrap_local_database
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Bootstrap the local Docker PostGIS database for Shanghai Yield Atlas.")
+    parser = argparse.ArgumentParser(description="Bootstrap the local Docker PostGIS database for Yieldwise.")
     parser.add_argument("--reference-run-id", help="Optional reference run id. Defaults to the latest available run.")
     parser.add_argument("--import-run-id", help="Optional import run id. Defaults to the latest available run.")
     parser.add_argument("--geo-run-id", help="Optional geo asset run id. Defaults to the latest available run.")

@@ -4393,7 +4393,7 @@ def map_buildings_payload(
         items.append(feature)
     return {
         "type": "FeatureCollection",
-        "name": payload.get("name") or "ShanghaiYieldBuildings",
+        "name": payload.get("name") or "YieldwiseBuildings",
         "features": items,
         "summary": {
             "buildingCount": len(items),
@@ -5340,7 +5340,7 @@ def build_geojson(
                 "geometry": {"type": "Point", "coordinates": [lon, lat]},
             }
         )
-    return {"type": "FeatureCollection", "name": "ShanghaiYieldAtlas", "features": features}
+    return {"type": "FeatureCollection", "name": "Yieldwise", "features": features}
 
 
 def build_building_geojson(
@@ -5421,7 +5421,7 @@ def build_building_geojson(
                     "geometry": {"type": "Polygon", "coordinates": [ring]},
                 }
             )
-    return {"type": "FeatureCollection", "name": "ShanghaiYieldBuildings", "features": features}
+    return {"type": "FeatureCollection", "name": "YieldwiseBuildings", "features": features}
 
 
 def build_kml(
@@ -5465,7 +5465,7 @@ def build_kml(
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Shanghai Yield Atlas</name>
+    <name>Yieldwise</name>
 {joined}
   </Document>
 </kml>
@@ -6043,7 +6043,7 @@ def build_floor_watchlist_kml(
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Shanghai Yield Floor Watchlist</name>
+    <name>Yieldwise Floor Watchlist</name>
 {joined}
   </Document>
 </kml>

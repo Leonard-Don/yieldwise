@@ -52,7 +52,7 @@ TZ = timezone(timedelta(hours=8))
 OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter"
 # Overpass rejects "Mozilla/*" UAs as bot traffic. Use a descriptive
 # project-specific UA per their fair-use guidance.
-USER_AGENT = "ShanghaiYieldAtlas/0.1 (internal research; +https://github.com/Leonard-Don/shanghai-yield-atlas)"
+USER_AGENT = "Yieldwise/0.1 (internal research; +https://github.com/Leonard-Don/yieldwise)"
 
 # Mirrors the project's district id → name (matches generate_amap_seed_data + others).
 DISTRICTS: dict[str, str] = {

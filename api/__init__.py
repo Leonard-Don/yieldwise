@@ -1,4 +1,4 @@
-"""Shanghai Yield Atlas API package."""
+"""Yieldwise API package."""
 
 from .env import load_local_env
 

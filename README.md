@@ -1,6 +1,6 @@
 # Yieldwise · 租知
 
-[![Validate](https://github.com/Leonard-Don/shanghai-yield-atlas/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/shanghai-yield-atlas/actions/workflows/validate.yml)
+[![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Open-source workbench for analyzing rental-yield, pipeline, and comp-set data across Chinese cities — on a single map, in your browser.**
@@ -39,7 +39,7 @@ No scraping, no compliance grey area — you bring authorized data, the tool hel
 Requires Python 3.11+ and a local Postgres+PostGIS (Docker is fine).
 
 ```bash
-git clone https://github.com/Leonard-Don/shanghai-yield-atlas.git yieldwise
+git clone https://github.com/Leonard-Don/yieldwise.git yieldwise
 cd yieldwise
 docker compose up -d           # spins up postgis on :5432
 python3 -m venv .venv && source .venv/bin/activate
@@ -88,14 +88,14 @@ Yieldwise ships **zero scrapers** and never auto-fetches anything that requires 
 - 253 backend tests passing, ~110 frontend node tests
 - Built by one student, ~10h/week — expect rough edges
 
-**Not yet shipped** — see [GitHub Issues](https://github.com/Leonard-Don/shanghai-yield-atlas/issues):
+**Not yet shipped** — see [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues):
 - PDF/Excel report export
 - Public hosted demo
 - Address-only geocoding (currently requires explicit lng/lat in CSV)
 
 ## Pricing
 
-The tool itself is free under MIT. If you want a curated bundle of methodology + demo dataset + Excel templates, see [the upcoming knowledge package](https://github.com/Leonard-Don/shanghai-yield-atlas/discussions) — release planned for ~6 weeks from initial public push.
+The tool itself is free under MIT. If you want a curated bundle of methodology + demo dataset + Excel templates, see [the upcoming knowledge package](https://github.com/Leonard-Don/yieldwise/discussions) — release planned for ~6 weeks from initial public push.
 
 ## Contributing
 

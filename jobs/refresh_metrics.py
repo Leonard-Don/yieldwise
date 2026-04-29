@@ -109,7 +109,7 @@ def materialize_metrics_run(snapshot: dict, *, batch_name: str, output_dir: str 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build a metrics snapshot payload for the Shanghai Yield Atlas MVP.")
+    parser = argparse.ArgumentParser(description="Build a metrics snapshot payload for the Yieldwise MVP.")
     parser.add_argument("--date", default=date.today().isoformat(), help="Snapshot date in YYYY-MM-DD format.")
     parser.add_argument("--output", help="Optional path to write the JSON snapshot.")
     parser.add_argument("--output-dir", help="Optional metrics run directory. When provided, materializes a staged metrics run.")

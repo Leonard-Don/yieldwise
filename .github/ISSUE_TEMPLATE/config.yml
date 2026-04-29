@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Provider Access Playbook
-    url: https://github.com/Leonard-Don/shanghai-yield-atlas/blob/main/docs/internal/provider-access-playbook.md
+    url: https://github.com/Leonard-Don/yieldwise/blob/main/docs/internal/provider-access-playbook.md
     about: 先看数据源接入顺序、公开页采样边界和申请入口。
