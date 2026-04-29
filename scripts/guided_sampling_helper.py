@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read docs/public-sampling-backlog.md, emit a per-task worklist CSV.
+"""Read docs/internal/public-sampling-backlog.md, emit a per-task worklist CSV.
 
 This is NOT a scraper — it does not fetch listing pages. It only converts
 the human-curated backlog markdown into a structured CSV that lets you

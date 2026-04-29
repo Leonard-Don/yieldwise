@@ -38,9 +38,12 @@ def _runs_dir() -> Path:
 
 
 def _new_run_id() -> str:
-    # Lexicographically sortable: ISO timestamp + short suffix.
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    suffix = uuid.uuid4().hex[:8]
+    # Lexicographically sortable: ISO timestamp with microseconds + short suffix.
+    # Microsecond precision keeps newest-first listing deterministic when callers
+    # save several runs in quick succession (otherwise same-second runs would
+    # tie-break on the random uuid suffix).
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    suffix = uuid.uuid4().hex[:6]
     return f"{ts}-{suffix}"
 
 

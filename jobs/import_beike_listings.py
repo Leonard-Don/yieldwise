@@ -6,7 +6,7 @@ shapes are gated behind a login on https://open.ke.com — once you have those
 docs, fill in the four TODO sections marked below. Everything else (output
 shape, run-slug, error handling, --dry-run, --district filter) is wired up.
 
-Handoff: see docs/beike-adapter-handoff.md for step-by-step.
+Handoff: see docs/internal/beike-adapter-handoff.md for step-by-step.
 
 Run:
     # one-time test, no real API calls (for shape verification only):
@@ -68,7 +68,7 @@ def acquire_token(app_id: str, app_ak: str) -> str:
       Response: {"code": 0, "data": {"access_token": "...", "expires_in": 7200}}
     """
     raise NotImplementedError(
-        "Beike token endpoint not wired yet. See docs/beike-adapter-handoff.md "
+        "Beike token endpoint not wired yet. See docs/internal/beike-adapter-handoff.md "
         "for the four-step handoff. Until then, --dry-run works for shape verification."
     )
 

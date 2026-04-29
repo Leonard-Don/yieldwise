@@ -2,7 +2,7 @@
 """Quarantine UI-corruption artifacts in staged sale + rent rows.
 
 Two known systemic bugs in the public-browser-sampling UI capture path
-(see docs/public-sampling-backlog.md P0 section, 2026-04-29):
+(see docs/internal/public-sampling-backlog.md P0 section, 2026-04-29):
 
 1. RENT corruption — total_floors leaks into monthly_rent. Symptom: rent
    values like 1, 16, 19 元/月 across 22 communities (24% of all rent rows).

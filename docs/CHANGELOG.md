@@ -2,7 +2,7 @@
 
 记录 Phase 6 起的迭代节奏。每条目对应一个或多个 PR/合并 commit。
 
-按 spec `docs/superpowers/specs/2026-04-23-user-facing-platform-design.md` 推进；spec 第 3 节路由布局已 100% 兑现，第 4 节后端拆分已 100% 兑现，前端 `app.js` 拆分按机械切片渐进推进至 ~19%。
+按 spec `docs/internal/superpowers/specs/2026-04-23-user-facing-platform-design.md` 推进；spec 第 3 节路由布局已 100% 兑现，第 4 节后端拆分已 100% 兑现，前端 `app.js` 拆分按机械切片渐进推进至 ~19%。
 
 ---
 

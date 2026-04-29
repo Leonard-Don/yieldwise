@@ -53,4 +53,4 @@ python3 jobs/refresh_metrics.py \
 - `Public Sampling Task`: 继续补公开页人工采样
 - `Bug Report`: 页面、导入链或地图联动问题
 
-当前采样重点见 `docs/public-sampling-backlog.md`。
+当前采样重点见 `docs/internal/public-sampling-backlog.md`。
