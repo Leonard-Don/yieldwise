@@ -103,7 +103,15 @@ ROOM_PATTERN = re.compile(r"(\d)\s*室\s*(\d)\s*厅\s*(\d)\s*卫")
 AREA_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*(?:㎡|平米|平方米|平)")
 SALE_PRICE_PATTERN = re.compile(r"(?:总价|售价|挂牌价)?\s*(\d+(?:\.\d+)?)\s*万")
 UNIT_PRICE_PATTERN = re.compile(r"(?:单价|均价)?\s*(\d+(?:\.\d+)?)\s*元(?:/平|/㎡)")
-RENT_PRICE_PATTERN = re.compile(r"(?:月租|租金)?\s*(\d+(?:\.\d+)?)\s*(万)?\s*元?(?:/月)?")
+# Tightened 2026-04-29: previous version made BOTH the 月租/租金 prefix and the
+# 元 suffix optional, so plain `\d+` was a valid match — that meant free text
+# like "中层/16层" let "16" outrank the real "月租12200元" later in the string,
+# polluting 24% of all rent samples. Now the match requires either a 月租/租金
+# prefix OR an explicit 元 suffix.
+RENT_PRICE_PATTERN = re.compile(
+    r"(?:(?:月租|租金)\s*(\d+(?:\.\d+)?)\s*(万)?(?:\s*元)?(?:/月)?)"
+    r"|(?:(\d+(?:\.\d+)?)\s*(万)?\s*元(?:/月)?)"
+)
 
 
 def load_capture_rows(path: Path) -> list[dict[str, str]]:
@@ -265,9 +273,15 @@ def parse_monthly_rent(texts: list[str], explicit_value: str | None) -> float | 
         return explicit
     for text in texts:
         match = RENT_PRICE_PATTERN.search(text)
-        if match:
-            amount = float(match.group(1))
-            return round(amount * 10000, 2) if match.group(2) else round(amount, 2)
+        if not match:
+            continue
+        # Pattern has two alternatives:
+        #   1) 月租|租金 prefix (groups 1, 2)
+        #   2) explicit 元 suffix (groups 3, 4)
+        amount_text = match.group(1) or match.group(3)
+        wan_marker = match.group(2) or match.group(4)
+        amount = float(amount_text)
+        return round(amount * 10000, 2) if wan_marker else round(amount, 2)
     return None
 
 

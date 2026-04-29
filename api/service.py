@@ -1002,6 +1002,23 @@ def place_labels_for(community_id: str | None, building_id: str | None = None) -
     return place_labels_from_indices(reference_catalog_indices(), community_id, building_id)
 
 
+# Smoke-fixture rows are produced by scripts/browser_capture_smoke.py to
+# verify the capture-and-submit round-trip. They use hardcoded prices
+# (default 323 万 sale, 12200 元 rent) which would otherwise contaminate
+# analytical aggregations. Filter them out at the read boundary so the
+# smoke runs still serve their verification purpose without skewing yields.
+_SMOKE_LISTING_ID_PREFIX = "browser-smoke-"
+
+
+def _filter_out_smoke_fixtures(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return rows
+    return [
+        r for r in rows
+        if not str(r.get("source_listing_id") or "").startswith(_SMOKE_LISTING_ID_PREFIX)
+    ]
+
+
 def staged_import_artifacts(run_id: str | None = None) -> dict[str, Any] | None:
     run_summaries = list_import_runs()
     if not run_summaries:
@@ -1016,8 +1033,8 @@ def staged_import_artifacts(run_id: str | None = None) -> dict[str, Any] | None:
     if not isinstance(manifest, dict):
         return None
     outputs = manifest.get("outputs", {})
-    sale_rows = read_json_file(resolve_artifact_path(outputs.get("normalized_sale"))) or []
-    rent_rows = read_json_file(resolve_artifact_path(outputs.get("normalized_rent"))) or []
+    sale_rows = _filter_out_smoke_fixtures(read_json_file(resolve_artifact_path(outputs.get("normalized_sale"))) or [])
+    rent_rows = _filter_out_smoke_fixtures(read_json_file(resolve_artifact_path(outputs.get("normalized_rent"))) or [])
     queue_rows = read_json_file(resolve_artifact_path(outputs.get("address_resolution_queue"))) or []
     floor_pairs = read_json_file(resolve_artifact_path(outputs.get("floor_pairs"))) or []
     floor_evidence = read_json_file(resolve_artifact_path(outputs.get("floor_evidence"))) or []
