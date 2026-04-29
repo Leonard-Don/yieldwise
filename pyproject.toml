@@ -1,3 +1,13 @@
+[project]
+name = "yieldwise"
+version = "0.1.0"
+description = "Yieldwise · 租知 — 租赁资产投研工作台"
+requires-python = ">=3.13"
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://yieldwise.example"
+
 [tool.ruff]
 line-length = 120
 target-version = "py313"
