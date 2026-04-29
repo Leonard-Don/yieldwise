@@ -14,6 +14,7 @@ import { initShortcuts } from "./shortcuts.js";
 import { initSearch } from "./search.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
+import { bootstrapCityConfig } from "./config-bootstrap.js";
 
 const root = document.querySelector('[data-user-shell="atlas"]');
 if (!root) {
@@ -115,6 +116,9 @@ async function bootstrap(root) {
 
   const mapContainer = root.querySelector('[data-component="map"]');
   const boardContainer = root.querySelector('[data-component="board"]');
+
+  // City manifest must be cached before initMap reads center/zoom.
+  await bootstrapCityConfig();
 
   // Map and board boot in parallel — they only talk via the store.
   await Promise.all([

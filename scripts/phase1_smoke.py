@@ -73,6 +73,7 @@ def main() -> int:
             (f"{base}/", 'data-component="onboarding"'),
             (f"{base}/backstage/", "<title>Shanghai Yield Atlas</title>"),
             (f"{base}/api/v2/health", '"surface":"user-platform-v2"'),
+            (f"{base}/api/v2/config/city", '"cityId":"shanghai"'),
             (f"{base}/api/health", '"status":"ok"'),
             (f"{base}/api/v2/opportunities", '"items"'),
             (f"{base}/api/v2/map/districts", '"districts"'),

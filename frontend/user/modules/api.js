@@ -80,6 +80,7 @@ export const api = {
   districtsAll: () => getJSON("/api/v2/map/districts"),
   districtDetail: (id) => getJSONFresh(`/api/v2/districts/${encodeURIComponent(id)}`),
   runtimeConfig: () => getJSON("/api/runtime-config"),
+  cityConfig: () => getJSON("/api/v2/config/city"),
   search: (q, limit = 10) => {
     const params = new URLSearchParams();
     params.set("q", q);

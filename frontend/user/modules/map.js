@@ -1,9 +1,7 @@
 import { api } from "./api.js";
 import { loadAmap } from "./runtime.js";
 import { yieldColorFor, districtColorFor } from "./modes.js";
-
-const SHANGHAI_CENTER = [121.4737, 31.2304];
-const DEFAULT_ZOOM = 10.8;
+import { getActiveCityConfig } from "./config-bootstrap.js";
 
 export async function initMap({ container, store }) {
   const placeholder = container.querySelector('[data-role="map-placeholder"]');
@@ -27,9 +25,10 @@ export async function initMap({ container, store }) {
     return null;
   }
 
+  const cityCfg = getActiveCityConfig();
   const map = new AMap.Map(container.id, {
-    center: SHANGHAI_CENTER,
-    zoom: DEFAULT_ZOOM,
+    center: cityCfg.center,
+    zoom: cityCfg.defaultZoom,
     viewMode: "2D",
     mapStyle: "amap://styles/dark",
     showLabel: true,
