@@ -1,16 +1,18 @@
-# Shanghai Yield Atlas Internal Beta
+# Yieldwise · 租知
 
 [![Validate](https://github.com/Leonard-Don/shanghai-yield-atlas/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/shanghai-yield-atlas/actions/workflows/validate.yml)
 
+**租赁资产投研工作台 · 拿房选址 / 估值 / 投后一张地图**
+
 <p align="center">
-  <img src="docs/screenshots/atlas-workbench-overview.png" alt="Shanghai Yield Atlas workbench overview" width="100%" />
+  <img src="docs/screenshots/atlas-workbench-overview.png" alt="Yieldwise workbench overview" width="100%" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Shanghai Yield Atlas ops workbench" width="100%" />
+  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Yieldwise ops workbench" width="100%" />
 </p>
 
-一个面向内部研究的上海租售比 Atlas 工作台，把“地图钻取、批次接入、公开页补样、复核回看、几何补采、数据库主读切换”收进同一张研究台。
+面向保租房 / 长租公寓运营商投资部 / 资产管理部的租赁资产投研工作台。把团队散在 Excel、戴德梁行 PDF、内部 PMS 里的拿房线索、在管房源、市场比准数据，收进同一张地图，做拿房选址 / REIT 估值 / 投后管理三个 anchor 工作流。
 
 ## 这个仓库现在是什么
 
