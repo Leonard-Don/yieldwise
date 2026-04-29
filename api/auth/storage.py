@@ -19,6 +19,7 @@ from .hashing import hash_password, verify_password
 
 _FILENAME = "auth_users.json"
 _LOCK_RETRY_DELAY_S = 0.05
+_LOCK_MAX_ATTEMPTS = 100  # ~5 seconds at 50ms each, then re-raise
 _VALID_ROLES = ("admin", "analyst", "viewer")
 
 
@@ -45,24 +46,40 @@ def _store_path() -> Path:
 
 @contextmanager
 def _locked_file(mode: str) -> Iterator:
-    """Acquire an exclusive flock on the store. Creates the file if missing."""
+    """Acquire an exclusive flock via a sidecar .lock file, then yield the data fh.
+
+    The lock is held on a sidecar `<file>.lock` rather than the data file itself:
+    `_write_all` uses tmp + os.replace() which swaps the inode, so a flock on the
+    old inode would be silently dropped. Sidecar lock survives the inode swap.
+
+    Retries up to `_LOCK_MAX_ATTEMPTS` times on BlockingIOError, then re-raises.
+    """
     path = _store_path()
     if not path.exists():
         path.write_text("[]", encoding="utf-8")
-    fh = open(path, mode, encoding="utf-8")
+    lock_path = path.with_suffix(path.suffix + ".lock")
+
+    lock_fd = open(lock_path, "w")
     try:
-        while True:
+        for attempt in range(1, _LOCK_MAX_ATTEMPTS + 1):
             try:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except BlockingIOError:
+                if attempt == _LOCK_MAX_ATTEMPTS:
+                    raise
                 time.sleep(_LOCK_RETRY_DELAY_S)
-        yield fh
-    finally:
+
+        fh = open(path, mode, encoding="utf-8")
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            yield fh
         finally:
             fh.close()
+    finally:
+        try:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_fd.close()
 
 
 def _read_all() -> list[dict]:
@@ -77,8 +94,20 @@ def _read_all() -> list[dict]:
 
 
 def _write_all(rows: list[dict]) -> None:
-    with _locked_file("w") as fh:
-        json.dump(rows, fh, ensure_ascii=False, indent=2, sort_keys=True)
+    """Atomic write: dump to <path>.tmp, fsync, os.replace() onto the real path.
+
+    A crash mid-write leaves the original auth_users.json untouched rather than
+    a truncated half-write that would break json.loads and lock all logins out.
+    """
+    path = _store_path()
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with _locked_file("r") as _fh:  # acquire sidecar lock; we don't use this fh
+        del _fh
+        with open(tmp_path, "w", encoding="utf-8") as tmp_fh:
+            json.dump(rows, tmp_fh, ensure_ascii=False, indent=2, sort_keys=True)
+            tmp_fh.flush()
+            os.fsync(tmp_fh.fileno())
+        os.replace(tmp_path, path)
 
 
 def _row_to_user(row: dict) -> User:
