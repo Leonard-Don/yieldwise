@@ -1,7 +1,6 @@
 # Yieldwise · 租知
 
 [![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
-[![Docker](https://github.com/Leonard-Don/yieldwise/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Open-source workbench for analyzing rental-yield, pipeline, and comp-set data across Chinese cities — on a single map, in your browser.**
@@ -37,39 +36,33 @@ No scraping, no compliance grey area — you bring authorized data, the tool hel
 
 ## Quick start
 
-Requires Docker + Docker Compose. One command brings up Postgres+PostGIS and the app:
+Prerequisites: Python 3.13+ and a local Postgres + PostGIS instance. [Postgres.app](https://postgresapp.com/) is the lightest option on macOS and bundles PostGIS.
 
 ```bash
 git clone https://github.com/Leonard-Don/yieldwise.git
 cd yieldwise
 cp .env.example .env             # edit .env to set AMAP_API_KEY (free, see below)
-docker compose up -d --build     # ~2 min first build, ~10s subsequent runs
+
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r api/requirements.txt
+
+createdb yieldwise                                                # one-time
+psql yieldwise -c "CREATE EXTENSION IF NOT EXISTS postgis"        # one-time
+
+export $(grep -v '^#' .env | xargs)
+uvicorn api.main:app --reload --port 8000
 ```
 
-Then open `http://localhost:8000` and log in with the credentials in `.env` (default `admin` / `changeme-after-first-login` — change before exposing the port to the network).
+Open `http://localhost:8000` and log in with the credentials in `.env` (default `admin` / `changeme-after-first-login`).
 
 Try the customer-data upload at `/admin/customer-data`:
 1. Click 下载模板 → save `portfolio.csv`
 2. Fill in 5–10 rows with your sample data
-3. Upload
-4. The map populates with your points
+3. Upload — the map populates with your points
 
-Need a free AMAP key for the map to render? Get one at [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites). For commercial use, request a commercial key (personal keys violate AMAP ToS).
+The schema (both core tables and the customer-data domain) is applied automatically on first DB use, so no manual `psql -f` is needed.
 
-Prefer to run without Docker?
-
-<details>
-<summary>Native Python setup</summary>
-
-```bash
-docker compose up -d postgis      # postgis only
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r api/requirements.txt
-export $(grep -v '^#' .env | xargs)
-export POSTGRES_DSN=postgresql://atlas:atlas_local_dev@127.0.0.1:5432/yieldwise
-uvicorn api.main:app --reload --port 8000
-```
-</details>
+Need a free AMAP key for the map to render? Get one at [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites). Personal keys are fine for solo use; commercial deployments need a commercial key.
 
 CSV templates: `/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.csv` — see [docs/customer-data-csv-spec.md](docs/customer-data-csv-spec.md).
 
@@ -107,8 +100,6 @@ Yieldwise ships **zero scrapers** and never auto-fetches anything that requires 
 - Maintained part-time — expect rough edges, file issues if you hit them
 
 **Not yet shipped** — see [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues):
-- PDF/Excel report export
-- Public hosted demo
 - Address-only geocoding (currently requires explicit lng/lat in CSV)
 
 ## Pricing
