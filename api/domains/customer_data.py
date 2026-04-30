@@ -20,7 +20,7 @@ from api.schemas.customer_data import (
 router = APIRouter(tags=["customer-data"])
 
 _TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "customer_data" / "templates"
-_TEMPLATE_TYPES = ("portfolio", "pipeline", "comp_set")
+_TEMPLATE_TYPES = ("portfolio",)
 
 
 def _max_bytes() -> int:
@@ -149,16 +149,6 @@ def persist_import(
 @router.get("/customer-data/portfolio", response_model=list[dict])
 def list_portfolio(_: CurrentUser = Depends(current_user)) -> list[dict]:
     return _read_table("customer_data.portfolio")
-
-
-@router.get("/customer-data/pipeline", response_model=list[dict])
-def list_pipeline(_: CurrentUser = Depends(current_user)) -> list[dict]:
-    return _read_table("customer_data.pipeline")
-
-
-@router.get("/customer-data/comp_set", response_model=list[dict])
-def list_comp_set(_: CurrentUser = Depends(current_user)) -> list[dict]:
-    return _read_table("customer_data.comp_set")
 
 
 def _read_table(qualified_name: str) -> list[dict]:

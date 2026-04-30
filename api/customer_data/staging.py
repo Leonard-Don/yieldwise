@@ -3,8 +3,6 @@
 Layout:
   <runs_dir>/<run_id>/
     portfolio.json        rows: [{...}, ...]
-    pipeline.json         (only if a pipeline upload)
-    comp_set.json
     errors.json
     summary.json          {run_id, client_id, type, row_count, error_count, created_at}
 """

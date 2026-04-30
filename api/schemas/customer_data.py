@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-CustomerDataType = Literal["portfolio", "pipeline", "comp_set"]
+CustomerDataType = Literal["portfolio"]
 
 
 class StagedRunSummary(BaseModel):

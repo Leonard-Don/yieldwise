@@ -30,15 +30,13 @@ def test_portfolio_read_no_db_returns_empty():
     assert r.json() == []
 
 
-def test_pipeline_read_no_db_returns_empty():
+def test_pipeline_endpoint_removed():
     client = _seed_login()
     r = client.get("/api/v2/customer-data/pipeline")
-    assert r.status_code == 200
-    assert r.json() == []
+    assert r.status_code == 404
 
 
-def test_comp_set_read_no_db_returns_empty():
+def test_comp_set_endpoint_removed():
     client = _seed_login()
     r = client.get("/api/v2/customer-data/comp_set")
-    assert r.status_code == 200
-    assert r.json() == []
+    assert r.status_code == 404

@@ -63,14 +63,12 @@ The schema (both core tables and the customer-data domain) is applied automatica
 
 Need a free AMAP key for the map to render? Get one at [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites). Personal keys are fine for solo use; commercial deployments need a commercial key.
 
-CSV templates: `/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.csv` — see [docs/customer-data-csv-spec.md](docs/customer-data-csv-spec.md).
+CSV template: `/api/v2/customer-data/templates/portfolio.csv` — see [docs/customer-data-csv-spec.md](docs/customer-data-csv-spec.md).
 
 ## Features
 
 - **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)
-- **CSV import** — `portfolio` for tracking your own holdings, plus `pipeline` and `comp_set` types for richer workflows
-- **Multi-user auth** with admin/analyst/viewer roles
-- **Multi-city parameterization** — drop a YAML config to add a city
+- **`portfolio` CSV import** — drop in the properties you're tracking and they appear on the map
 - **OSM + AMAP merged building footprints** with quota-based community matching
 - **Per-row error capture** in CSV imports — bad rows go to an `errors.json` audit trail, never block the whole batch
 - **Staged-first storage** — every import lands in `tmp/customer-data-runs/<run_id>/` for review before persisting to Postgres
@@ -90,9 +88,9 @@ Yieldwise ships **zero scrapers** and never auto-fetches anything that requires 
 ## Project status
 
 **v0.3** (April 2026) — Beta. Stable:
-- Auth + customer data import + staged-first persist
-- Multi-city config (Shanghai live; templates for Beijing/Shenzhen)
-- 253 backend tests passing, ~110 frontend node tests
+- Auth + portfolio CSV import + staged-first persist
+- Shanghai live (city manifest is YAML-based — drop in another `<city>.yaml` to extend)
+- ~250 backend tests + ~110 frontend node tests
 - Maintained part-time — expect rough edges, file issues if you hit them
 
 **Not yet shipped** — see [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues):

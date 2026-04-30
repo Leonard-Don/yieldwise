@@ -4,8 +4,6 @@ from __future__ import annotations
 import pytest
 
 from api.customer_data.models import (
-    CompSetRow,
-    PipelineRow,
     PortfolioRow,
     ROW_MODELS,
 )
@@ -32,39 +30,7 @@ def test_portfolio_row_accepts_iso_date_string():
     assert float(r.monthly_rent_cny) == 7800.0
 
 
-def test_pipeline_row_rejects_invalid_stage():
-    with pytest.raises(ValueError, match="stage"):
-        PipelineRow(
-            project_name="P", stage="not-a-stage",
-            longitude=121.5, latitude=31.0,
-        )
-
-
-def test_pipeline_row_accepts_all_stages():
-    for stage in ("lead", "qualified", "negotiating", "won", "lost"):
-        r = PipelineRow(
-            project_name="P", stage=stage,
-            longitude=121.5, latitude=31.0,
-        )
-        assert r.stage == stage
-
-
-def test_comp_set_row_iso_date_and_numeric_fields():
-    r = CompSetRow(
-        source="戴德梁行 2026Q1",
-        report_date="2026-03-31",
-        address="addr",
-        transaction_price_cny="250000000.00",
-        rent_per_sqm_cny="180.5",
-        area_sqm=1500,
-        longitude=121.46,
-        latitude=31.23,
-    )
-    assert r.report_date.isoformat() == "2026-03-31"
-    assert float(r.transaction_price_cny) == 250_000_000.0
-
-
 def test_row_models_registry():
     assert ROW_MODELS["portfolio"] is PortfolioRow
-    assert ROW_MODELS["pipeline"] is PipelineRow
-    assert ROW_MODELS["comp_set"] is CompSetRow
+    assert "pipeline" not in ROW_MODELS
+    assert "comp_set" not in ROW_MODELS

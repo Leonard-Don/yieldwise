@@ -3,11 +3,9 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Literal, Type
+from typing import Type
 
 from pydantic import BaseModel, ConfigDict, Field
-
-Stage = Literal["lead", "qualified", "negotiating", "won", "lost"]
 
 
 class _Base(BaseModel):
@@ -26,30 +24,6 @@ class PortfolioRow(_Base):
     latitude: float = Field(..., gt=-90, lt=90)
 
 
-class PipelineRow(_Base):
-    project_name: str
-    address: str | None = None
-    stage: Stage
-    est_price_cny: Decimal | None = None
-    notes: str | None = None
-    longitude: float = Field(..., gt=-180, lt=180)
-    latitude: float = Field(..., gt=-90, lt=90)
-    updated_at: date | None = None
-
-
-class CompSetRow(_Base):
-    source: str
-    report_date: date | None = None
-    address: str | None = None
-    transaction_price_cny: Decimal | None = None
-    rent_per_sqm_cny: Decimal | None = None
-    area_sqm: Decimal | None = None
-    longitude: float = Field(..., gt=-180, lt=180)
-    latitude: float = Field(..., gt=-90, lt=90)
-
-
 ROW_MODELS: dict[str, Type[_Base]] = {
     "portfolio": PortfolioRow,
-    "pipeline": PipelineRow,
-    "comp_set": CompSetRow,
 }

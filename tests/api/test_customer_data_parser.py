@@ -52,17 +52,6 @@ def test_parse_rejects_unknown_type():
         parse_csv(b"x,y\n", type_="not-a-type")
 
 
-def test_parse_pipeline_validates_stage():
-    pipeline_csv = (
-        "project_name,address,stage,est_price_cny,notes,longitude,latitude,updated_at\n"
-        "P1,a,negotiating,1000000,note,121.5,31.0,2026-04-15\n"
-        "P2,a,bogus,500000,note,121.5,31.0,2026-04-15\n"
-    )
-    res = parse_csv(pipeline_csv.encode("utf-8"), type_="pipeline")
-    assert len(res.rows) == 1
-    assert len(res.errors) == 1
-
-
 def test_parse_empty_file_returns_zero_rows_no_errors():
     res = parse_csv(b"", type_="portfolio")
     assert res.rows == []

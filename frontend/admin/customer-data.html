@@ -17,24 +17,15 @@
   <main class="cd-shell">
     <section class="cd-card">
       <h2>下载模板</h2>
-      <p class="cd-help">填好后用对应类型上传。CSV 必须带 UTF-8 BOM（Excel 默认即可）和 longitude / latitude 列（GCJ-02）。</p>
+      <p class="cd-help">填好后上传。CSV 必须带 UTF-8 BOM（Excel 默认即可）和 longitude / latitude 列（GCJ-02）。</p>
       <ul class="cd-templates">
         <li><a href="/api/v2/customer-data/templates/portfolio.csv">portfolio.csv（在管房源）</a></li>
-        <li><a href="/api/v2/customer-data/templates/pipeline.csv">pipeline.csv（候选标的）</a></li>
-        <li><a href="/api/v2/customer-data/templates/comp_set.csv">comp_set.csv（比准数据）</a></li>
       </ul>
     </section>
     <section class="cd-card">
       <h2>上传</h2>
       <form id="upload-form" class="cd-form" novalidate>
-        <label>
-          <span>类型</span>
-          <select name="type" required>
-            <option value="portfolio">portfolio · 在管房源</option>
-            <option value="pipeline">pipeline · 候选标的</option>
-            <option value="comp_set">comp_set · 比准数据</option>
-          </select>
-        </label>
+        <input type="hidden" name="type" value="portfolio">
         <label>
           <span>CSV 文件</span>
           <input type="file" name="file" accept=".csv,text/csv" required>
