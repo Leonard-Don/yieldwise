@@ -31,7 +31,7 @@ Yieldwise is a personal-scale real-estate analysis tool. You upload your own CSV
 
 ## Why it exists
 
-Built as a final-year project by a FinTech student. Public real-estate data in China is scattered across government open-data portals, OSM, AMAP POIs, and PDF reports priced for institutions. Yieldwise stitches the open-source bits into one place and gives you a CSV import lane for the rest.
+Public real-estate data in China is scattered across government open-data portals, OSM, AMAP POIs, and PDF reports priced for institutions. Yieldwise stitches the open-source bits into one place and gives you a CSV import lane for the rest.
 
 No scraping, no compliance grey area — you bring authorized data, the tool helps you analyze it.
 
@@ -104,7 +104,7 @@ Yieldwise ships **zero scrapers** and never auto-fetches anything that requires 
 - Auth + customer data import + staged-first persist
 - Multi-city config (Shanghai live; templates for Beijing/Shenzhen)
 - 253 backend tests passing, ~110 frontend node tests
-- Built by one student, ~10h/week — expect rough edges
+- Maintained part-time — expect rough edges, file issues if you hit them
 
 **Not yet shipped** — see [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues):
 - PDF/Excel report export
@@ -125,7 +125,6 @@ MIT — see [LICENSE](LICENSE). The MIT grant covers Yieldwise's source code onl
 
 ## Contact
 
-- GitHub: [@Leonard-Don](https://github.com/Leonard-Don)
-- Email: leonarddon@oxxz.site
+For questions, feedback, or bug reports, please use [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues) or [Discussions](https://github.com/Leonard-Don/yieldwise/discussions).
 
-If you find this useful or have feedback, a star on the repo helps a lot.
+If you find this useful, a star on the repo helps a lot.
