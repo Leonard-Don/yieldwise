@@ -3,7 +3,7 @@
 [![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Open-source workbench for analyzing rental-yield, pipeline, and comp-set data across Chinese cities — on a single map, in your browser.**
+**Open-source workbench for analyzing rental-yield data across Chinese cities — drop in your own CSVs, see them on a map, compute yield / payback / occupancy KPIs.**
 
 [中文 README](README.zh.md) · [Live demo](#quick-start) · [How it's built](docs/internal/legacy-runbook.md)
 
@@ -13,7 +13,7 @@
 
 ## What is this
 
-Yieldwise is a personal-scale real-estate analysis tool. You upload your own CSV files (managed properties, deal pipeline, third-party comps) and Yieldwise:
+Yieldwise is a personal-scale real-estate analysis tool. You upload your own CSV files of properties you care about and Yieldwise:
 
 - Plots them on a map alongside open-data communities and OSM building footprints
 - Computes rental yield / payback / occupancy KPIs per district / community / building
@@ -24,9 +24,8 @@ Yieldwise is a personal-scale real-estate analysis tool. You upload your own CSV
 ## Who is this for
 
 - **Individual investors** who want to look at rental yield distributions across districts before bidding on a property
-- **FinTech / urban-economics / real-estate finance students and researchers** who need a quick analytical scaffolding without paying CoStar / 戴德梁行 prices
-- **Independent property advisors** running a few small mandates who'd rather not build their own GIS stack
-- **Tinkerers** who want to see what a "Bloomberg terminal for Chinese rentals" might look like at a $0 software cost
+- **FinTech / urban-economics / real-estate finance students and researchers** who need a quick analytical scaffolding for coursework or research
+- **Tinkerers** who want to see what a "Bloomberg terminal for Chinese rentals" might look like as an open-source side project
 
 ## Why it exists
 
@@ -69,11 +68,8 @@ CSV templates: `/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.cs
 ## Features
 
 - **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)
-- **Three CSV import types**:
-  - `portfolio` — properties under management
-  - `pipeline` — acquisition candidates with stage tracking (lead/qualified/negotiating/won/lost)
-  - `comp_set` — third-party reference points
-- **Multi-user auth** with admin/analyst/viewer roles (single-tenant, private deploy)
+- **CSV import** — `portfolio` for tracking your own holdings, plus `pipeline` and `comp_set` types for richer workflows
+- **Multi-user auth** with admin/analyst/viewer roles
 - **Multi-city parameterization** — drop a YAML config to add a city
 - **OSM + AMAP merged building footprints** with quota-based community matching
 - **Per-row error capture** in CSV imports — bad rows go to an `errors.json` audit trail, never block the whole batch
@@ -101,10 +97,6 @@ Yieldwise ships **zero scrapers** and never auto-fetches anything that requires 
 
 **Not yet shipped** — see [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues):
 - Address-only geocoding (currently requires explicit lng/lat in CSV)
-
-## Pricing
-
-The tool itself is free under MIT. If you want a curated bundle of methodology + demo dataset + Excel templates, see [the upcoming knowledge package](https://github.com/Leonard-Don/yieldwise/discussions) — release planned for ~6 weeks from initial public push.
 
 ## Contributing
 
