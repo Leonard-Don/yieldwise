@@ -4,15 +4,10 @@ import os
 from datetime import date
 from pathlib import Path
 
-from fastapi import Body, Depends as _Depends, FastAPI, HTTPException, Query, Response
+from fastapi import Body, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
-
-from api.auth.deps import current_user as _current_user_dep
-from api.auth.middleware import StaticShellAuthGate
-from api.auth.seed import seed_initial_admin as _seed_initial_admin
 
 from .persistence import (
     persist_geo_asset_run_to_postgres,
@@ -81,11 +76,9 @@ from .service import (
 from .domains import (
     alerts as v2_alerts,
     annotations as v2_annotations,
-    auth as v2_auth,
     buildings as v2_buildings,
     communities as v2_communities,
     config as v2_config,
-    customer_data as v2_customer_data,
     districts as v2_districts,
     health as v2_health,
     map_tiles as v2_map_tiles,
@@ -112,68 +105,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_SESSION_SECRET = os.environ.get("SESSION_SECRET")
-if not _SESSION_SECRET:
-    # In dev/staged solo mode, allow boot with a noisy fallback. Production
-    # MUST set SESSION_SECRET (an admin-seed warning is logged on first boot).
-    import secrets as _secrets
-    _SESSION_SECRET = _secrets.token_urlsafe(32)
-    import logging as _logging
-    _logging.getLogger(__name__).warning(
-        "SESSION_SECRET not set; using ephemeral random secret. "
-        "All sessions will be invalidated on app restart. "
-        "Set SESSION_SECRET in production."
-    )
-
-_HTTPS_ONLY = os.environ.get("ATLAS_HTTPS_ONLY", "").lower() in ("1", "true", "yes")
-# StaticShellAuthGate must run with request.session already populated, so
-# SessionMiddleware needs to be the outermost layer. Starlette wraps the
-# LAST `add_middleware` call as the outermost, so the StaticShellAuthGate
-# add_middleware call comes BEFORE SessionMiddleware in code; this puts
-# SessionMiddleware on the outside at execution time.
-app.add_middleware(StaticShellAuthGate)
-
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=_SESSION_SECRET,
-    session_cookie="yieldwise_session",
-    same_site="lax",
-    https_only=_HTTPS_ONLY,
-    max_age=60 * 60 * 24 * 14,  # 14 days
-)
-
-
-@app.on_event("startup")
-def _yieldwise_startup() -> None:
-    # Seed an admin user on first boot when ATLAS_ADMIN_USERNAME +
-    # ATLAS_ADMIN_PASSWORD are set. Idempotent; safe to call on every boot.
-    _seed_initial_admin()
-
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-_AUTH_REQUIRED = [_Depends(_current_user_dep)]
-
-# v2_auth router stays public — login itself must be reachable. Admin
-# endpoints inside it self-gate via require_role("admin").
-app.include_router(v2_auth.router, prefix="/api")
-# v2_health stays public — load balancers / uptime probes hit it anonymously.
 app.include_router(v2_health.router, prefix="/api/v2")
-app.include_router(v2_alerts.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_config.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_opportunities.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_map_tiles.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_buildings.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_communities.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_customer_data.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_districts.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_user_prefs.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_watchlist.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_annotations.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
-app.include_router(v2_search.router, prefix="/api/v2", dependencies=_AUTH_REQUIRED)
+app.include_router(v2_alerts.router, prefix="/api/v2")
+app.include_router(v2_config.router, prefix="/api/v2")
+app.include_router(v2_opportunities.router, prefix="/api/v2")
+app.include_router(v2_map_tiles.router, prefix="/api/v2")
+app.include_router(v2_buildings.router, prefix="/api/v2")
+app.include_router(v2_communities.router, prefix="/api/v2")
+app.include_router(v2_districts.router, prefix="/api/v2")
+app.include_router(v2_user_prefs.router, prefix="/api/v2")
+app.include_router(v2_watchlist.router, prefix="/api/v2")
+app.include_router(v2_annotations.router, prefix="/api/v2")
+app.include_router(v2_search.router, prefix="/api/v2")
 
 
 @app.get("/api/bootstrap")
@@ -938,37 +887,6 @@ app.mount(
     StaticFiles(directory=FRONTEND_DIR / "backstage", html=True),
     name="backstage",
 )
-
-LOGIN_DIR = FRONTEND_DIR / "login"
-
-
-@app.get("/login")
-def serve_login() -> FileResponse:
-    return FileResponse(LOGIN_DIR / "index.html")
-
-
-# Mount login assets at /static so the HTML can reference /static/login.css
-# and /static/login.js. Must be registered BEFORE the catch-all `/` mount
-# so the user-shell static mount doesn't swallow `/static/*`.
-app.mount("/static", StaticFiles(directory=LOGIN_DIR), name="login-static")
-
-
-ADMIN_DIR = FRONTEND_DIR / "admin"
-
-
-@app.get("/admin/users")
-def serve_admin_users() -> FileResponse:
-    return FileResponse(ADMIN_DIR / "index.html")
-
-
-@app.get("/admin/customer-data")
-def serve_admin_customer_data() -> FileResponse:
-    return FileResponse(ADMIN_DIR / "customer-data.html")
-
-
-# Admin assets at /static-admin (separate from login's /static so the HTML
-# files can reference their own CSS/JS without clashing).
-app.mount("/static-admin", StaticFiles(directory=ADMIN_DIR), name="admin-static")
 
 app.mount(
     "/",

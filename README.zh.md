@@ -3,7 +3,7 @@
 [![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**开源租赁资产分析工作台 —— 把你的 CSV 数据画在一张地图上，自动算租售比 / 回本年限 / 出租率。**
+**开源租赁资产分析工作台 —— 把房源画在一张地图上，自动算租售比 / 回本年限 / 出租率。**
 
 [English README](README.md) · [Demo 跑起来](#快速开始) · [背后的实现笔记](docs/internal/legacy-runbook.md)
 
@@ -13,11 +13,11 @@
 
 ## 这是什么
 
-Yieldwise 是一个**个人级**的房地产分析工具。你导入自己关注的房源 CSV，Yieldwise 会：
+Yieldwise 是一个**个人级**的房地产分析工具。它会：
 
-- 把它们和开放数据小区 + OSM 楼栋画在一张地图上
+- 把房源和开放数据小区 + OSM 楼栋画在一张地图上
 - 按行政区 / 小区 / 楼栋粒度算租售比 / 回本年限 / 出租率 KPI
-- 让你几秒内对比你的标的与本地市场
+- 几秒内对比标的与本地市场
 
 **本地跑，数据不出你的电脑。**
 
@@ -29,9 +29,9 @@ Yieldwise 是一个**个人级**的房地产分析工具。你导入自己关注
 
 ## 为什么做这个
 
-中国公开房产数据散在政府开放数据门户、OSM、高德 POI、给机构看的 PDF 报告里。Yieldwise 把开源那部分拼起来，剩下的部分给你留了 CSV 导入通道。
+中国公开房产数据散在政府开放数据门户、OSM、高德 POI、给机构看的 PDF 报告里。Yieldwise 把开源那部分拼起来。
 
-**不爬数据，不碰合规灰区** —— 你带你授权的数据来，工具帮你分析。
+**不爬数据，不碰合规灰区** —— 只用公开开放数据。
 
 ## 快速开始
 
@@ -52,49 +52,34 @@ export $(grep -v '^#' .env | xargs)
 uvicorn api.main:app --reload --port 8000
 ```
 
-打开 `http://localhost:8000`，用 `.env` 里的账号登录（默认 `admin` / `changeme-after-first-login`）。
+打开 `http://localhost:8000` 看地图。
 
-到 `/admin/customer-data` 试上传：
-1. 点 **下载模板** → 存 `portfolio.csv`
-2. 填 5–10 行你的样本数据
-3. 上传 —— 地图自动出你的点
+Schema 首次访问时自动建好，不需要手动 `psql -f`。
 
-Schema（核心表 + customer-data 域）首次访问时自动建好，不需要手动 `psql -f`。
-
-需要免费高德 key 才能渲染地图？去 [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites) 申请。个人 key 自用够用，商业部署需要商用 key。
-
-CSV 模板：`/api/v2/customer-data/templates/portfolio.csv` —— 列规范见 [docs/customer-data-csv-spec.md](docs/customer-data-csv-spec.md)。
+需要免费高德 key 才能渲染地图？去 [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites) 申请。
 
 ## 功能
 
 - **一张地图三种工作流**：收益猎手 · 自住找房 · 全市观察
-- **`portfolio` CSV 导入** —— 把你关注的房贴进来，立刻出现在地图上
 - **OSM + 高德楼栋融合** 含 per-community 配额匹配
-- **行级错误捕获** —— 烂行进 `errors.json` 审计，整批不会因为一行炸掉
-- **暂存优先**存储 —— 每次导入先落 `tmp/customer-data-runs/<run_id>/`，确认后再写入 Postgres
 
 ## 数据来源（公开透明）
 
 | 层 | 来源 | 许可 |
 |---|---|---|
 | 楼栋形状 | OpenStreetMap | ODbL |
-| 小区边界 | 高德 POI（生产用需要商用 key）| 按高德 ToS |
+| 小区边界 | 高德 POI | 按高德 ToS |
 | 行政区边界 | 上海政府开放数据 | 开放政府数据 |
 | 挂牌（demo）| 合成 / 手工策展数据 | 自生成 |
-| 客户数据 | **用户自带（CSV）** | 用户所有 |
 
 Yieldwise 不带任何爬虫、不主动获取任何需要授权的数据。要爬，你在你自己的环境自己决定。
 
 ## 项目状态
 
 **v0.3**（2026 年 4 月）—— Beta。已稳定的能力：
-- Auth + portfolio CSV 导入 + 暂存优先持久化
 - 上海开箱即用（city manifest 走 YAML，要加城市丢一个 `<city>.yaml` 就行）
-- 后端 ~250 测试 + 前端 ~110 个 node:test
+- 后端 + 前端测试套件齐全
 - 业余时间维护 —— 难免有粗糙之处，遇到问题请提 issue
-
-**还没做的** —— 见 [GitHub Issues](https://github.com/Leonard-Don/yieldwise/issues)：
-- 仅地址的 geocoding（当前 CSV 必须显式 lng/lat）
 
 ## 贡献
 

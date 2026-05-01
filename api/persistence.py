@@ -308,17 +308,6 @@ def _apply_schema_if_needed(cur) -> None:
             cur.execute(sql)
 
 
-def ensure_customer_data_schema(*, dsn: str | None = None) -> None:
-    """Apply db/customer_data.sql idempotently. Called by the customer_data
-    domain before every persist; cheap because every statement is IF NOT EXISTS."""
-    sql_path = Path(__file__).resolve().parent.parent / "db" / "customer_data.sql"
-    sql_text = sql_path.read_text(encoding="utf-8")
-    with postgres_connection(dsn=dsn) as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql_text)
-        conn.commit()
-
-
 def _upsert_source_providers(cur) -> None:
     for item in provider_readiness_snapshot():
         cur.execute(

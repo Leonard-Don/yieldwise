@@ -1,6 +1,6 @@
 # Yieldwise — Dependency License Matrix
 
-- **Generated:** 2026-04-29
+- **Generated:** 2026-05-01
 - **Tool:** `pip-licenses` against `api/requirements.txt`, supplemented by `pip show` for PEP 639 `License-Expression` fields that pip-licenses 4.x does not parse
 - **Audit policy:**
   - ✅ Acceptable: MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause, ISC, MPL-2.0, LGPL-3.0-only / LGPL-3.0-or-later when consumed via dynamic import only (no static linking, no modification, no derivative distribution)
@@ -20,8 +20,6 @@
 | psycopg-pool     | 3.3.0   | UNKNOWN                 | https://psycopg.org/                       |
 | PyYAML           | 6.0.2   | MIT License             | https://pyyaml.org/                        |
 | uvicorn          | 0.35.0  | BSD License             | https://www.uvicorn.org/                   |
-| bcrypt           | 4.3.0   | Apache Software License | https://github.com/pyca/bcrypt/            |
-| python-multipart | 0.0.20  | Apache Software License | https://github.com/Kludex/python-multipart |
 
 `pip show` cross-check for UNKNOWN / underspecified rows:
 
@@ -30,8 +28,6 @@
 | psycopg          | LGPL-3.0-only                              |
 | psycopg-pool     | LGPL-3.0-only                              |
 | uvicorn          | BSD-3-Clause                               |
-| bcrypt           | Apache-2.0 (License field)                 |
-| python-multipart | Apache-2.0 (License-Expression, PEP 639)   |
 
 ## LGPL Components (Dynamic Import)
 

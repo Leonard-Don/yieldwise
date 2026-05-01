@@ -55,44 +55,56 @@ test("bucketBars: handles all-zero/empty without dividing by zero", () => {
   assert.equal(bars[2].pct, 0);
 });
 
-test("pickKpisFor: yield mode focuses on yield/score/sample", () => {
+test("pickKpisFor: yield mode focuses on yield/payback/score/sample", () => {
   const detail = {
     yieldAvg: 0.04,
+    paybackYears: 25,
     score: 66,
     sampleSize: 13,
     saleMedianWan: 306.85,
     rentMedianMonthly: 12900,
   };
   const kpis = pickKpisFor("yield", detail);
-  assert.deepEqual(kpis.map((k) => k.key), ["yield", "score", "sample"]);
+  assert.deepEqual(kpis.map((k) => k.key), ["yield", "payback", "score", "sample"]);
   assert.equal(kpis[0].value, "4.00%");
+  assert.equal(kpis[1].value, "25.0 年");
 });
 
-test("pickKpisFor: home mode focuses on price/rent/sample", () => {
+test("pickKpisFor: home mode focuses on price/rent/payback/sample", () => {
   const detail = {
     yieldAvg: 0.04,
+    paybackYears: 25,
     score: 66,
     sampleSize: 13,
     saleMedianWan: 306.85,
     rentMedianMonthly: 12900,
   };
   const kpis = pickKpisFor("home", detail);
-  assert.deepEqual(kpis.map((k) => k.key), ["price", "rent", "sample"]);
+  assert.deepEqual(kpis.map((k) => k.key), ["price", "rent", "payback", "sample"]);
   assert.equal(kpis[0].value, "306.85 万");
   assert.equal(kpis[1].value, "¥12,900");
+  assert.equal(kpis[2].value, "25.0 年");
 });
 
-test("pickKpisFor: city mode focuses on yield/score/sample (community-level KPI labels)", () => {
-  const detail = { yield: 4.16, score: 99, sample: 16 };
+test("pickKpisFor: city mode focuses on yield/payback/score/sample (community-level KPI labels)", () => {
+  const detail = { yield: 4.16, paybackYears: 24, score: 99, sample: 16 };
   const kpis = pickKpisFor("city", detail);
-  assert.deepEqual(kpis.map((k) => k.key), ["yield", "score", "sample"]);
+  assert.deepEqual(kpis.map((k) => k.key), ["yield", "payback", "score", "sample"]);
   assert.equal(kpis[0].value, "4.16%");
+  assert.equal(kpis[1].value, "24.0 年");
 });
 
 test("pickKpisFor: unknown mode falls back to yield mode kpis", () => {
-  const detail = { yieldAvg: 0.04, score: 66, sampleSize: 13 };
+  const detail = { yieldAvg: 0.04, paybackYears: 25, score: 66, sampleSize: 13 };
   const kpis = pickKpisFor("nonsense", detail);
-  assert.deepEqual(kpis.map((k) => k.key), ["yield", "score", "sample"]);
+  assert.deepEqual(kpis.map((k) => k.key), ["yield", "payback", "score", "sample"]);
+});
+
+test("pickKpisFor: footprint KPI is inserted next to quantitative tiles", () => {
+  const detail = { yieldAvg: 0.04, paybackYears: 25, score: 66, sampleSize: 13, osmFootprintCount: 12 };
+  const kpis = pickKpisFor("yield", detail);
+  assert.deepEqual(kpis.map((k) => k.key), ["yield", "payback", "footprints", "score", "sample"]);
+  assert.equal(kpis[2].value, "12 栋");
 });
 
 test("topCommunitiesFromDistrict: empty input → []", () => {

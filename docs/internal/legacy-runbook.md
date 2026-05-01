@@ -37,32 +37,6 @@
 - **`tmp/browser-capture-runs/` 状态不可逆**：`reviewBrowserCaptureQueueItem` 会修改 `review_queue.json` 把 attention 标记为 resolved；`browser-review-fixtures/` 里的 fixture 删除会回滚原状，但不要批量手动删除 capture run 目录
 - **pwcli 默认 30s 单次 eval 上限**：在更慢的机器上请用 `ATLAS_PWCLI_EVAL_TIMEOUT=60` 等覆盖
 
-## 分支策略
-
-- `main` — Yieldwise 商业版（剥离公开页采集，可对外交付）
-- `research-private` — 内研分支，保留 browser-capture / 公开页采样 / 全部研究流。每半年从 `main` cherry-pick 非合规改进。
-- `release/yieldwise-v1.x` — 私部署 frozen 标签（v1 ship 后建立）
-
-> 提交到 `main` 之前确认改动不依赖被剥离的公开页采集模块。
-
-## 认证 / Auth（v0.2 起）
-
-`/`、`/backstage/`、`/admin/users` 都需要登录；`/api/v2/*` 也走 session cookie 鉴权（除 `/api/v2/health` 公共）。
-
-- 首次部署：设置 `SESSION_SECRET` + `ATLAS_ADMIN_USERNAME` + `ATLAS_ADMIN_PASSWORD`（≥8 字符），启动后用初始 admin 登录 `/login`，再到 `/admin/users` 改密 / 加成员
-- 角色：`admin`（含用户管理）/ `analyst`（读写数据）/ `viewer`（只读）
-- 详细部署：`docs/deployment/auth-setup.md`
-- 安全姿态（CSRF / 审计 / 限流 / legacy `/api/*` 暴露面）：`docs/security.md`
-
-## 客户数据导入 / Customer Data (v0.3 起)
-
-`/admin/customer-data` 让 admin / analyst 上传三类 CSV：在管房源 / 候选标的 / 比准数据。
-
-- 模板下载：`/api/v2/customer-data/templates/{portfolio,pipeline,comp_set}.csv`
-- 上传走暂存区（`tmp/customer-data-runs/<run_id>/`），按 run 单独持久化到 Postgres
-- 部署细节：`docs/deployment/customer-data-import.md`
-- CSV 列规范：`docs/customer-data-csv-spec.md`
-
 ## 路由布局（Phase 8i 起）
 
 | 路径 | 绑定 | 说明 |
