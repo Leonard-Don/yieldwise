@@ -37,6 +37,7 @@ from .backstage.review import (
     update_browser_capture_review_queue,
     update_browser_capture_review_queue_batch,
 )
+from .backstage.refresh_center import build_refresh_center_report, persist_refresh_center_report
 from .backstage.runs import (
     list_geo_asset_runs,
     list_import_runs,
@@ -93,7 +94,7 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
     title="Yieldwise API",
-    version="0.1.0",
+    version="0.3.0",
     description="Yieldwise · 租知 — 租赁资产投研工作台后端。",
 )
 
@@ -276,6 +277,19 @@ def building_floor_detail(building_id: str, floor_no: int) -> dict:
 @app.get("/api/ops/overview")
 def ops_overview() -> dict:
     return operations_payload()
+
+
+@app.get("/api/ops/refresh-center")
+def ops_refresh_center() -> dict:
+    return build_refresh_center_report()
+
+
+@app.post("/api/ops/refresh-center/report")
+def ops_refresh_center_report(payload: dict = Body(default={})) -> dict:
+    report = build_refresh_center_report()
+    if bool(payload.get("persist", True)):
+        return persist_refresh_center_report(report)
+    return report
 
 
 @app.get("/api/import-runs")

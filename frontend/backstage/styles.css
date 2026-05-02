@@ -1825,23 +1825,28 @@ input[type="range"]:focus-visible,
 
 .ops-overview-card--action {
   padding: 16px 18px;
+  order: 3;
+}
+
+.ops-overview-card--refresh-center {
+  grid-column: 1 / -1;
   order: 2;
 }
 
 .ops-overview-card--coverage {
-  order: 3;
-}
-
-.ops-overview-card--sampling {
   order: 4;
 }
 
-.ops-overview-card--geo {
+.ops-overview-card--sampling {
   order: 5;
 }
 
-.ops-overview-card--pipeline {
+.ops-overview-card--geo {
   order: 6;
+}
+
+.ops-overview-card--pipeline {
+  order: 7;
 }
 
 .ops-overview-action-grid {
@@ -1863,6 +1868,82 @@ input[type="range"]:focus-visible,
 
 .ops-overview-button-row .action {
   width: 100%;
+}
+
+.refresh-center-title {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.refresh-center-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.refresh-center-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(151, 191, 226, 0.12);
+  border-radius: 16px;
+  background: rgba(5, 15, 25, 0.22);
+}
+
+.refresh-center-section-head,
+.refresh-center-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.refresh-center-section-head span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.refresh-center-list {
+  display: grid;
+  gap: 8px;
+}
+
+.refresh-center-row p {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.refresh-center-row strong,
+.refresh-center-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refresh-center-row small {
+  color: var(--muted);
+}
+
+.refresh-center-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(160px, 1.4fr);
+  align-items: center;
+}
+
+.refresh-center-report-path {
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .import-run-list,
@@ -2898,6 +2979,10 @@ input[type="range"]:focus-visible,
   .capture-workbench-layout {
     grid-template-columns: 1fr;
   }
+
+  .refresh-center-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 980px) {
@@ -2986,7 +3071,8 @@ input[type="range"]:focus-visible,
 
   .ops-overview-stat-grid,
   .ops-overview-action-grid,
-  .ops-overview-button-row {
+  .ops-overview-button-row,
+  .refresh-center-grid {
     grid-template-columns: 1fr;
   }
 

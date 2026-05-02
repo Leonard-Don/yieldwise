@@ -74,6 +74,7 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 
 - **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)
 - **OSM + AMAP merged building footprints** with quota-based community matching
+- **Ops refresh center** for dry-running reference/import/geo/metrics readiness, anomaly filters, geometry QA, and one-click import preparation
 
 ## Data sources (transparency)
 

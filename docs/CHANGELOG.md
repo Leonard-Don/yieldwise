@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-05-02 — Refresh Center: dry-run 导入闭环
+
+- 新增 `/api/ops/refresh-center` 与 `/api/ops/refresh-center/report`，聚合 reference/import/geo/metrics 最新批次、PostgreSQL 准备度、dry-run 检查和报告落盘路径
+- 后台 Ops 总览新增“刷新中心”卡片，直接呈现一键导入计划、阻断/关注项、异常过滤、几何 QA，并可生成 `tmp/refresh-reports/*.json`
+- 样本异常过滤覆盖地址复核队列、低置信配对、单样本楼层、楼层最佳配对偏低和回报率异常值；几何 QA 明确坐标系校正、质量评分、GIS 回传入口
+
 ## 2026-04-28 — Phase 8i: 数据模式 + 运行选择辅助
 
 `refactor(backstage): extract data-mode + run-selection helpers (4e9293a)`

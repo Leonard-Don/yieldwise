@@ -84,6 +84,7 @@ const state = {
   buildingGeoFeatures: [],
   floorGeoFeatures: [],
   geoAssetSource: "fallback",
+  refreshCenterReport: null,
   opsMessage: null,
   opsMessageTone: "info",
   opsMessageContext: "import",
@@ -91,6 +92,7 @@ const state = {
   busyBootstrapDatabase: false,
   busyMetricsRefresh: false,
   busyMetricsRefreshMode: null,
+  busyRefreshCenterReport: false,
   busyPersistRunId: null,
   busyReviewQueueId: null,
   busyBrowserCaptureReviewQueueId: null,
@@ -307,8 +309,30 @@ async function loadOperationsOverview() {
   }
 }
 
+async function loadRefreshCenterReport() {
+  try {
+    const previousPersistedReport = state.refreshCenterReport?.persisted && state.refreshCenterReport?.reportPath
+      ? state.refreshCenterReport
+      : null;
+    const response = await fetch("/api/ops/refresh-center", {
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+      throw new Error(`Refresh center failed with ${response.status}`);
+    }
+    const payload = await response.json();
+    if (previousPersistedReport && !payload.reportPath) {
+      payload.persisted = true;
+      payload.reportPath = previousPersistedReport.reportPath;
+    }
+    state.refreshCenterReport = payload;
+  } catch (error) {
+    state.refreshCenterReport = null;
+  }
+}
+
 async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
-  await loadOperationsOverview();
+  await Promise.all([loadOperationsOverview(), loadRefreshCenterReport()]);
   ensureImportRunSelection();
   ensureGeoAssetRunSelection();
   syncOperationsBackstageLocationIfNeeded();
@@ -5002,6 +5026,39 @@ async function refreshMetricsSnapshotRequest({
   }
 }
 
+async function generateRefreshCenterReport() {
+  state.busyRefreshCenterReport = true;
+  state.opsMessage = null;
+  state.opsMessageContext = "database";
+  render();
+
+  try {
+    const response = await fetch("/api/ops/refresh-center/report", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ persist: true })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `Refresh center report failed with ${response.status}`);
+    }
+    state.refreshCenterReport = payload;
+    state.opsMessage = payload.reportPath
+      ? `刷新报告已生成：${payload.reportPath}`
+      : "刷新中心 dry-run 报告已生成。";
+    state.opsMessageTone = "success";
+  } catch (error) {
+    state.opsMessage = error.message || "刷新中心报告生成失败。";
+    state.opsMessageTone = "error";
+  } finally {
+    state.busyRefreshCenterReport = false;
+    render();
+  }
+}
+
 async function copyTextToClipboard(text, successMessage = "已复制。") {
   if (!text) {
     return;
@@ -6787,6 +6844,26 @@ function renderOperations() {
   const coverageHint = pendingAnchorCount ? `待补锚点 ${pendingAnchorCount} 个。` : cityCommunityCount ? "已全部挂图。" : "等待首批锚点。";
   const samplingHint = `${browserCaptureRunCount} 次公开页采样${prioritySamplingCount ? ` · 重点区 ${prioritySamplingCount}` : ""}`;
   const batchHint = `批次 ${referenceRunCount}/${importRunCount}/${metricsRunCount}/${geoAssetRunCount}`;
+  const refreshCenter = state.refreshCenterReport;
+  const refreshCenterStatus = refreshCenter?.status ?? "loading";
+  const refreshCenterReadiness = refreshCenter?.readiness ?? {};
+  const refreshChecks = refreshCenter?.dryRunChecks ?? [];
+  const refreshPlan = refreshCenter?.refreshPlan ?? [];
+  const refreshAnomalyFilters = refreshCenter?.anomalyFilters?.filters ?? [];
+  const refreshAnomalyCount = Number(refreshCenter?.anomalyFilters?.totalCandidateCount ?? 0);
+  const refreshGeometryQa = refreshCenter?.geometryQa ?? {};
+  const refreshBlockerCount = refreshChecks.filter((item) => item.status === "blocker").length;
+  const refreshWarningCount = refreshChecks.filter((item) => item.status === "warn").length;
+  const refreshGeneratedLabel = refreshCenter?.generatedAt ? formatTimestamp(refreshCenter.generatedAt) : "读取中";
+  const refreshReportLabel = refreshReportPathLabel(refreshCenter?.reportPath);
+  const refreshPrimaryHint = refreshBlockerCount
+    ? `阻断 ${refreshBlockerCount} 项，先处理主档或必需批次。`
+    : refreshWarningCount
+    ? `还有 ${refreshWarningCount} 项需要复核后再写库。`
+    : "dry-run 已通过，可执行 staged 刷新。";
+  const visibleAnomalyFilters = refreshAnomalyFilters
+    .filter((item) => Number(item.count ?? 0) > 0 || item.status !== "ok")
+    .slice(0, 4);
 
   opsSummary.innerHTML = `
     ${
@@ -6817,6 +6894,117 @@ function renderOperations() {
           <strong>${latestBootstrapLabel}</strong>
           <small>${postgresLabel}</small>
         </article>
+      </div>
+    </article>
+    <article class="ops-overview-card ops-overview-card--refresh-center" data-refresh-center-status="${refreshCenterStatus}">
+      <div class="breakdown-top">
+        <div class="refresh-center-title">
+          <span class="ops-overview-kicker">刷新中心</span>
+          <strong>${refreshCenterStatusLabel(refreshCenterStatus)} · Dry-run</strong>
+          <p>${refreshPrimaryHint}</p>
+        </div>
+        <span class="trace-status ${refreshCenterStatusTone(refreshCenterStatus)}">${refreshCenterStatusLabel(refreshCenterStatus)}</span>
+      </div>
+      <div class="comparison-strip">
+        <span class="source-pill">检查 ${refreshChecks.length}</span>
+        <span class="source-pill">异常候选 ${refreshAnomalyCount}</span>
+        <span class="source-pill">几何任务 ${Number(refreshGeometryQa.openTaskCount ?? 0)}</span>
+        <span class="source-pill">生成 ${refreshGeneratedLabel}</span>
+      </div>
+      <div class="refresh-center-grid">
+        <section class="refresh-center-column">
+          <div class="refresh-center-section-head">
+            <strong>一键导入计划</strong>
+            <span>${refreshCenterReadiness.canWriteMetricsToPostgres ? "可写库" : "staged 优先"}</span>
+          </div>
+          <div class="refresh-center-list">
+            ${
+              refreshPlan.length
+                ? refreshPlan
+                    .map(
+                      (item) => `
+                        <div class="refresh-center-row">
+                          <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
+                          <p><strong>${item.label}</strong><small>${item.batchName ?? item.reason}</small></p>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : "<p class=\"helper-text\">刷新计划读取中。</p>"
+            }
+          </div>
+        </section>
+        <section class="refresh-center-column">
+          <div class="refresh-center-section-head">
+            <strong>Dry-run 检查</strong>
+            <span>${refreshBlockerCount ? `${refreshBlockerCount} 阻断` : refreshWarningCount ? `${refreshWarningCount} 关注` : "通过"}</span>
+          </div>
+          <div class="refresh-center-list">
+            ${
+              refreshChecks.length
+                ? refreshChecks
+                    .slice(0, 5)
+                    .map(
+                      (item) => `
+                        <div class="refresh-center-row">
+                          <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
+                          <p><strong>${item.label}</strong><small>${item.detail}</small></p>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : "<p class=\"helper-text\">等待 dry-run 报告。</p>"
+            }
+          </div>
+        </section>
+        <section class="refresh-center-column">
+          <div class="refresh-center-section-head">
+            <strong>异常过滤</strong>
+            <span>${refreshAnomalyCount}</span>
+          </div>
+          <div class="refresh-center-list">
+            ${
+              visibleAnomalyFilters.length
+                ? visibleAnomalyFilters
+                    .map(
+                      (item) => `
+                        <div class="refresh-center-row">
+                          <span class="trace-status ${refreshCenterStatusTone(item.status)}">${Number(item.count ?? 0)}</span>
+                          <p><strong>${item.label}</strong><small>${item.threshold}</small></p>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : "<p class=\"helper-text\">当前没有需要置顶的样本异常。</p>"
+            }
+          </div>
+        </section>
+        <section class="refresh-center-column">
+          <div class="refresh-center-section-head">
+            <strong>几何 QA</strong>
+            <span>${Number(refreshGeometryQa.coveragePct ?? 0).toFixed(1)}%</span>
+          </div>
+          <div class="refresh-center-list">
+            ${(refreshGeometryQa.qaFields ?? [])
+              .map(
+                (item) => `
+                  <div class="refresh-center-row">
+                    <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
+                    <p><strong>${item.label}</strong><small>${item.detail}</small></p>
+                  </div>
+                `
+              )
+              .join("") || "<p class=\"helper-text\">等待几何批次。</p>"}
+          </div>
+        </section>
+      </div>
+      <div class="ops-overview-button-row refresh-center-actions">
+        <button class="action compact primary" data-refresh-center-report ${state.busyRefreshCenterReport ? "disabled" : ""}>
+          ${state.busyRefreshCenterReport ? "生成中..." : "生成刷新报告"}
+        </button>
+        <button class="action compact" data-refresh-center-quality-tab="queue">复核异常队列</button>
+        <button class="action compact" data-refresh-center-detail-tab="geo">查看几何 QA</button>
+        <span class="source-pill refresh-center-report-path">${refreshReportLabel}</span>
       </div>
     </article>
     <article class="ops-overview-card ops-overview-card--coverage">
@@ -8628,6 +8816,42 @@ function renderOperations() {
     });
   });
 
+  opsSummary.querySelectorAll("[data-refresh-center-report]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (button.disabled) {
+        return;
+      }
+      await generateRefreshCenterReport();
+    });
+  });
+
+  opsSummary.querySelectorAll("[data-refresh-center-quality-tab]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const nextTab = button.dataset.refreshCenterQualityTab;
+      if (!operationsQualityTabs.includes(nextTab)) {
+        return;
+      }
+      state.operationsQualityTab = nextTab;
+      syncOperationsBackstageLocationIfNeeded();
+      renderOperations();
+    });
+  });
+
+  opsSummary.querySelectorAll("[data-refresh-center-detail-tab]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const nextTab = button.dataset.refreshCenterDetailTab;
+      if (!operationsDetailTabs.includes(nextTab)) {
+        return;
+      }
+      state.operationsDetailTab = nextTab;
+      syncOperationsBackstageLocationIfNeeded();
+      renderOperations();
+    });
+  });
+
   geoAssetRunList.querySelectorAll("[data-geo-run-id]").forEach((item) => {
     item.addEventListener("click", async () => {
       state.operationsHistoryTab = "geo";
@@ -9243,6 +9467,44 @@ function sourceLabelById(sourceId) {
     dataSources.find((item) => item.id === sourceId)?.name ??
     sourceId
   );
+}
+
+function refreshCenterStatusLabel(status) {
+  return {
+    ready: "可刷新",
+    needs_review: "需复核",
+    blocked: "被阻断",
+    loading: "读取中",
+    waiting: "等待批次",
+    skipped: "跳过",
+    ok: "正常",
+    warn: "需关注",
+    blocker: "阻断",
+    info: "提示"
+  }[status] ?? status ?? "读取中";
+}
+
+function refreshCenterStatusTone(status) {
+  return {
+    ready: "resolved",
+    ok: "resolved",
+    needs_review: "needs_review",
+    warn: "needs_review",
+    blocked: "critical",
+    blocker: "critical",
+    loading: "matching",
+    waiting: "matching",
+    skipped: "captured",
+    info: "captured"
+  }[status] ?? "captured";
+}
+
+function refreshReportPathLabel(path) {
+  if (!path) {
+    return "尚未落盘";
+  }
+  const index = path.indexOf("tmp/");
+  return index >= 0 ? path.slice(index) : path;
 }
 
 
