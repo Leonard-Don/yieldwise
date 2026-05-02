@@ -121,12 +121,25 @@ function renderRow(item, mode, selection) {
 function formatCell(item, col) {
   const raw = item[col.key];
   if (col.key === "name") {
-    return `<span class="name" title="${escapeAttr(raw ?? "")}">${escapeText(raw ?? "—")}</span>`;
+    return `<span class="atlas-board-name-cell"><span class="name" title="${escapeAttr(raw ?? "")}">${escapeText(raw ?? "—")}</span>${renderQualityBadge(item.quality)}</span>`;
   }
   if (col.key === "districtName") {
     return `<span class="name">${escapeText(raw ?? "—")}</span>`;
   }
   return `<span class="secondary">${formatValue(raw, col.format)}</span>`;
+}
+
+function renderQualityBadge(quality) {
+  if (!quality || typeof quality !== "object") return "";
+  const status = String(quality.status || "thin");
+  const label = quality.label || {
+    strong: "高可信",
+    usable: "可用",
+    thin: "样本薄",
+    blocked: "待补样",
+  }[status] || "待复核";
+  const title = quality.summary || quality.sampleLabel || label;
+  return `<span class="atlas-quality-mini" data-quality-status="${escapeAttr(status)}" title="${escapeAttr(title)}">${escapeText(label)}</span>`;
 }
 
 function formatValue(value, format) {

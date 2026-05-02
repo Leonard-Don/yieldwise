@@ -3,6 +3,7 @@ import {
   formatPct,
   formatWan,
   formatYuan,
+  normalizeQuality,
   pickKpisFor,
   topCommunitiesFromDistrict,
 } from "./drawer-data.js";
@@ -153,6 +154,7 @@ export function initDrawer({ root, store }) {
     });
     return [
       renderKpiRow(kpis),
+      renderQualityPanel(detail),
       renderFloorChart(bars),
       renderListingSummary(detail),
     ].join("");
@@ -218,6 +220,30 @@ export function initDrawer({ root, store }) {
       )
       .join("");
     return `<div><h3 class="atlas-section-title">挂牌摘要</h3><div class="atlas-listing-summary">${cells}</div></div>`;
+  }
+
+  function renderQualityPanel(detail) {
+    const quality = normalizeQuality(detail);
+    if (!quality) return "";
+    const score = quality.score === null ? "—" : `${quality.score}/100`;
+    const checks = quality.checks.length
+      ? quality.checks
+          .map(
+            (item) =>
+              `<span class="atlas-quality-check" data-state="${escapeText(item.status || "info")}"><strong>${escapeText(item.label || "")}</strong>${escapeText(item.detail || "")}</span>`,
+          )
+          .join("")
+      : "";
+    const reason = quality.reasons[0] || quality.summary;
+    return `<div class="atlas-quality-panel" data-quality-status="${escapeText(quality.status)}">
+      <div class="atlas-quality-head">
+        <span class="atlas-quality-badge" data-quality-status="${escapeText(quality.status)}">${escapeText(quality.label)}</span>
+        <strong>${escapeText(score)}</strong>
+        <small>${escapeText(quality.sampleLabel)}</small>
+      </div>
+      <p>${escapeText(reason || "")}</p>
+      ${checks ? `<div class="atlas-quality-checks">${checks}</div>` : ""}
+    </div>`;
   }
 
   async function fetchDetail(sel) {

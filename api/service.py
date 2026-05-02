@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from .mock_data import ADDRESS_QUEUE, DATA_SOURCES, DISTRICTS, PIPELINE_STEPS, SCHEMAS, SOURCE_HEALTH, SYSTEM_STRATEGY
+from .data_quality import attach_quality_to_communities
 from .persistence import database_has_real_data, postgres_data_snapshot, postgres_runtime_status, query_row, query_rows
 from .provider_adapters import mock_enabled, provider_readiness_snapshot
 from .reference_catalog import load_reference_catalog
@@ -1452,7 +1453,7 @@ def enrich_community(community: dict[str, Any], district_item: dict[str, Any]) -
     data["primaryBuildingId"] = data.get("primaryBuildingId") or (
         focus_match["id"] if focus_match else (buildings[0]["id"] if buildings else None)
     )
-    return data
+    return attach_quality_to_communities([data])[0]
 
 
 def interpolate_floor_yield(building: dict[str, Any], floor_no: int) -> float:
@@ -3403,7 +3404,7 @@ def db_community_dataset() -> list[dict[str, Any]]:
                 "latestAnchorReview": deepcopy(latest_anchor_reviews.get(str(community_row["community_id"]))),
             }
         )
-    return dataset
+    return attach_quality_to_communities(dataset)
 
 
 def staged_community_dataset(*, use_metrics_overlay: bool = True) -> list[dict[str, Any]]:
@@ -3773,7 +3774,7 @@ def staged_community_dataset(*, use_metrics_overlay: bool = True) -> list[dict[s
                 }
             )
     dataset.sort(key=lambda item: (item["districtId"], -item["score"], item["name"]))
-    return dataset
+    return attach_quality_to_communities(dataset)
 
 
 def staged_district_dataset(
@@ -4412,6 +4413,10 @@ def map_communities_payload(
                 "anchor_decision_state": community.get("anchorDecisionState"),
                 "sample_status": community.get("sampleStatus") or "dictionary_only",
                 "sample_status_label": community.get("sampleStatusLabel") or sample_status_label("dictionary_only"),
+                "quality": community.get("quality"),
+                "quality_status": community.get("qualityStatus"),
+                "quality_label": community.get("qualityLabel"),
+                "quality_score": community.get("qualityScore"),
                 "yield_pct": community.get("yield"),
                 "sample_size": community.get("sample"),
                 "data_freshness": community.get("dataFreshness"),

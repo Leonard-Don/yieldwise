@@ -48,6 +48,44 @@
   white-space: nowrap;
 }
 
+.atlas-board-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.atlas-board-name-cell .name {
+  min-width: 0;
+}
+
+.atlas-quality-mini {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-dim);
+  background: var(--bg-2);
+}
+
+.atlas-quality-mini[data-quality-status="strong"],
+.atlas-quality-mini[data-quality-status="usable"] {
+  border-color: rgba(0, 214, 143, 0.32);
+  color: var(--up);
+}
+
+.atlas-quality-mini[data-quality-status="thin"] {
+  border-color: rgba(255, 193, 112, 0.34);
+  color: var(--warn);
+}
+
+.atlas-quality-mini[data-quality-status="blocked"] {
+  border-color: rgba(255, 92, 92, 0.34);
+  color: var(--down);
+}
+
 .atlas-board-row .secondary {
   color: var(--text-dim);
   font-size: 11px;

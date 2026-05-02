@@ -6,6 +6,7 @@ import {
   formatWan,
   formatYuan,
   normalizeYieldPct,
+  normalizeQuality,
   bucketBars,
   pickKpisFor,
   topCommunitiesFromDistrict,
@@ -35,6 +36,27 @@ test("normalizeYieldPct: < 1 treated as fraction → ×100", () => {
   assert.equal(normalizeYieldPct(0.04), 4);
   assert.equal(normalizeYieldPct(4.16), 4.16);
   assert.equal(normalizeYieldPct(null), null);
+});
+
+test("normalizeQuality: keeps compact visible fields for drawer rendering", () => {
+  const quality = normalizeQuality({
+    quality: {
+      status: "usable",
+      label: "可用",
+      score: 72.4,
+      sampleLabel: "售 4 / 租 5",
+      reasons: ["样本足够"],
+      checks: [
+        { id: "sample_balance", label: "租售样本", status: "ok", detail: "售 4 / 租 5" },
+        { id: "yield_signal", label: "收益信号", status: "ok", detail: "4.20%" },
+      ],
+    },
+  });
+
+  assert.equal(quality.status, "usable");
+  assert.equal(quality.score, 72);
+  assert.equal(quality.sampleLabel, "售 4 / 租 5");
+  assert.equal(quality.checks.length, 2);
 });
 
 test("bucketBars: returns 3 entries with label/value/pct", () => {

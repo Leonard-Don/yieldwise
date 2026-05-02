@@ -31,3 +31,7 @@ def test_v2_opportunities_returns_items_key(client) -> None:
     assert isinstance(body, dict)
     assert "items" in body
     assert isinstance(body["items"], list)
+    if body["items"]:
+        item = body["items"][0]
+        assert item["quality"]["status"] in {"strong", "usable", "thin", "blocked"}
+        assert item["qualityLabel"] == item["quality"]["label"]

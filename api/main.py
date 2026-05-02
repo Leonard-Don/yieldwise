@@ -89,6 +89,7 @@ from .domains import (
     buildings as v2_buildings,
     communities as v2_communities,
     config as v2_config,
+    data_quality as v2_data_quality,
     districts as v2_districts,
     health as v2_health,
     map_tiles as v2_map_tiles,
@@ -128,6 +129,7 @@ app.include_router(v2_opportunities.router, prefix="/api/v2")
 app.include_router(v2_map_tiles.router, prefix="/api/v2")
 app.include_router(v2_buildings.router, prefix="/api/v2")
 app.include_router(v2_communities.router, prefix="/api/v2")
+app.include_router(v2_data_quality.router, prefix="/api/v2")
 app.include_router(v2_districts.router, prefix="/api/v2")
 app.include_router(v2_user_prefs.router, prefix="/api/v2")
 app.include_router(v2_watchlist.router, prefix="/api/v2")

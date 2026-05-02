@@ -34,9 +34,12 @@ def test_refresh_center_endpoint_exposes_closed_loop_sections(client) -> None:
         "geo_run",
         "postgres",
         "anomaly_filters",
+        "data_quality_gate",
     }
     assert "geometryQa" in payload
     assert "anomalyFilters" in payload
+    assert "dataQualityGate" in payload
+    assert payload["dataQualityGate"]["status"] in {"ok", "warn", "blocker"}
     assert isinstance(payload["anomalyFilters"]["filters"], list)
 
 

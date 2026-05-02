@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .runs import list_geo_asset_runs, list_import_runs, list_metrics_runs, list_reference_runs, runtime_data_state
+from ..data_quality import build_data_quality_gate
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -560,6 +561,8 @@ def latest_import_anomaly_detail(latest_import: dict[str, Any] | None) -> dict[s
 
 
 def build_refresh_center_report() -> dict[str, Any]:
+    from ..service import current_community_dataset
+
     runtime = runtime_data_state()
     reference_runs = list_reference_runs()
     import_runs = list_import_runs()
@@ -573,6 +576,10 @@ def build_refresh_center_report() -> dict[str, Any]:
     geo_detail = None
     anomaly_filters = summarize_import_anomaly_filters(import_detail)
     geometry_qa = geometry_qa_summary(geo_detail, latest_geo)
+    data_quality_gate = build_data_quality_gate(
+        communities=current_community_dataset(),
+        import_runs=import_runs,
+    )
 
     postgres_ready = bool(runtime.get("hasPostgresDsn"))
     database_connected = bool(runtime.get("databaseConnected"))
@@ -618,6 +625,17 @@ def build_refresh_center_report() -> dict[str, Any]:
             "warn" if anomaly_filters["totalCandidateCount"] else "ok",
             f"发现 {anomaly_filters['totalCandidateCount']} 个候选异常。",
             "先处理 review queue、低置信配对和单样本楼层。" if anomaly_filters["totalCandidateCount"] else "当前没有阻断级样本异常。",
+        ),
+        _check(
+            "data_quality_gate",
+            "数据质量闸门",
+            data_quality_gate["status"],
+            (
+                f"均分 {data_quality_gate['score']}/100，"
+                f"脏挂牌 {data_quality_gate['dirtyListings']['totalIssueCount']}，"
+                f"待补样 {data_quality_gate['statusCounts']['blocked']}。"
+            ),
+            "先清理脏挂牌并补齐阻断小区样本。" if data_quality_gate["status"] == "blocker" else "继续按质量薄弱项补样。",
         ),
         _check(
             "mock_policy",
@@ -674,6 +692,7 @@ def build_refresh_center_report() -> dict[str, Any]:
         },
         "dryRunChecks": dry_run_checks,
         "refreshPlan": refresh_plan,
+        "dataQualityGate": data_quality_gate,
         "geometryQa": geometry_qa,
         "anomalyFilters": anomaly_filters,
         "reports": {
@@ -753,6 +772,7 @@ def execute_refresh_center_plan(
             "generatedAt": report.get("generatedAt"),
             "selectedRuns": report.get("selectedRuns"),
             "readiness": report.get("readiness"),
+            "dataQualityGate": report.get("dataQualityGate"),
         }
         blocker_checks = [item for item in report.get("dryRunChecks", []) if item.get("status") == "blocker"]
         if blocker_checks and not force:

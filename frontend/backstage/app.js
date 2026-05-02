@@ -6988,6 +6988,11 @@ function renderOperations() {
   const refreshAnomalyFilters = refreshCenter?.anomalyFilters?.filters ?? [];
   const refreshAnomalyCount = Number(refreshCenter?.anomalyFilters?.totalCandidateCount ?? 0);
   const refreshGeometryQa = refreshCenter?.geometryQa ?? {};
+  const refreshQualityGate = refreshCenter?.dataQualityGate ?? {};
+  const refreshQualityChecks = refreshQualityGate?.checks ?? [];
+  const refreshQualityCounts = refreshQualityGate?.statusCounts ?? {};
+  const refreshQualityDirty = refreshQualityGate?.dirtyListings ?? {};
+  const refreshQualityStatus = refreshQualityGate?.status ?? "loading";
   const refreshBlockerCount = refreshChecks.filter((item) => item.status === "blocker").length;
   const refreshWarningCount = refreshChecks.filter((item) => item.status === "warn").length;
   const refreshGeneratedLabel = refreshCenter?.generatedAt ? formatTimestamp(refreshCenter.generatedAt) : "读取中";
@@ -7056,6 +7061,7 @@ function renderOperations() {
       <div class="comparison-strip">
         <span class="source-pill">检查 ${refreshChecks.length}</span>
         <span class="source-pill">异常候选 ${refreshAnomalyCount}</span>
+        <span class="source-pill">质量 ${refreshQualityGate?.label ?? refreshCenterStatusLabel(refreshQualityStatus)}</span>
         <span class="source-pill">几何任务 ${Number(refreshGeometryQa.openTaskCount ?? 0)}</span>
         <span class="source-pill">最近执行 ${refreshCenterJobStatusLabel(latestRefreshJobStatus)}</span>
         <span class="source-pill">生成 ${refreshGeneratedLabel}</span>
@@ -7122,6 +7128,40 @@ function renderOperations() {
                     )
                     .join("")
                 : "<p class=\"helper-text\">等待 dry-run 报告。</p>"
+            }
+          </div>
+        </section>
+        <section class="refresh-center-column">
+          <div class="refresh-center-section-head">
+            <strong>数据质量闸门</strong>
+            <span>${refreshQualityGate?.score ?? "--"}/100</span>
+          </div>
+          <div class="refresh-center-list">
+            <div class="refresh-center-row">
+              <span class="trace-status ${refreshCenterStatusTone(refreshQualityStatus)}">${refreshCenterStatusLabel(refreshQualityStatus)}</span>
+              <p>
+                <strong>${refreshQualityGate?.label ?? "读取中"}</strong>
+                <small>高可信 ${Number(refreshQualityCounts.strong ?? 0)} / 可用 ${Number(refreshQualityCounts.usable ?? 0)} / 薄样本 ${Number(refreshQualityCounts.thin ?? 0)} / 待补样 ${Number(refreshQualityCounts.blocked ?? 0)}</small>
+              </p>
+            </div>
+            <div class="refresh-center-row">
+              <span class="trace-status ${refreshCenterStatusTone(Number(refreshQualityDirty.totalIssueCount ?? 0) ? "blocker" : "ok")}">${Number(refreshQualityDirty.totalIssueCount ?? 0)}</span>
+              <p><strong>脏挂牌值</strong><small>租金污染 ${Number(refreshQualityDirty.rentIssueCount ?? 0)} / 售价默认值 ${Number(refreshQualityDirty.saleIssueCount ?? 0)}</small></p>
+            </div>
+            ${
+              refreshQualityChecks.length
+                ? refreshQualityChecks
+                    .slice(0, 3)
+                    .map(
+                      (item) => `
+                        <div class="refresh-center-row">
+                          <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
+                          <p><strong>${item.label}</strong><small>${item.detail}</small></p>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : ""
             }
           </div>
         </section>

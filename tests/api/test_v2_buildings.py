@@ -23,6 +23,7 @@ def test_v2_building_detail_matches_legacy(client, sample_building_id) -> None:
     assert legacy.status_code == 200, legacy.text
     assert v2.status_code == 200, v2.text
     assert v2.json() == legacy.json()
+    assert v2.json()["quality"]["status"] in {"strong", "usable", "thin", "blocked"}
 
 
 def test_v2_building_detail_404_for_unknown(client) -> None:

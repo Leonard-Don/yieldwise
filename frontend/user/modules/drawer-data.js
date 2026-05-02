@@ -41,6 +41,32 @@ export function formatInt(value) {
   return String(Math.round(Number(value)));
 }
 
+export function normalizeQuality(detail) {
+  const quality = detail && typeof detail === "object" ? detail.quality : null;
+  if (!quality || typeof quality !== "object") {
+    return null;
+  }
+  const status = String(quality.status || "thin");
+  return {
+    status,
+    label: quality.label || qualityLabelFor(status),
+    score: Number.isFinite(Number(quality.score)) ? Math.round(Number(quality.score)) : null,
+    sampleLabel: quality.sampleLabel || "样本 —",
+    summary: quality.summary || "",
+    reasons: Array.isArray(quality.reasons) ? quality.reasons.filter(Boolean).slice(0, 3) : [],
+    checks: Array.isArray(quality.checks) ? quality.checks.filter(Boolean).slice(0, 4) : [],
+  };
+}
+
+export function qualityLabelFor(status) {
+  return {
+    strong: "高可信",
+    usable: "可用",
+    thin: "样本薄",
+    blocked: "待补样",
+  }[status] || "待复核";
+}
+
 export function bucketBars({ low = 0, mid = 0, high = 0 } = {}) {
   const values = [
     { key: "low", label: "低层", value: Number(low) || 0 },
