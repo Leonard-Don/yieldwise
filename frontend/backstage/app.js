@@ -6860,7 +6860,7 @@ function renderStrategy() {
           </div>
           <small>${source.coverage}</small>
           ${source.recommendedNextStep ? `<p class="source-hint">${source.recommendedNextStep}</p>` : ""}
-          ${renderProviderActions(source)}
+          ${renderSourceActions(source)}
         </article>
       `
     )
@@ -6952,7 +6952,7 @@ function renderOperations() {
   const reviewQueueCount = Number(summary.reviewQueueCount ?? 0);
   const browserCaptureRunCount = Number(summary.browserCaptureRunCount ?? 0);
   const pendingAnchorCount = Number(summary.pendingAnchorCount ?? Math.max(cityCommunityCount - anchoredCommunityCount, 0));
-  const providerPendingCount = Math.max(sourceCount - readySourceCount, 0);
+  const sourcePendingCount = Math.max(sourceCount - readySourceCount, 0);
   const samplingTaskCount = Number(state.browserSamplingPackItems?.length ?? 0);
   const prioritySamplingCount = (state.browserSamplingPackItems ?? []).filter((item) => item.focusScope === "priority").length;
   const geoOpenTaskCount = Number(summary.geoAssetOpenTaskCount ?? geoAssetRuns.reduce((sum, item) => sum + (item.openTaskCount ?? 0), 0));
@@ -6976,7 +6976,7 @@ function renderOperations() {
     summary.activeDataMode === "database"
       ? `${summary.databaseSaleListingCount ?? 0} sale / ${summary.databaseRentListingCount ?? 0} rent`
       : `${metricsRunCount} 个 staged metrics run`;
-  const providerHint = providerPendingCount ? `待补凭证 ${providerPendingCount} 个。` : "链路已就绪。";
+  const sourceHint = sourcePendingCount ? `待补本地配置 ${sourcePendingCount} 个。` : "链路已就绪。";
   const coverageHint = pendingAnchorCount ? `待补锚点 ${pendingAnchorCount} 个。` : cityCommunityCount ? "已全部挂图。" : "等待首批锚点。";
   const samplingHint = `${browserCaptureRunCount} 次公开页采样${prioritySamplingCount ? ` · 重点区 ${prioritySamplingCount}` : ""}`;
   const batchHint = `批次 ${referenceRunCount}/${importRunCount}/${metricsRunCount}/${geoAssetRunCount}`;
@@ -7025,7 +7025,7 @@ function renderOperations() {
         <strong>${dataModeLabel} · ${databaseStatusLabel}</strong>
         <p>${overviewStatusHint}</p>
         <div class="comparison-strip">
-          <span class="source-pill">Provider ${readySourceCount}/${sourceCount}</span>
+          <span class="source-pill">数据源 ${readySourceCount}/${sourceCount}</span>
           <span class="source-pill">挂图 ${anchoredCommunityCount}/${cityCommunityCount}</span>
           <span class="source-pill">待复核 ${reviewQueueCount}</span>
           <span class="source-pill">采样任务 ${samplingTaskCount}</span>
@@ -7203,8 +7203,8 @@ function renderOperations() {
     <article class="ops-overview-card ops-overview-card--pipeline">
       <span class="ops-overview-kicker">数据链路</span>
       <strong>${readySourceCount}/${sourceCount}</strong>
-      <p>provider readiness 与落地批次</p>
-      <small>${providerHint} ${batchHint}</small>
+      <p>本地数据源状态与落地批次</p>
+      <small>${sourceHint} ${batchHint}</small>
     </article>
     <article class="ops-overview-card ops-overview-card--action">
       <div class="ops-overview-action-grid">
@@ -8132,12 +8132,12 @@ function renderOperations() {
             <span class="source-pill">${item.category}</span>
             <span class="source-pill">priority ${item.priority}</span>
             <span class="source-pill">staging ${item.stagedRunCount ?? 0}</span>
-            ${item.applicationMode ? `<span class="source-pill">${providerModeLabel(item.applicationMode)}</span>` : ""}
+            ${item.applicationMode ? `<span class="source-pill">${sourceModeLabel(item.applicationMode)}</span>` : ""}
           </div>
           ${item.recommendedNextStep ? `<p class="source-hint">${item.recommendedNextStep}</p>` : ""}
           ${item.contactValue ? `<small>${item.contactLabel ?? "联系"} · ${item.contactValue}</small>` : ""}
-          <small>${item.supportsLivePull ? "后续可切在线 adapter" : "本阶段以离线 / staging 接入为主"}</small>
-          ${renderProviderActions(item, { compact: true })}
+          <small>${item.supportsLocalAutomation ? "本地辅助任务可用" : "本阶段只保留离线 / staging 接入"}</small>
+          ${renderSourceActions(item, { compact: true })}
         </article>
       `
     )
@@ -9826,7 +9826,7 @@ function refreshReportPathLabel(path) {
 }
 
 
-function renderProviderActions(source, options = {}) {
+function renderSourceActions(source, options = {}) {
   const compact = options.compact ?? false;
   const actions = [
     source.applyUrl ? `<a class="source-link" href="${source.applyUrl}" target="_blank" rel="noreferrer">申请入口</a>` : "",

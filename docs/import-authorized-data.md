@@ -154,8 +154,8 @@ python3 jobs/load_import_run_to_postgres.py \
 4. 通过工作台或 API 把 `needs_review` 队列逐条复核。
 5. 等规则稳定后，再用 `jobs/load_import_run_to_postgres.py` 把输出写入 `db/schema.sql` 里的 `ingestion_runs`、`listings_*`、`floor_evidence_*` 表。
 
-## 现在还没做的部分
+## 明确不做 / 后续只做本地化增强
 
-- 真实在线 OAuth / API 拉取
-- 楼栋 footprint / AOI 自动匹配
-- 批次审计与权限控制
+- 不接外部账号授权，不做平台自动拉取；数据入口保持 CSV / GeoJSON / 手工公开样本。
+- 楼栋 footprint / AOI 可以继续做本地批次匹配，但不把工作流升级成实时外部接入。
+- 不做多用户权限、审计日志或后台管理；复核历史只服务个人本地研究。

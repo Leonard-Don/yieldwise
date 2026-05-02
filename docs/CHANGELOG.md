@@ -65,7 +65,7 @@
 
 `refactor(backstage): extract pure format/label helpers (41b61ca)`
 
-- 32 个纯函数 → `lib/format.js`：`truncate`、`slugifyExportName`、`formatSignedNumber/Delta`、`searchScore`、`searchTypeLabel`、`yieldClass`、`granularityLabel`、`anchorDecisionLabel`、`mapWaypointSourceLabel` + 4 个 `metricsRefresh*Label` + 6 个 `browserSampling*Label` + 4 个 `browserCaptureReview*Label` + `providerModeLabel` / `sourceStatusLabel` / `queueStatusLabel` / `geoTaskStatusLabel` / `geoWorkOrderStatusLabel` / `geoWorkOrderFilterLabel` / `resolutionStatusLabel` 等
+- 32 个纯函数 → `lib/format.js`：`truncate`、`slugifyExportName`、`formatSignedNumber/Delta`、`searchScore`、`searchTypeLabel`、`yieldClass`、`granularityLabel`、`anchorDecisionLabel`、`mapWaypointSourceLabel` + 4 个 `metricsRefresh*Label` + 6 个 `browserSampling*Label` + 4 个 `browserCaptureReview*Label` + `sourceModeLabel` / `sourceStatusLabel` / `queueStatusLabel` / `geoTaskStatusLabel` / `geoWorkOrderStatusLabel` / `geoWorkOrderFilterLabel` / `resolutionStatusLabel` 等
 - `app.js`: 11646 → 11384（-262 行）
 
 ## 2026-04-28 — Phase 8b: DOM selectors + UI 常量

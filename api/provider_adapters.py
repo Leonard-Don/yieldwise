@@ -23,8 +23,8 @@ PROVIDER_REGISTRY = [
         "priority": "medium",
         "role": "小区字典与地址归一底座",
         "coverage": "行政区 / 小区主档 / 地址字典 / 小区别名导入。",
-        "connectionState": "not_connected",
-        "supportsLivePull": False,
+        "connectionState": "planned",
+        "supportsLocalAutomation": False,
         "requiredEnv": [],
         "scopes": ["dictionary_batch"],
         "platformUrl": "https://data.sh.gov.cn/view/",
@@ -43,8 +43,8 @@ PROVIDER_REGISTRY = [
         "priority": "medium",
         "role": "主地图增强与楼栋 / AOI 几何来源",
         "coverage": "行政区边界、AOI、小区与楼栋 footprint 几何批次，以及小区锚点 enrichment。",
-        "connectionState": "not_connected",
-        "supportsLivePull": False,
+        "connectionState": "planned",
+        "supportsLocalAutomation": False,
         "requiredEnv": ["AMAP_API_KEY"],
         "scopes": ["dictionary_batch", "geometry_batch"],
         "platformUrl": "https://lbs.amap.com/",
@@ -52,9 +52,9 @@ PROVIDER_REGISTRY = [
         "docsUrl": "https://a.amap.com/jsapi/static/doc/index.html",
         "guideUrl": "/docs/import-geo-assets.md",
         "applicationMode": "console_key",
-        "recommendedNextStep": "先登录高德开放平台，在应用管理创建 JSAPI / Web 服务 Key；AOI / footprint 继续通过几何批次导入。",
+        "recommendedNextStep": "先进入高德开放平台控制台，在应用管理创建 JSAPI / Web 服务 Key；AOI / footprint 继续通过几何批次导入。",
         "contactLabel": "控制台动作",
-        "contactValue": "登录后进入 应用管理 创建应用与 Key",
+        "contactValue": "在控制台创建应用与 Key",
     },
     {
         "id": "public-browser-sampling",
@@ -64,7 +64,7 @@ PROVIDER_REGISTRY = [
         "role": "公开页面只读采样、字段补洞与浏览器辅助录入",
         "coverage": "公开房源页、小区详情页、地图点位和楼栋 / 楼层文本的人工 capture CSV、手工或半自动 staging 样本。",
         "connectionState": "offline_ready",
-        "supportsLivePull": False,
+        "supportsLocalAutomation": False,
         "requiredEnv": [],
         "scopes": ["sale_rent_batch", "dictionary_batch"],
         "platformUrl": "/docs/internal/import-public-browser-capture.md",
@@ -83,7 +83,7 @@ PROVIDER_REGISTRY = [
         "role": "研究阶段楼栋 footprint / anchor 手工勾绘与导入",
         "coverage": "重点区楼栋 footprint、多边形草图、人工校正后的楼栋 geometry 批次。",
         "connectionState": "offline_ready",
-        "supportsLivePull": False,
+        "supportsLocalAutomation": False,
         "requiredEnv": [],
         "scopes": ["geometry_batch"],
         "platformUrl": "/docs/import-geo-assets.md",
@@ -102,7 +102,7 @@ PROVIDER_REGISTRY = [
         "role": "自有 CSV / 已授权样本的离线 staging 通道",
         "coverage": "出售 / 出租 CSV、字典 CSV、GeoJSON footprint 批次与联调 conformance harness。",
         "connectionState": "offline_ready",
-        "supportsLivePull": False,
+        "supportsLocalAutomation": False,
         "requiredEnv": [],
         "scopes": ["sale_rent_batch", "dictionary_batch", "geometry_batch"],
         "platformUrl": "/docs/import-authorized-data.md",
@@ -209,23 +209,23 @@ def provider_readiness_snapshot(
     items: list[dict[str, Any]] = []
     for item in PROVIDER_REGISTRY:
         readiness = deepcopy(item)
-        credential_sets = list(readiness.get("credentialSets", []))
-        matched_credential_set_label: str | None = None
+        local_config_sets = list(readiness.get("localConfigSets", []))
+        matched_local_config_set_label: str | None = None
         required_env = list(readiness.get("requiredEnv", []))
         configured_env: list[str] = []
         missing_env: list[str] = []
         env_ready = False
 
-        if credential_sets:
+        if local_config_sets:
             best_score = (-1, -1)
-            for credential_set in credential_sets:
-                env_names = list(credential_set.get("env", []))
+            for config_set in local_config_sets:
+                env_names = list(config_set.get("env", []))
                 configured = [name for name in env_names if os.getenv(name, "").strip()]
                 missing = [name for name in env_names if name not in configured]
                 score = (len(configured), -len(missing))
                 if score > best_score:
                     best_score = score
-                    matched_credential_set_label = credential_set.get("label")
+                    matched_local_config_set_label = config_set.get("label")
                     configured_env = configured
                     missing_env = missing
                     required_env = env_names
@@ -234,7 +234,7 @@ def provider_readiness_snapshot(
             configured_env = [name for name in required_env if os.getenv(name, "").strip()]
             missing_env = [name for name in required_env if name not in configured_env]
             env_ready = bool(required_env) and not missing_env
-        connection_state = readiness.get("connectionState", "not_connected")
+        connection_state = readiness.get("connectionState", "planned")
         note = "等待本地数据文件、公开数据下载或手工批次。"
         if readiness["id"] == "authorized-batch-import":
             note = "离线导入通道已可用，用于 staging 和 conformance harness。"
@@ -243,13 +243,13 @@ def provider_readiness_snapshot(
         elif readiness["id"] == "manual-geometry-staging":
             note = "手工几何 staging 通道已可用，适合重点区楼栋 footprint 人工勾绘与研究校正。"
         elif env_ready:
-            connection_state = "credentials_ready"
-            note = "凭证位已配置，可用于本地数据辅助任务。"
+            connection_state = "local_config_ready"
+            note = "本地配置已就绪，可用于本地数据辅助任务。"
         elif configured_env:
-            connection_state = "credentials_partial"
-            note = f"已配置部分凭证：{', '.join(configured_env)}；仍缺少 {', '.join(missing_env)}。"
+            connection_state = "partial_local_config"
+            note = f"已配置部分本地变量：{', '.join(configured_env)}；仍缺少 {', '.join(missing_env)}。"
         if readiness["id"] == "amap-aoi-poi" and os.getenv("AMAP_API_KEY", "").strip():
-            connection_state = "credentials_ready"
+            connection_state = "local_config_ready"
             note = (
                 "地图 key 与安全密钥已配置，可直接接 JSAPI，几何导入仍走离线批次。"
                 if os.getenv("AMAP_SECURITY_JSCODE", "").strip()
@@ -265,15 +265,15 @@ def provider_readiness_snapshot(
         readiness["connectionState"] = connection_state
         readiness["readinessLabel"] = {
             "offline_ready": "离线可接入",
-            "credentials_ready": "凭证位已就绪",
-            "credentials_partial": "部分凭证已就绪",
-            "connected_live": "在线接通",
-            "not_connected": "待接入",
+            "local_config_ready": "本地配置已就绪",
+            "partial_local_config": "部分本地配置已就绪",
+            "local_ready": "本地通道可用",
+            "planned": "待接入",
         }.get(connection_state, "待接入")
-        readiness["hasCredentials"] = env_ready
-        readiness["configuredRequiredEnv"] = configured_env
-        readiness["missingRequiredEnv"] = missing_env
-        readiness["matchedCredentialSetLabel"] = matched_credential_set_label
+        readiness["hasLocalConfig"] = env_ready
+        readiness["configuredLocalEnv"] = configured_env
+        readiness["missingLocalEnv"] = missing_env
+        readiness["matchedLocalConfigSetLabel"] = matched_local_config_set_label
         readiness["stagedRunCount"] = staged_count
         readiness["isPrimaryCandidate"] = readiness["priority"] == "high"
         readiness["activeDataRole"] = (

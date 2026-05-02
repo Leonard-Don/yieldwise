@@ -4001,7 +4001,7 @@ def _operations_payload_cached() -> dict[str, Any]:
         "summary": {
             "sourceCount": len(provider_health),
             "readySourceCount": sum(
-                1 for item in provider_health if item["connectionState"] in {"offline_ready", "credentials_ready", "connected_live"}
+                1 for item in provider_health if item["connectionState"] in {"offline_ready", "local_config_ready", "local_ready"}
             ),
             "resolvedQueueCount": resolved_count,
             "reviewQueueCount": review_count,
@@ -4112,7 +4112,7 @@ def _bootstrap_operations_payload_cached() -> dict[str, Any]:
         "summary": {
             "sourceCount": len(runtime["providerReadiness"]),
             "readySourceCount": sum(
-                1 for item in runtime["providerReadiness"] if item["connectionState"] in {"offline_ready", "credentials_ready", "connected_live"}
+                1 for item in runtime["providerReadiness"] if item["connectionState"] in {"offline_ready", "local_config_ready", "local_ready"}
             ),
             "resolvedQueueCount": 0,
             "reviewQueueCount": 0,
@@ -5255,10 +5255,10 @@ def imported_building_geo_asset_index(geo_run_id: str | None = None) -> dict[str
     if geo_run_id:
         run_summaries = [r for r in list_geo_asset_runs() if r.get("runId") == geo_run_id]
     else:
-        # Skip provider runs whose features inherently lack building_id — those
+        # Skip source runs whose features inherently lack building_id — those
         # runs would be loaded into memory only to be filtered out feature-by-
         # feature inside the loop. The biggest offender is the OSM-derived run
-        # (81 MB / 69k features, all building_id=None). Excluding by provider
+        # (81 MB / 69k features, all building_id=None). Excluding by source id
         # turns a 4-second cold load into instant work.
         run_summaries = [
             r for r in list_geo_asset_runs()

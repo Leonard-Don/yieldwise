@@ -2693,7 +2693,9 @@ input[type="range"]:focus-visible,
 }
 
 .trace-status.done,
-.trace-status.online,
+.trace-status.local_ready,
+.trace-status.local_config_ready,
+.trace-status.offline_ready,
 .trace-status.resolved {
   background: rgba(117, 240, 207, 0.16);
   color: #bffcef;
@@ -2702,7 +2704,7 @@ input[type="range"]:focus-visible,
 .trace-status.review,
 .trace-status.needs_review,
 .trace-status.needs_capture,
-.trace-status.partner_negotiation {
+.trace-status.partial_local_config {
   background: rgba(255, 191, 105, 0.18);
   color: #ffd9a8;
 }

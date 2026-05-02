@@ -214,26 +214,23 @@ function granularityLabel(value) {
   }[value];
 }
 
-function providerModeLabel(mode) {
+function sourceModeLabel(mode) {
   return {
-    self_serve_trial: "自用申请",
     catalog_apply_or_download: "目录申请 / 下载",
-    console_key: "控制台申请 Key",
-    internal_staging: "内部 staging",
+    console_key: "本地 Key",
+    internal_staging: "本地 staging",
     manual_sketch: "手工勾绘 staging"
   }[mode] ?? mode;
 }
 
 function sourceStatusLabel(status) {
   return {
-    credentials_ready: "凭证位已就绪",
-    credentials_partial: "部分凭证已就绪",
+    local_config_ready: "本地配置已就绪",
+    partial_local_config: "部分本地配置已就绪",
     offline_ready: "离线可接入",
-    connected_live: "在线接通",
+    local_ready: "本地通道可用",
     ready_for_integration: "待接入",
-    online: "在线",
-    partner_negotiation: "洽谈中",
-    not_connected: "待接入"
+    planned: "待接入"
   }[status] ?? status;
 }
 

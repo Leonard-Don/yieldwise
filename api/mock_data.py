@@ -362,7 +362,7 @@ SOURCE_HEALTH = [
     {
         "sourceId": "shanghai-open-data-community",
         "name": "上海开放数据 · 物业小区信息",
-        "status": "online",
+        "status": "local_ready",
         "freshness": "weekly",
         "coveragePct": 92,
         "listingCount": 128,
@@ -372,7 +372,7 @@ SOURCE_HEALTH = [
     {
         "sourceId": "authorized-batch-import",
         "name": "授权批次导入",
-        "status": "online",
+        "status": "local_ready",
         "freshness": "on_demand",
         "coveragePct": 58,
         "listingCount": 48,
@@ -382,7 +382,7 @@ SOURCE_HEALTH = [
     {
         "sourceId": "amap-aoi-poi",
         "name": "高德 AOI / POI / District",
-        "status": "online",
+        "status": "local_ready",
         "freshness": "realtime",
         "coveragePct": 81,
         "listingCount": 96,

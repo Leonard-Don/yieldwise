@@ -102,7 +102,7 @@ python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage
 - 默认不再偷偷回退 demo 数据
 - 没有真实数据时，页面显示明确空态、source readiness 和 staging 状态
 - 只有显式设置 `ATLAS_ENABLE_DEMO_MOCK=true` 时，才允许 mock fallback
-- provider adapter 统一拆成 `sale_rent_batch`、`dictionary_batch`、`geometry_batch` 三类
+- 本地数据源批次统一拆成 `sale_rent_batch`、`dictionary_batch`、`geometry_batch` 三类
 
 ## 当前能力概览
 
@@ -345,7 +345,7 @@ python3 jobs/import_authorized_listings.py \
   --output-dir tmp/import-runs/public-browser-sampling-2026-04-12
 ```
 
-这批样本会继续走统一的地址标准化、配对和楼层证据链，但在 provider 上会明确标成 staging-only，不会伪装成官方实时接口。
+这批样本会继续走统一的地址标准化、配对和楼层证据链，并明确标成 staging-only，不会伪装成官方实时接口。
 
 如果你手里只有浏览器里人工复制下来的公开页面文本，不想自己先拆成 `sale / rent CSV`，现在也可以直接跑：
 
@@ -522,7 +522,7 @@ python3 jobs/load_import_run_to_postgres.py \
 ## 现在多了什么
 
 - `api/main.py`：FastAPI 服务，提供 bootstrap、机会榜、geo-assets、楼层明细、运维总览和导出接口
-- `api/provider_adapters.py`：provider registry、adapter contract 和 readiness 规则
+- `api/provider_adapters.py`：本地数据源清单、批次契约和就绪规则
 - `api/reference_catalog.py`：数据库 / 文件 / mock 三层 reference catalog 读取
 - `api/service.py`：数据库优先的领域查询、小区 / 楼栋 / 楼层证据明细、批次复核回写、几何任务回写、几何基线对比和 GeoJSON / KML 生成逻辑
 - `api/persistence.py`：授权批次、几何批次和 reference dictionary 写入 PostgreSQL 的持久化层
@@ -543,7 +543,7 @@ python3 jobs/load_import_run_to_postgres.py \
 - `jobs/load_import_run_to_postgres.py`：把授权批次和逐层证据写入 PostgreSQL
 - `jobs/load_reference_dictionary_to_postgres.py`：把 reference dictionary 批次写入 PostgreSQL
 - `jobs/refresh_metrics.py`：指标快照任务脚手架
-- `.env.example`：后续接高德与数据源凭证时的环境变量模板
+- `.env.example`：高德地图与本地辅助任务的环境变量模板
 
 ## 原型定位
 
@@ -558,7 +558,7 @@ python3 jobs/load_import_run_to_postgres.py \
 5. 继续提升真实底图质量，把重点区楼栋 footprint 与公开页采样证据做得更厚。
 6. 用楼层榜导出按钮把当前批次 / 基线窗口导出成 `KML` 或 `GeoJSON`，给内部分析或 Google Earth 巡检使用。
 7. 把 `jobs/refresh_metrics.py` 改成真实定时任务，并接上数据库写入。
-8. 等官方/API 凭证就位后，再把离线导入升级为真正的 provider adapter 在线拉取。
+8. 保持离线导入和手工公开样本路线；不把本地工作台升级成外部平台自动拉取器。
 
 ## 建议的后续拆分
 

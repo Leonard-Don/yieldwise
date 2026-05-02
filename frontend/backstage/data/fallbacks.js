@@ -422,7 +422,7 @@ const fallbackOperationsOverview = {
     {
       sourceId: "shanghai-open-data-community",
       name: "上海开放数据 · 物业小区信息",
-      status: "online",
+      status: "local_ready",
       freshness: "weekly",
       coveragePct: 92,
       listingCount: 128,
@@ -432,7 +432,7 @@ const fallbackOperationsOverview = {
     {
       sourceId: "authorized-batch-import",
       name: "授权批次导入",
-      status: "online",
+      status: "local_ready",
       freshness: "on_demand",
       coveragePct: 58,
       listingCount: 48,
@@ -442,8 +442,8 @@ const fallbackOperationsOverview = {
     {
       sourceId: "amap-aoi-poi",
       name: "高德 AOI / POI / District",
-      status: "online",
-      freshness: "realtime",
+      status: "local_ready",
+      freshness: "on_demand",
       coveragePct: 81,
       listingCount: 96,
       normalizationPct: 83,

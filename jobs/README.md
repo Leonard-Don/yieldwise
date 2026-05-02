@@ -1,6 +1,6 @@
 # Jobs Scaffold
 
-当前 `jobs/` 目录已经承接三类 provider adapter 批次：
+当前 `jobs/` 目录已经承接三类本地数据源批次：
 
 - `sale_rent_batch`
 - `dictionary_batch`

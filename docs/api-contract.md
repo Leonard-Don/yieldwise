@@ -50,9 +50,9 @@
 - `runtime`
 - `data_sources`
 
-其中 `data_sources` 已经是 provider registry 的 readiness 视图。
+其中 `data_sources` 是本地数据源清单的就绪视图。
 
-每个 provider 条目当前除了基础字段，还会带：
+每个数据源条目当前除了基础字段，还会带：
 
 - `platformUrl`
 - `applyUrl`
@@ -62,9 +62,9 @@
 - `recommendedNextStep`
 - `contactLabel`
 - `contactValue`
-- `configuredRequiredEnv`
-- `missingRequiredEnv`
-- `matchedCredentialSetLabel`
+- `configuredLocalEnv`
+- `missingLocalEnv`
+- `matchedLocalConfigSetLabel`
 
 ### `GET /api/runtime-config`
 

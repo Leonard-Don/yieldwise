@@ -1,4 +1,4 @@
-"""Unit tests for cross-provider geo-run comparator."""
+"""Unit tests for cross-source geo-run comparator."""
 from __future__ import annotations
 
 from jobs.compare_geo_runs import (

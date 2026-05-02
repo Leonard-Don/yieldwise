@@ -598,7 +598,7 @@ def main() -> None:
     parser.add_argument("--sale-file", type=Path, help="CSV file for sale listings.")
     parser.add_argument("--rent-file", type=Path, help="CSV file for rent listings.")
     parser.add_argument("--output-dir", type=Path, required=True, help="Directory where normalized outputs will be written.")
-    parser.add_argument("--provider-id", default="authorized-import", help="Data source provider id for the import run.")
+    parser.add_argument("--provider-id", default="authorized-import", help="Data source id for the import run.")
     parser.add_argument("--batch-name", help="Optional human-readable batch name.")
     args = parser.parse_args()
 

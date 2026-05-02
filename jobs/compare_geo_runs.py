@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-provider geometry-run overlap report.
+"""Cross-source geometry-run overlap report.
 
 The built-in `/api/geo-assets/runs/{id}/compare` only compares runs that
 share the same provider_id + asset_type — it's designed to track diff
@@ -43,7 +43,7 @@ DEG_TO_M_LNG_AT_31N = 95_000.0
 
 
 def latest_run_with_provider(provider_id: str) -> Path | None:
-    """Pick the most-recently-modified geo run whose manifest provider matches."""
+    """Pick the most-recently-modified geo run whose manifest source id matches."""
     matches: list[tuple[float, Path]] = []
     for d in GEO_RUNS_ROOT.iterdir():
         if not d.is_dir():
@@ -248,7 +248,7 @@ def main() -> int:
 
 def render_markdown(summary: dict, sample_rows: list[dict]) -> str:
     lines = [
-        "# Geo-run cross-provider comparison",
+        "# Geo-run cross-source comparison",
         "",
         f"- **Primary** (`{summary['primary_run']}`): {summary['primary_count']} features",
         f"- **Baseline** (`{summary['baseline_run']}`): {summary['baseline_count']} features",
