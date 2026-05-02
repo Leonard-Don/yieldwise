@@ -264,7 +264,9 @@ def clear_runtime_caches() -> None:
     _reference_run_detail_full_cached.cache_clear()
     _list_import_runs_cached.cache_clear()
     _import_run_detail_full_cached.cache_clear()
+    _import_run_floor_evidence_cached.cache_clear()
     _import_floor_history_for_cached.cache_clear()
+    _import_floor_history_rows_by_key_cached.cache_clear()
     _list_metrics_runs_cached.cache_clear()
     _metrics_run_detail_cached.cache_clear()
     _list_browser_capture_runs_cached.cache_clear()
@@ -2178,6 +2180,31 @@ def import_run_detail_full(run_id: str) -> dict[str, Any] | None:
     return deepcopy(detail) if detail else None
 
 
+@lru_cache(maxsize=128)
+def _import_run_floor_evidence_cached(run_id: str) -> dict[str, Any] | None:
+    manifest_path = import_manifest_path_for_run(run_id)
+    if manifest_path:
+        manifest = read_json_file(manifest_path)
+        if isinstance(manifest, dict) and manifest.get("run_id") == run_id:
+            run_summary = import_run_summary_from_manifest(manifest, manifest_path)
+            outputs = manifest.get("outputs", {})
+            floor_evidence = read_json_file(resolve_artifact_path(outputs.get("floor_evidence"))) or []
+            return {
+                **run_summary,
+                "floorEvidence": floor_evidence,
+            }
+    detail = _import_run_detail_full_cached(run_id)
+    if not detail:
+        return None
+    return {
+        "runId": detail["runId"],
+        "providerId": detail["providerId"],
+        "batchName": detail["batchName"],
+        "createdAt": detail["createdAt"],
+        "floorEvidence": detail.get("floorEvidence", []),
+    }
+
+
 def import_run_detail(run_id: str, baseline_run_id: str | None = None) -> dict[str, Any] | None:
     detail = import_run_detail_full(run_id)
     if not detail:
@@ -2417,80 +2444,134 @@ def import_floor_evidence_for(building_id: str, floor_no: int) -> dict[str, Any]
 
 @lru_cache(maxsize=512)
 def _import_floor_history_for_cached(building_id: str, floor_no: int) -> dict[str, Any]:
-    history_rows: list[dict[str, Any]] = []
-
-    for run_summary in sorted(_list_import_runs_cached(), key=lambda item: comparable_created_at_value(item.get("createdAt"))):
-        detail = _import_run_detail_full_cached(run_summary["runId"])
-        if not detail:
-            continue
-
-        evidence = next(
-            (
-                item
-                for item in detail["floorEvidence"]
-                if item.get("building_id") == building_id and item.get("floor_no") == floor_no
-            ),
-            None,
-        )
-        if not evidence:
-            continue
-
-        previous = history_rows[-1] if history_rows else None
-        yield_pct = evidence.get("yield_pct")
-        pair_count = evidence.get("pair_count", 0)
-        sale_median_wan = evidence.get("sale_median_wan")
-        rent_median_monthly = evidence.get("rent_median_monthly")
-
-        if previous is None:
-            status = "new"
-            status_label = "首个快照"
-            yield_delta = None
-            pair_delta = None
-            sale_delta = None
-            rent_delta = None
-        else:
-            yield_delta = round(yield_pct - previous["yieldPct"], 2) if yield_pct is not None and previous.get("yieldPct") is not None else None
-            pair_delta = pair_count - previous.get("pairCount", 0)
-            sale_delta = (
-                round(sale_median_wan - previous["saleMedianWan"], 2)
-                if sale_median_wan is not None and previous.get("saleMedianWan") is not None
-                else None
-            )
-            rent_delta = (
-                round(rent_median_monthly - previous["rentMedianMonthly"], 2)
-                if rent_median_monthly is not None and previous.get("rentMedianMonthly") is not None
-                else None
-            )
-            status, status_label = comparison_status_for_delta(yield_delta)
-
-        history_rows.append(
-            {
-                "runId": detail["runId"],
-                "batchName": detail["batchName"],
-                "createdAt": detail["createdAt"],
-                "yieldPct": yield_pct,
-                "pairCount": pair_count,
-                "saleMedianWan": sale_median_wan,
-                "rentMedianMonthly": rent_median_monthly,
-                "bestPairConfidence": evidence.get("best_pair_confidence"),
-                "yieldDeltaVsPrevious": yield_delta,
-                "pairCountDeltaVsPrevious": pair_delta,
-                "saleMedianDeltaWan": sale_delta,
-                "rentMedianDeltaMonthly": rent_delta,
-                "status": status,
-                "statusLabel": status_label,
-                "isLatest": False,
-            }
-        )
+    history_rows = [
+        dict(item)
+        for item in _import_floor_history_rows_by_key_cached().get((building_id, int(floor_no)), ())
+    ]
 
     if not history_rows:
         return {"timeline": [], "summary": None}
+    return {
+        "timeline": list(reversed(history_rows)),
+        "summary": _floor_history_summary_from_rows(history_rows),
+    }
 
-    history_rows[-1]["isLatest"] = True
+
+def import_floor_history_for(building_id: str, floor_no: int) -> dict[str, Any]:
+    return deepcopy(_import_floor_history_for_cached(building_id, floor_no))
+
+
+def _floor_watchlist_building_context_by_id() -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
+    if database_mode_active():
+        communities = db_community_dataset()
+    elif staged_mode_active():
+        communities = staged_community_dataset()
+    elif demo_mode_active():
+        communities = [
+            enrich_community(community, district_item)
+            for district_item in DISTRICTS
+            for community in district_item.get("communities", [])
+        ]
+    else:
+        communities = []
+
+    contexts: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+    for community in communities:
+        for building in community.get("buildings", []):
+            building_id = building.get("id")
+            if building_id:
+                contexts[str(building_id)] = (building, community)
+    return contexts
+
+
+def _floor_history_entry(
+    detail: dict[str, Any],
+    evidence: dict[str, Any],
+    previous: dict[str, Any] | None,
+) -> dict[str, Any]:
+    yield_pct = evidence.get("yield_pct")
+    pair_count = evidence.get("pair_count", 0)
+    sale_median_wan = evidence.get("sale_median_wan")
+    rent_median_monthly = evidence.get("rent_median_monthly")
+
+    if previous is None:
+        status = "new"
+        status_label = "首个快照"
+        yield_delta = None
+        pair_delta = None
+        sale_delta = None
+        rent_delta = None
+    else:
+        yield_delta = (
+            round(yield_pct - previous["yieldPct"], 2)
+            if yield_pct is not None and previous.get("yieldPct") is not None
+            else None
+        )
+        pair_delta = pair_count - previous.get("pairCount", 0)
+        sale_delta = (
+            round(sale_median_wan - previous["saleMedianWan"], 2)
+            if sale_median_wan is not None and previous.get("saleMedianWan") is not None
+            else None
+        )
+        rent_delta = (
+            round(rent_median_monthly - previous["rentMedianMonthly"], 2)
+            if rent_median_monthly is not None and previous.get("rentMedianMonthly") is not None
+            else None
+        )
+        status, status_label = comparison_status_for_delta(yield_delta)
+
+    return {
+        "runId": detail["runId"],
+        "batchName": detail["batchName"],
+        "createdAt": detail["createdAt"],
+        "yieldPct": yield_pct,
+        "pairCount": pair_count,
+        "saleMedianWan": sale_median_wan,
+        "rentMedianMonthly": rent_median_monthly,
+        "bestPairConfidence": evidence.get("best_pair_confidence"),
+        "yieldDeltaVsPrevious": yield_delta,
+        "pairCountDeltaVsPrevious": pair_delta,
+        "saleMedianDeltaWan": sale_delta,
+        "rentMedianDeltaMonthly": rent_delta,
+        "status": status,
+        "statusLabel": status_label,
+        "isLatest": False,
+    }
+
+
+@lru_cache(maxsize=1)
+def _import_floor_history_rows_by_key_cached() -> dict[tuple[str, int], tuple[dict[str, Any], ...]]:
+    history_by_floor: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    run_summaries = sorted(
+        _list_import_runs_cached(),
+        key=lambda item: comparable_created_at_value(item.get("createdAt") or item.get("CreatedAt")),
+    )
+    for run_summary in run_summaries:
+        detail = _import_run_floor_evidence_cached(run_summary["runId"])
+        if not detail:
+            continue
+        for evidence in detail["floorEvidence"]:
+            building_id = evidence.get("building_id")
+            floor_no = evidence.get("floor_no")
+            if building_id is None or floor_no is None:
+                continue
+            key = (str(building_id), int(floor_no))
+            rows = history_by_floor.setdefault(key, [])
+            rows.append(_floor_history_entry(detail, evidence, rows[-1] if rows else None))
+
+    for rows in history_by_floor.values():
+        if rows:
+            rows[-1]["isLatest"] = True
+    return {key: tuple(rows) for key, rows in history_by_floor.items()}
+
+
+def _floor_history_summary_from_rows(history_rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not history_rows:
+        return None
     latest = history_rows[-1]
     first = history_rows[0]
     yield_values = [item["yieldPct"] for item in history_rows if item.get("yieldPct") is not None]
-    summary = {
+    return {
         "observedRuns": len(history_rows),
         "latestRunId": latest["runId"],
         "latestBatchName": latest["batchName"],
@@ -2503,14 +2584,6 @@ def _import_floor_history_for_cached(building_id: str, floor_no: int) -> dict[st
         "avgYieldPct": round(sum(yield_values) / len(yield_values), 2) if yield_values else None,
         "totalPairCount": sum(item.get("pairCount", 0) for item in history_rows),
     }
-    return {
-        "timeline": list(reversed(history_rows)),
-        "summary": summary,
-    }
-
-
-def import_floor_history_for(building_id: str, floor_no: int) -> dict[str, Any]:
-    return deepcopy(_import_floor_history_for_cached(building_id, floor_no))
 
 
 def floor_watchlist(
@@ -2621,24 +2694,27 @@ def floor_watchlist(
         )
         return watchlist[:limit]
     if run_id:
-        current_detail = import_run_detail_full(run_id)
+        current_detail = _import_run_floor_evidence_cached(run_id)
         if not current_detail:
             return []
 
         baseline_run = baseline_run_for(run_id, baseline_run_id=baseline_run_id)
-        baseline_detail = import_run_detail_full(baseline_run["runId"]) if baseline_run else None
+        baseline_detail = _import_run_floor_evidence_cached(baseline_run["runId"]) if baseline_run else None
         baseline_map = {
             (item.get("community_id"), item.get("building_id"), item.get("floor_no")): item
             for item in (baseline_detail["floorEvidence"] if baseline_detail else [])
         }
+        building_contexts = _floor_watchlist_building_context_by_id()
+        history_rows_by_floor = _import_floor_history_rows_by_key_cached()
         watchlist = []
 
         for evidence in current_detail["floorEvidence"]:
             community_id = evidence.get("community_id")
             building_id = evidence.get("building_id")
             floor_no = evidence.get("floor_no")
-            building = get_building(building_id) if building_id else None
-            community = get_community(community_id) if community_id else None
+            building, community = building_contexts.get(str(building_id), (None, None)) if building_id else (None, None)
+            if community and community_id and community.get("id") != community_id:
+                community = get_community(community_id)
             if not building or not community:
                 continue
             if not community_visible(
@@ -2650,8 +2726,8 @@ def floor_watchlist(
             ):
                 continue
 
-            history_payload = import_floor_history_for(building_id, floor_no)
-            summary = history_payload["summary"] or {}
+            history_rows = list(history_rows_by_floor.get((str(building_id), int(floor_no)), ()))
+            summary = _floor_history_summary_from_rows(history_rows) or {}
             baseline_evidence = baseline_map.get((community_id, building_id, floor_no))
             current_yield = evidence.get("yield_pct") or 0.0
             current_pair_count = evidence.get("pair_count", 0)
@@ -2727,21 +2803,12 @@ def floor_watchlist(
         )
         return watchlist[:limit]
 
-    floor_keys: set[tuple[str, int]] = set()
-    for run_summary in list_import_runs():
-        detail = import_run_detail_full(run_summary["runId"])
-        if not detail:
-            continue
-        for item in detail["floorEvidence"]:
-            building_id = item.get("building_id")
-            floor_no = item.get("floor_no")
-            if building_id and floor_no is not None:
-                floor_keys.add((building_id, floor_no))
-
+    history_by_floor = _import_floor_history_rows_by_key_cached()
+    building_contexts = _floor_watchlist_building_context_by_id()
     watchlist = []
-    for building_id, floor_no in floor_keys:
-        building = get_building(building_id)
-        community = get_community((building or {}).get("communityId")) if building else None
+    for (building_id, floor_no), history_rows in history_by_floor.items():
+        history_rows = list(history_rows)
+        building, community = building_contexts.get(building_id, (None, None))
         if not building or not community:
             continue
         if not community_visible(
@@ -2753,12 +2820,11 @@ def floor_watchlist(
         ):
             continue
 
-        history_payload = import_floor_history_for(building_id, floor_no)
-        if not history_payload["timeline"] or not history_payload["summary"]:
+        summary = _floor_history_summary_from_rows(history_rows)
+        if not history_rows or not summary:
             continue
 
-        latest = history_payload["timeline"][0]
-        summary = history_payload["summary"]
+        latest = history_rows[-1]
         latest_yield = latest.get("yieldPct") or 0.0
         yield_delta_since_first = summary.get("yieldDeltaSinceFirst") or 0.0
         observed_runs = summary.get("observedRuns") or 0
@@ -5688,6 +5754,9 @@ def build_geo_task_watchlist_geojson(
     include_svg_props: bool = False,
 ) -> dict[str, Any]:
     features = []
+    if not geo_run_id:
+        return {"type": "FeatureCollection", "name": "ShanghaiGeoTaskWatchlist", "features": features}
+
     imported_assets = imported_building_geo_asset_index(geo_run_id)
     for item in geo_task_watchlist(
         district=district,
@@ -5829,6 +5898,9 @@ def build_geo_task_watchlist_csv(
         ],
     )
     writer.writeheader()
+    if not geo_run_id:
+        return output.getvalue()
+
     for item in geo_task_watchlist(
         district=district,
         geo_run_id=geo_run_id,
@@ -5887,6 +5959,7 @@ def build_floor_watchlist_geojson(
     features = []
     imported_assets = imported_building_geo_asset_index(geo_run_id)
     database_assets = database_geo_asset_index(geo_run_id)
+    building_contexts = _floor_watchlist_building_context_by_id()
     for item in floor_watchlist(
         district=district,
         min_yield=min_yield,
@@ -5896,8 +5969,7 @@ def build_floor_watchlist_geojson(
         baseline_run_id=baseline_run_id,
         limit=limit,
     ):
-        community = get_community(item["communityId"])
-        building = get_building(item["buildingId"])
+        building, community = building_contexts.get(str(item["buildingId"]), (None, None))
         if not community or not building:
             continue
         database_ring = feature_ring({"geometry": building.get("geometryJson")}) if database_mode_active() and building.get("geometryJson") else []

@@ -39,6 +39,9 @@ jobs:
       - name: User shell JS syntax check
         run: node --check frontend/user/modules/main.js
 
+      - name: Frontend unit tests
+        run: node --test tests/frontend/*.mjs
+
       - name: Pytest
         run: pytest -q
 

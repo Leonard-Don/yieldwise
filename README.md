@@ -58,6 +58,18 @@ The schema is applied automatically on first DB use, so no manual `psql -f` is n
 
 Need a free AMAP key for the map to render? Get one at [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites).
 
+### Local demo without Postgres
+
+Want to inspect the UI first? You can boot the demo/mock mode without creating a database:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r api/requirements.txt
+ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
+```
+
+This is only for local exploration. Real analysis should use Postgres/PostGIS plus your own authorized or open-data imports.
+
 ## Features
 
 - **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)

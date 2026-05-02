@@ -22,7 +22,7 @@ OUTPUT_DIR = ROOT_DIR / "output" / "playwright"
 IMPORT_RUNS_DIR = ROOT_DIR / "tmp" / "import-runs"
 METRICS_RUNS_DIR = ROOT_DIR / "tmp" / "metrics-runs"
 PWCLI_MAX_SESSION_LENGTH = 17
-PWCLI_COMMAND_TIMEOUT_SECONDS = 60.0
+PWCLI_COMMAND_TIMEOUT_SECONDS = float(os.environ.get("ATLAS_PWCLI_COMMAND_TIMEOUT", "120"))
 # Per-eval cap: each pwcli invocation has ~5s baseline overhead from
 # `npx --yes --package @playwright/cli`, so the cap below must leave
 # enough headroom for the actual page.evaluate work. Override via

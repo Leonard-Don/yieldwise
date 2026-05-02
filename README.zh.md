@@ -58,6 +58,18 @@ Schema 首次访问时自动建好，不需要手动 `psql -f`。
 
 需要免费高德 key 才能渲染地图？去 [lbs.amap.com](https://lbs.amap.com/api/javascript-api-v2/prerequisites) 申请。
 
+### 不接 Postgres 的本地 demo
+
+如果只是想先看 UI，可以不建数据库，直接用 demo/mock 模式：
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r api/requirements.txt
+ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
+```
+
+这只适合本地试用。真实分析仍然建议接 Postgres/PostGIS，并导入你自己有授权或公开开放的数据。
+
 ## 功能
 
 - **一张地图三种工作流**：收益猎手 · 自住找房 · 全市观察

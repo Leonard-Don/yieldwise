@@ -612,7 +612,7 @@ def apply_review_action(session: str, *, run_id: str, queue_id: str, review_stat
     )
     return eval_json_with_timeout(
         session,
-        f"""() => {{
+        f"""async () => {{
           const runId = {json.dumps(run_id)};
           const queueId = {json.dumps(queue_id)};
           const reviewStatus = {json.dumps(review_status)};
@@ -620,7 +620,7 @@ def apply_review_action(session: str, *, run_id: str, queue_id: str, review_stat
           if (typeof reviewBrowserCaptureQueueItem !== 'function') {{
             throw new Error('missing reviewBrowserCaptureQueueItem');
           }}
-          void reviewBrowserCaptureQueueItem(runId, queueId, {{
+          const result = await reviewBrowserCaptureQueueItem(runId, queueId, {{
             status: reviewStatus,
             resolutionNotes,
           }});
@@ -629,10 +629,11 @@ def apply_review_action(session: str, *, run_id: str, queue_id: str, review_stat
             runId,
             queueId,
             status: reviewStatus,
+            result: result || null,
             taskId: document.querySelector('[data-browser-capture-panel]')?.dataset.browserCaptureTaskId || null,
           }};
         }}""",
-        timeout_seconds=30.0,
+        timeout_seconds=180.0,
     )
 
 

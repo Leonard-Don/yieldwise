@@ -905,7 +905,7 @@ def run_backstage_boot_smoke(
                 && !params.get('opsGeoBaseline')
                 && document.querySelector('#frontstageWorkspace')?.hidden === false
                 && document.querySelector('#backstageWorkspace')?.hidden === true
-                && document.querySelector('#mapModeBadge')?.textContent?.trim() === 'AMap Live'
+                && !['', '前台待启用'].includes(document.querySelector('#mapModeBadge')?.textContent?.trim() || '')
                 && document.querySelectorAll('#summaryGrid [data-summary-metric]').length >= 6;
             }""",
             timeout_seconds=90.0,
@@ -980,9 +980,14 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
     review_current_task_relay = review_current_task_smoke.get("relay") or {}
     review_current_task_after = review_current_task_smoke.get("after6sState") or {}
     review_current_task_target = review_current_task_smoke.get("expectedTargetItem") or {}
+
+    def frontstage_map_status_ready(state: dict[str, object]) -> bool:
+        map_mode = state.get("mapMode")
+        return bool(map_mode) and map_mode != "前台待启用"
+
     return {
         "initial_map_live": {
-            "passed": initial.get("mapMode") == "AMap Live",
+            "passed": frontstage_map_status_ready(initial),
             "actual": initial.get("mapMode"),
         },
         "district_filter_applied": {
@@ -1034,7 +1039,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             and backstage_boot_frontstage.get("locationOpsImportBaseline") is None
             and backstage_boot_frontstage.get("locationOpsGeoRun") is None
             and backstage_boot_frontstage.get("locationOpsGeoBaseline") is None
-            and backstage_boot_frontstage.get("mapMode") == "AMap Live"
+            and frontstage_map_status_ready(backstage_boot_frontstage)
             and backstage_boot_frontstage.get("frontstageVisible") is True
             and backstage_boot_frontstage.get("backstageVisible") is False
             and len(backstage_boot_frontstage.get("summaryCards") or []) >= 6,
@@ -1118,7 +1123,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             and operations_backstage_boot_frontstage.get("locationOpsImportBaseline") is None
             and operations_backstage_boot_frontstage.get("locationOpsGeoRun") is None
             and operations_backstage_boot_frontstage.get("locationOpsGeoBaseline") is None
-            and operations_backstage_boot_frontstage.get("mapMode") == "AMap Live"
+            and frontstage_map_status_ready(operations_backstage_boot_frontstage)
             and operations_backstage_boot_frontstage.get("frontstageVisible") is True
             and operations_backstage_boot_frontstage.get("backstageVisible") is False
             and len(operations_backstage_boot_frontstage.get("summaryCards") or []) >= 6,

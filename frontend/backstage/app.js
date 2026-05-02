@@ -312,10 +312,13 @@ async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
   ensureImportRunSelection();
   ensureGeoAssetRunSelection();
   syncOperationsBackstageLocationIfNeeded();
-  if (
-    state.selectedBrowserCaptureRunId &&
-    !(effectiveOperationsOverview().browserCaptureRuns ?? []).some((item) => item.runId === state.selectedBrowserCaptureRunId)
-  ) {
+  const selectedBrowserCaptureRunId = state.selectedBrowserCaptureRunId;
+  const selectedBrowserCaptureRunStillListed = (effectiveOperationsOverview().browserCaptureRuns ?? []).some(
+    (item) => item.runId === selectedBrowserCaptureRunId
+  );
+  const selectedBrowserCaptureRunDetailLoaded =
+    selectedBrowserCaptureRunId && state.selectedBrowserCaptureRunDetail?.runId === selectedBrowserCaptureRunId;
+  if (selectedBrowserCaptureRunId && !selectedBrowserCaptureRunStillListed && !selectedBrowserCaptureRunDetailLoaded) {
     state.selectedBrowserCaptureRunId = null;
     state.selectedBrowserCaptureRunDetail = null;
     state.selectedBrowserCaptureReviewQueueId = null;
