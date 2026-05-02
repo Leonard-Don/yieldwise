@@ -53,8 +53,8 @@ _POOL_REGISTRY: dict[str, Any] = {}
 
 
 # T1 (audited 2026-04-29): all DB access routes through this pool.
-# Adding direct psycopg.connect() calls bypasses pool sizing and breaks
-# multi-user private deploy. See tests/api/test_persistence_pool.py.
+# Adding direct psycopg.connect() calls bypasses pool sizing and breaks the
+# long-running local service path. See tests/api/test_persistence_pool.py.
 def _get_pool(dsn: str) -> Any:
     pool = _POOL_REGISTRY.get(dsn)
     if pool is not None:

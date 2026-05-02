@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import signal
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import ProxyHandler, Request, build_opener
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -21,6 +22,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 import browser_capture_smoke as pw  # noqa: E402
 
+_url_opener = build_opener(ProxyHandler({}))
+
 
 def workflow_smoke_timeout_seconds() -> float:
     raw_value = os.getenv("ATLAS_WORKFLOW_SMOKE_TIMEOUT_SECONDS", "150")
@@ -30,49 +33,8 @@ def workflow_smoke_timeout_seconds() -> float:
         return 150.0
 
 
-def terminate_process_group(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=5.0)
-        return
-    except subprocess.TimeoutExpired:
-        pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=5.0)
-    except subprocess.TimeoutExpired:
-        pass
-
-
 def run_workflow_smoke_command(command: list[str], *, timeout_seconds: float) -> subprocess.CompletedProcess[str]:
-    process = subprocess.Popen(
-        command,
-        cwd=ROOT_DIR,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        start_new_session=True,
-    )
-    try:
-        stdout, stderr = process.communicate(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired as exc:
-        terminate_process_group(process)
-        stdout, stderr = process.communicate()
-        timeout_error = subprocess.TimeoutExpired(exc.cmd or command, timeout_seconds)
-        timeout_error.stdout = stdout
-        timeout_error.stderr = stderr
-        raise timeout_error from exc
-    if process.returncode:
-        raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
-    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    return pw.run_command_with_timeout(command, timeout_seconds=timeout_seconds, cwd=ROOT_DIR)
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -80,19 +42,160 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def run_pwcli_with_timeout(session: str, *args: str, timeout_seconds: float = 60.0) -> str:
-    env = pw.shell_env()
-    command = [env["PWCLI"], f"-s={pw.cli_session_name(session)}", *args]
-    completed = subprocess.run(
-        command,
-        cwd=ROOT_DIR,
-        env=env,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
+def atlas_api_url(atlas_url: str, path: str) -> str:
+    parsed = urlparse(atlas_url)
+    return urlunparse((parsed.scheme, parsed.netloc, path, "", "", ""))
+
+
+def request_json(url: str, *, method: str = "GET", payload: dict | None = None, timeout_seconds: float = 30.0) -> dict:
+    body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = Request(
+        url,
+        data=body,
+        method=method.upper(),
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
     )
-    return completed.stdout
+    with _url_opener.open(request, timeout=timeout_seconds) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def http_error_detail(error: HTTPError) -> str:
+    try:
+        payload = json.loads(error.read().decode("utf-8"))
+    except Exception:
+        return str(error)
+    detail = payload.get("detail") if isinstance(payload, dict) else None
+    return str(detail or error)
+
+
+def clear_server_runtime_caches(atlas_url: str) -> None:
+    try:
+        request_json(atlas_api_url(atlas_url, "/api/dev/runtime-caches/clear"), method="POST", payload={})
+    except Exception:
+        pass
+
+
+def has_staged_seed_data() -> bool:
+    import_manifests = list((ROOT_DIR / "tmp" / "import-runs").glob("*/manifest.json"))
+    metrics_manifests = list((ROOT_DIR / "tmp" / "metrics-runs").glob("*/manifest.json"))
+    return bool(import_manifests and metrics_manifests)
+
+
+def materialize_default_regression_seed_data() -> dict:
+    command = [
+        sys.executable,
+        str(ROOT_DIR / "jobs" / "materialize_public_snapshot.py"),
+        "--snapshot-dir",
+        str(ROOT_DIR / "data" / "public-snapshot" / "2026-04-12"),
+        "--enriched-community-file",
+        str(ROOT_DIR / "data" / "public-snapshot" / "2026-04-12" / "community_dictionary_seed.csv"),
+        "--pause-ms",
+        "0",
+    ]
+    completed = pw.run_command_with_timeout(command, timeout_seconds=180.0, cwd=ROOT_DIR)
+    return json.loads(completed.stdout.strip() or "{}")
+
+
+def browser_sampling_pack(atlas_url: str, *, limit: int = 20) -> list[dict]:
+    payload = request_json(f"{atlas_api_url(atlas_url, '/api/browser-sampling-pack')}?limit={limit}")
+    items = payload.get("items") if isinstance(payload, dict) else None
+    return [item for item in (items or []) if isinstance(item, dict)]
+
+
+def try_create_review_current_task_fixture(atlas_url: str) -> tuple[bool, str | None]:
+    try:
+        payload = request_json(
+            atlas_api_url(atlas_url, "/api/dev/browser-review-fixtures/review-current-task"),
+            method="POST",
+            payload={},
+        )
+    except HTTPError as error:
+        return False, http_error_detail(error)
+    fixture_id = str(payload.get("fixtureId") or "")
+    if fixture_id:
+        try:
+            request_json(
+                atlas_api_url(atlas_url, f"/api/dev/browser-review-fixtures/{fixture_id}"),
+                method="DELETE",
+            )
+        except Exception:
+            pass
+    return True, None
+
+
+def seed_review_current_task_capture_runs(atlas_url: str) -> list[str]:
+    tasks = browser_sampling_pack(atlas_url, limit=20)
+    task = next((item for item in tasks if item.get("taskId") and item.get("communityName")), None)
+    if not task:
+        raise RuntimeError("全量浏览器回归无法找到可用于 review fixture 的公开页采样任务。")
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    community_name = str(task.get("communityName") or "公开样本小区")
+    district_name = str(task.get("districtName") or "")
+    capture_url = atlas_api_url(atlas_url, "/api/browser-sampling-captures")
+    capture_run_ids: list[str] = []
+    for index in range(1, 3):
+        suffix = f"{timestamp}-{index}"
+        payload = {
+            "task_id": task.get("taskId"),
+            "task": task,
+            "batch_name": f"full-browser-regression-seed-{suffix}",
+            "refresh_metrics": False,
+            "captures": [
+                {
+                    "business_type": "sale",
+                    "source_listing_id": f"full-regression-seed-sale-{suffix}",
+                    "url": f"https://example.com/full-regression/seed-sale-{suffix}",
+                    "published_at": "2026-04-14T10:30:00+08:00",
+                    "community_name": community_name,
+                    "address_text": f"{district_name} {community_name}".strip() or community_name,
+                    "raw_text": f"{community_name} 89平米 2室2厅 南向 精装 挂牌总价{620 + index}万",
+                },
+                {
+                    "business_type": "rent",
+                    "source_listing_id": f"full-regression-seed-rent-{suffix}",
+                    "url": f"https://example.com/full-regression/seed-rent-{suffix}",
+                    "published_at": "2026-04-14T10:42:00+08:00",
+                    "community_name": community_name,
+                    "address_text": f"{district_name} {community_name}".strip() or community_name,
+                    "raw_text": f"{community_name} 89平米 2室2厅 南向 精装 月租{11800 + index * 100}元",
+                },
+            ],
+        }
+        result = request_json(capture_url, method="POST", payload=payload, timeout_seconds=90.0)
+        capture_run_id = str(result.get("captureRunId") or "")
+        if capture_run_id:
+            capture_run_ids.append(capture_run_id)
+    clear_server_runtime_caches(atlas_url)
+    return capture_run_ids
+
+
+def ensure_full_regression_seed_data(atlas_url: str) -> dict:
+    result: dict[str, object] = {
+        "materializedSeedData": False,
+        "seededReviewCaptureRuns": [],
+    }
+    if not has_staged_seed_data():
+        result["materializedSeedData"] = True
+        result["materializeResult"] = materialize_default_regression_seed_data()
+        clear_server_runtime_caches(atlas_url)
+
+    has_candidate, reason = try_create_review_current_task_fixture(atlas_url)
+    result["reviewFixtureCandidateBeforeSeed"] = has_candidate
+    if has_candidate:
+        return result
+
+    result["reviewFixtureSeedReason"] = reason
+    result["seededReviewCaptureRuns"] = seed_review_current_task_capture_runs(atlas_url)
+    has_candidate, reason = try_create_review_current_task_fixture(atlas_url)
+    result["reviewFixtureCandidateAfterSeed"] = has_candidate
+    if not has_candidate:
+        raise RuntimeError(f"全量浏览器回归无法准备 review_current_task fixture：{reason or 'unknown'}")
+    return result
+
+
+def run_pwcli_with_timeout(session: str, *args: str, timeout_seconds: float = 60.0) -> str:
+    return pw.run_pwcli(session, *args, timeout_seconds=timeout_seconds)
 
 
 def is_retryable_playwright_error(message: str) -> bool:
@@ -370,7 +473,7 @@ def set_filter_panel_tab(session: str, tab: str) -> dict:
               .filter(Boolean),
           }};
         }}""",
-        timeout_seconds=30.0,
+        timeout_seconds=90.0,
     )
 
 
@@ -1441,7 +1544,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             "passed": bool(district_coverage_click.get("clicked"))
             and district_coverage.get("districtFilter") == district_coverage_click.get("district")
             and district_coverage.get("selectedSamplingTaskId") == district_coverage_click.get("taskId")
-            and (district_coverage.get("rankingCount") or 0) == (district_coverage.get("visibleCommunityCount") or 0),
+            and (district_coverage.get("rankingCount") or 0) == (district_coverage.get("coverageCommunityCount") or 0),
             "actual": {
                 "clicked": district_coverage_click.get("clicked"),
                 "district": district_coverage_click.get("district"),
@@ -1450,6 +1553,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
                 "selectedSamplingTaskId": district_coverage.get("selectedSamplingTaskId"),
                 "samplingTaskLabel": district_coverage.get("samplingTaskLabel"),
                 "rankingCount": district_coverage.get("rankingCount"),
+                "coverageCommunityCount": district_coverage.get("coverageCommunityCount"),
                 "visibleCommunityCount": district_coverage.get("visibleCommunityCount"),
             },
         },
@@ -1656,6 +1760,20 @@ def main() -> int:
       "session": args.session,
       "steps": [],
     }
+
+    seed_data = ensure_full_regression_seed_data(args.url)
+    artifacts["seedData"] = seed_data
+    artifacts["steps"].append(
+        {
+            "name": "seed-regression-data",
+            "result": {
+                "materializedSeedData": seed_data.get("materializedSeedData"),
+                "seededReviewCaptureRuns": seed_data.get("seededReviewCaptureRuns"),
+                "reviewFixtureCandidateBeforeSeed": seed_data.get("reviewFixtureCandidateBeforeSeed"),
+                "reviewFixtureCandidateAfterSeed": seed_data.get("reviewFixtureCandidateAfterSeed"),
+            },
+        }
+    )
 
     review_current_task_smoke = run_browser_review_workflow_smoke(
         args.url,

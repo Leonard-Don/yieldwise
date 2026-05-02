@@ -53,7 +53,7 @@ python3 jobs/import_reference_dictionary.py \
 
 ```bash
 python3 jobs/import_authorized_listings.py \
-  --provider-id beike-open-platform \
+  --provider-id authorized-import \
   --batch-name "pudong-demo-2026-04-11" \
   --sale-file data/templates/authorized_sale_template.csv \
   --rent-file data/templates/authorized_rent_template.csv \
@@ -64,7 +64,7 @@ python3 jobs/import_authorized_listings.py \
 
 ```bash
 python3 jobs/import_authorized_listings.py \
-  --provider-id beike-open-platform \
+  --provider-id authorized-import \
   --batch-name "pudong-demo-2026-04-12" \
   --sale-file data/demo/authorized_sale_demo_2026-04-12.csv \
   --rent-file data/demo/authorized_rent_demo_2026-04-12.csv \

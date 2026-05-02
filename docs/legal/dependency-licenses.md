@@ -7,7 +7,7 @@
   - ❌ Forbidden in `main`: GPL-*, AGPL-*, statically-linked LGPL
   - 🟡 Per-case review: SSPL, BSL — confirm scope at next refresh
 - **Frontend deps:** loaded via CDN script tags from `frontend/*/index.html` —
-  - 高德 SDK：客户使用商用 key，许可由客户与高德直接签署（参见部署 SOP）
+  - 高德 SDK：本地运行时由使用者自行配置个人/开发 Key，并遵守高德平台条款
 
 ## Backend Dependencies
 
@@ -31,20 +31,20 @@
 
 ## LGPL Components (Dynamic Import)
 
-The following dependencies are LGPL-3.0-only. They are consumed via Python `import` only — no static linking, no modification, no redistribution of modified versions. Per the audit policy this is acceptable; client legal review should confirm against their own corporate policy.
+The following dependencies are LGPL-3.0-only. They are consumed via Python `import` only: no static linking, no modification, no redistribution of modified versions. Per the local open-source audit policy this is acceptable.
 
 | Package | Version | License | Usage | Justification |
 |---|---|---|---|---|
-| psycopg | 3.x | LGPL-3.0-only | PostgreSQL driver, dynamic `import psycopg` | de facto Python Postgres driver; no commercial drop-in replacement at parity |
+| psycopg | 3.x | LGPL-3.0-only | PostgreSQL driver, dynamic `import psycopg` | mature Python Postgres driver for local PostGIS workflows |
 | psycopg-pool | 3.x | LGPL-3.0-only | Connection pool wrapper | companion to psycopg; same legal posture |
 
-If the client's policy disallows LGPL outright, swap for `pg8000` (BSD-3-Clause). This requires a code migration: pg8000 has different cursor/row API, no async, no built-in pool — re-evaluate before committing to the swap.
+If this project ever needs a stricter dependency posture for public packaging, evaluate `pg8000` (BSD-3-Clause) in a separate technical migration.
 
 ## Frontend / Vendored Assets
 
 | 资产 | 来源 | 许可 | 备注 |
 | --- | --- | --- | --- |
-| AMap JS API | api.amap.com | 商业版需高德商用 key | 客户自备 |
+| AMap JS API | api.amap.com | 按高德平台条款 | 本地使用者自行配置个人/开发 Key |
 
 ## Refresh policy
 

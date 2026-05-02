@@ -9,7 +9,6 @@ MOCK_ENV_FLAG = "ATLAS_ENABLE_DEMO_MOCK"
 REFERENCE_CATALOG_ENV = "ATLAS_REFERENCE_CATALOG_FILE"
 
 PROVIDER_ALIASES = {
-    "58-anjuke-platform": "58-anjuke-open",
     "shanghai-open-data-community": "shanghai-open-data",
     "authorized-import": "authorized-batch-import",
     "official-export": "authorized-batch-import",
@@ -17,55 +16,6 @@ PROVIDER_ALIASES = {
 }
 
 PROVIDER_REGISTRY = [
-    {
-        "id": "beike-open-platform",
-        "name": "贝壳开放平台",
-        "category": "official_api",
-        "priority": "high",
-        "role": "主商业数据来源候选",
-        "coverage": "出售 / 出租 listing 批次，支持到 resblock / building / unit / floor 的标准地址模型。",
-        "connectionState": "not_connected",
-        "supportsLivePull": False,
-        "requiredEnv": [],
-        "credentialSets": [
-            {
-                "label": "oauth_client",
-                "env": ["BEIKE_CLIENT_ID", "BEIKE_CLIENT_SECRET"],
-            },
-            {
-                "label": "application_credentials",
-                "env": ["BEIKE_APP_ID", "BEIKE_APP_AK"],
-            },
-        ],
-        "scopes": ["sale_rent_batch", "dictionary_batch"],
-        "platformUrl": "https://open.ke.com/",
-        "applyUrl": "https://open.ke.com/serviceSupport/tutorialtryout/",
-        "docsUrl": "https://open.ke.com/serviceSupport/getToken/",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#beike-open-platform",
-        "applicationMode": "self_serve_trial",
-        "recommendedNextStep": "先注册并申请试用，拿到 access_token 后优先对接 listing / dictionary 批次。",
-        "contactLabel": "咨询邮箱",
-        "contactValue": "jiaoxiadan001@ke.com",
-    },
-    {
-        "id": "58-anjuke-open",
-        "name": "58 / 安居客开放体系",
-        "category": "official_partner",
-        "priority": "high",
-        "role": "补充型商业 listing 来源候选",
-        "coverage": "出售 / 出租 listing 批次，适合作为多平台样本补充和去重来源。",
-        "connectionState": "not_connected",
-        "supportsLivePull": False,
-        "requiredEnv": [],
-        "scopes": ["sale_rent_batch"],
-        "platformUrl": "https://www.58.com/",
-        "docsUrl": "https://static.58.com/git/passport-mapp/pdf/announcement.pdf",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#58-anjuke-open",
-        "applicationMode": "business_contact",
-        "recommendedNextStep": "优先走商务合作、系统授权导出或合作接口，不假设存在公开自助 API。",
-        "contactLabel": "建议路径",
-        "contactValue": "商务合作 / 授权导出",
-    },
     {
         "id": "shanghai-open-data",
         "name": "上海开放数据",
@@ -80,7 +30,7 @@ PROVIDER_REGISTRY = [
         "platformUrl": "https://data.sh.gov.cn/view/",
         "applyUrl": "https://data.sh.gov.cn/view/sandbox/index.html",
         "docsUrl": "https://data.sh.gov.cn/assets/data/%E4%B8%8A%E6%B5%B7%E5%B8%82%E5%85%AC%E5%85%B1%E6%95%B0%E6%8D%AE%E5%BC%80%E6%94%BE%E5%B9%B3%E5%8F%B0%E6%93%8D%E4%BD%9C%E6%8C%87%E5%8D%9720210729V2.2.5.pdf",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#shanghai-open-data",
+        "guideUrl": "/docs/import-reference-dictionary.md",
         "applicationMode": "catalog_apply_or_download",
         "recommendedNextStep": "先检索公开数据集；无条件开放直接下载或接口调用，有条件开放点申请，敏感场景走安全沙箱。",
         "contactLabel": "客服邮箱",
@@ -100,7 +50,7 @@ PROVIDER_REGISTRY = [
         "platformUrl": "https://lbs.amap.com/",
         "applyUrl": "https://lbs.amap.com/",
         "docsUrl": "https://a.amap.com/jsapi/static/doc/index.html",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#amap-aoi-poi",
+        "guideUrl": "/docs/import-geo-assets.md",
         "applicationMode": "console_key",
         "recommendedNextStep": "先登录高德开放平台，在应用管理创建 JSAPI / Web 服务 Key；AOI / footprint 继续通过几何批次导入。",
         "contactLabel": "控制台动作",
@@ -117,9 +67,9 @@ PROVIDER_REGISTRY = [
         "supportsLivePull": False,
         "requiredEnv": [],
         "scopes": ["sale_rent_batch", "dictionary_batch"],
-        "platformUrl": "/docs/internal/provider-access-playbook.md#public-browser-sampling",
-        "docsUrl": "/docs/internal/provider-access-playbook.md#public-browser-sampling",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#public-browser-sampling",
+        "platformUrl": "/docs/internal/import-public-browser-capture.md",
+        "docsUrl": "/docs/internal/import-public-browser-capture.md",
+        "guideUrl": "/docs/internal/import-public-browser-capture.md",
         "applicationMode": "browser_staging",
         "recommendedNextStep": "先把浏览器人工采样文本整理成 capture CSV，再跑 import_public_browser_capture.py 落成标准 sale_rent_batch / dictionary_batch 产物。",
         "contactLabel": "使用边界",
@@ -136,9 +86,9 @@ PROVIDER_REGISTRY = [
         "supportsLivePull": False,
         "requiredEnv": [],
         "scopes": ["geometry_batch"],
-        "platformUrl": "/docs/internal/provider-access-playbook.md#manual-geometry-staging",
-        "docsUrl": "/docs/internal/provider-access-playbook.md#manual-geometry-staging",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#manual-geometry-staging",
+        "platformUrl": "/docs/import-geo-assets.md",
+        "docsUrl": "/docs/import-geo-assets.md",
+        "guideUrl": "/docs/import-geo-assets.md",
         "applicationMode": "manual_sketch",
         "recommendedNextStep": "当官方 AOI / footprint 还没接通时，先把重点区楼栋手工勾绘成 GeoJSON，统一走 geometry_batch 导入。",
         "contactLabel": "使用边界",
@@ -149,15 +99,15 @@ PROVIDER_REGISTRY = [
         "name": "授权离线批次",
         "category": "offline_authorized",
         "priority": "medium",
-        "role": "官方导出文件 / 商务授权样本的离线 staging 通道",
+        "role": "自有 CSV / 已授权样本的离线 staging 通道",
         "coverage": "出售 / 出租 CSV、字典 CSV、GeoJSON footprint 批次与联调 conformance harness。",
         "connectionState": "offline_ready",
         "supportsLivePull": False,
         "requiredEnv": [],
         "scopes": ["sale_rent_batch", "dictionary_batch", "geometry_batch"],
         "platformUrl": "/docs/import-authorized-data.md",
-        "docsUrl": "/docs/internal/provider-access-playbook.md#authorized-batch-import",
-        "guideUrl": "/docs/internal/provider-access-playbook.md#authorized-batch-import",
+        "docsUrl": "/docs/import-authorized-data.md",
+        "guideUrl": "/docs/import-authorized-data.md",
         "applicationMode": "internal_staging",
         "recommendedNextStep": "拿到官方导出 CSV / GeoJSON 后先走离线 staging，再写入 PostgreSQL 作为主读数据。",
         "contactLabel": "内部链路",
@@ -285,7 +235,7 @@ def provider_readiness_snapshot(
             missing_env = [name for name in required_env if name not in configured_env]
             env_ready = bool(required_env) and not missing_env
         connection_state = readiness.get("connectionState", "not_connected")
-        note = "等待商务授权或官方导出文件。"
+        note = "等待本地数据文件、公开数据下载或手工批次。"
         if readiness["id"] == "authorized-batch-import":
             note = "离线导入通道已可用，用于 staging 和 conformance harness。"
         elif readiness["id"] == "public-browser-sampling":
@@ -294,11 +244,7 @@ def provider_readiness_snapshot(
             note = "手工几何 staging 通道已可用，适合重点区楼栋 footprint 人工勾绘与研究校正。"
         elif env_ready:
             connection_state = "credentials_ready"
-            note = (
-                "凭证位已配置，等待真正的 provider adapter 实现。"
-                if readiness["id"] != "beike-open-platform"
-                else "贝壳应用凭证已配置，下一步是按官方 token 规则把在线 adapter 接起来。"
-            )
+            note = "凭证位已配置，可用于本地数据辅助任务。"
         elif configured_env:
             connection_state = "credentials_partial"
             note = f"已配置部分凭证：{', '.join(configured_env)}；仍缺少 {', '.join(missing_env)}。"
@@ -332,7 +278,9 @@ def provider_readiness_snapshot(
         readiness["isPrimaryCandidate"] = readiness["priority"] == "high"
         readiness["activeDataRole"] = (
             "active_database"
-            if has_real_data and readiness["id"] in {"beike-open-platform", "58-anjuke-open", "shanghai-open-data", "amap-aoi-poi"}
+            if has_real_data
+            and readiness["id"]
+            in {"shanghai-open-data", "amap-aoi-poi", "authorized-batch-import", "public-browser-sampling", "manual-geometry-staging"}
             else "staging"
             if staged_count
             else "planned"

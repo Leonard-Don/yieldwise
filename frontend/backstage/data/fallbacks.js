@@ -104,7 +104,7 @@ const fallbackDistricts = [
         sample: 30,
         buildingCount: 6,
         buildingFocus: "9幢",
-        note: "低总价高出租活跃度，适合 MVP 试点。",
+        note: "低总价高出租活跃度，适合本地样本演示。",
         buildings: [
           { name: "3幢", totalFloors: 12, low: 2.63, mid: 2.75, high: 2.71, score: 83 },
           { name: "9幢", totalFloors: 18, low: 2.84, mid: 2.96, high: 3.04, score: 92 },
@@ -352,7 +352,7 @@ const fallbackDistricts = [
 const fallbackPipelineSteps = [
   {
     title: "采集层",
-    description: "安居客 / 贝壳出售与出租房源，保留原始文本、原始坐标、抓取时间与页面快照。",
+    description: "本地 CSV 与公开页人工采样样本，保留原始文本、原始坐标、抓取时间与页面快照。",
     meta: "raw_listings_sale / raw_listings_rent"
   },
   {
@@ -420,26 +420,6 @@ const fallbackOperationsOverview = {
   },
   sourceHealth: [
     {
-      sourceId: "beike-open-platform",
-      name: "贝壳开放平台",
-      status: "ready_for_integration",
-      freshness: "T-1",
-      coveragePct: 78,
-      listingCount: 326,
-      normalizationPct: 88,
-      note: "OAuth 与字段映射位已预留，适合做主商业源。"
-    },
-    {
-      sourceId: "58-anjuke-platform",
-      name: "58 / 安居客开放体系",
-      status: "partner_negotiation",
-      freshness: "T-2",
-      coveragePct: 64,
-      listingCount: 214,
-      normalizationPct: 72,
-      note: "字段一致性需要更强的地址归一与去重。"
-    },
-    {
       sourceId: "shanghai-open-data-community",
       name: "上海开放数据 · 物业小区信息",
       status: "online",
@@ -457,7 +437,7 @@ const fallbackOperationsOverview = {
       coveragePct: 58,
       listingCount: 48,
       normalizationPct: 84,
-      note: "适合先跑小批量授权数据、地址复核和逐层证据验证。"
+      note: "适合先跑小批量自有 CSV、地址复核和逐层证据验证。"
     },
     {
       sourceId: "amap-aoi-poi",
@@ -477,7 +457,7 @@ const fallbackOperationsOverview = {
       buildingNo: "5号楼",
       buildingId: "zhangjiang-park-b2",
       floorNo: 17,
-      sourceId: "beike-open-platform",
+      sourceId: "authorized-batch-import",
       rawAddress: "浦东新区张江路xx弄5号楼17层1702",
       normalizedPath: "浦东新区 / 张江汤臣豪园 / 5号楼 / 2单元 / 17层 / 1702",
       status: "resolved",
@@ -491,7 +471,7 @@ const fallbackOperationsOverview = {
       buildingNo: "5号楼",
       buildingId: "zhangjiang-park-b2",
       floorNo: 24,
-      sourceId: "58-anjuke-platform",
+      sourceId: "public-browser-sampling",
       rawAddress: "张江汤臣豪园5号楼顶层复式",
       normalizedPath: "浦东新区 / 张江汤臣豪园 / 5号楼 / 待识别单元 / 24层",
       status: "needs_review",
@@ -505,7 +485,7 @@ const fallbackOperationsOverview = {
       buildingNo: "9幢",
       buildingId: "qibao-yunting-b2",
       floorNo: 12,
-      sourceId: "beike-open-platform",
+      sourceId: "authorized-batch-import",
       rawAddress: "七宝云庭9幢12楼1201",
       normalizedPath: "闵行区 / 七宝云庭 / 9幢 / 1单元 / 12层 / 1201",
       status: "resolved",
@@ -519,7 +499,7 @@ const fallbackOperationsOverview = {
       buildingNo: "12幢",
       buildingId: "gongkang-hill-b2",
       floorNo: 18,
-      sourceId: "58-anjuke-platform",
+      sourceId: "public-browser-sampling",
       rawAddress: "共康新城十二幢18F",
       normalizedPath: "宝山区 / 共康新城 / 12幢 / 待识别单元 / 18层",
       status: "matching",
@@ -548,7 +528,7 @@ const fallbackOperationsOverview = {
   importRuns: [
     {
       runId: "pudong-demo-2026-04-11-20260411222040",
-      providerId: "beike-open-platform",
+      providerId: "authorized-batch-import",
       batchName: "pudong-demo-2026-04-11",
       createdAt: "2026-04-11T22:20:40+08:00",
       resolvedRate: 0.75,

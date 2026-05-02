@@ -8,8 +8,7 @@ work through targets one at a time without re-reading the prose.
 For each backlog target it produces:
 - community + building/floor context
 - desired sale + rent counts (to know when you can move on)
-- a pre-built 安居客 search URL (the same source that public-open-snapshot
-  used: mobile.anjuke.com/sh/...) so you can open the right page in one click
+- sale + rent search keywords you can paste into any regular browser
 
 Output:
     tmp/sampling-tasks/<TS>/worklist.csv
@@ -35,7 +34,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_BACKLOG = ROOT_DIR / "docs" / "public-sampling-backlog.md"
@@ -120,17 +118,17 @@ def _infer_scope_kind(scope: str) -> str:
     return "other"
 
 
-def build_anjuke_url(community: str, business: str = "sale") -> str:
-    base = "https://shanghai.anjuke.com/sale/?kw=" if business == "sale" else "https://shanghai.anjuke.com/zu/?kw="
-    return base + quote(community)
+def build_public_search_query(community: str, business: str = "sale") -> str:
+    suffix = "二手房" if business == "sale" else "租房"
+    return f"上海 {community} {suffix}"
 
 
 def items_to_rows(items: list[dict]) -> list[dict]:
     rows: list[dict] = []
     for it in items:
         community = it["community"]
-        sale_url = build_anjuke_url(community, "sale")
-        rent_url = build_anjuke_url(community, "rent")
+        sale_query = build_public_search_query(community, "sale")
+        rent_query = build_public_search_query(community, "rent")
         delta = (it["target_count"] or 0) - (it["current_count"] or 0) if it["target_count"] else None
         rows.append({
             "priority": it["priority"],
@@ -140,8 +138,8 @@ def items_to_rows(items: list[dict]) -> list[dict]:
             "current_count": it["current_count"],
             "target_count": it["target_count"],
             "delta_to_target": delta,
-            "anjuke_sale_search": sale_url,
-            "anjuke_rent_search": rent_url,
+            "sale_search_query": sale_query,
+            "rent_search_query": rent_query,
         })
     return rows
 
@@ -193,8 +191,8 @@ def main() -> int:
         delta = r["delta_to_target"]
         suffix = f" ({delta} more to go)" if delta else ""
         print(f"    • {r['community']} {r['scope']}{suffix}")
-        print(f"      sale: {r['anjuke_sale_search']}")
-        print(f"      rent: {r['anjuke_rent_search']}")
+        print(f"      sale query: {r['sale_search_query']}")
+        print(f"      rent query: {r['rent_search_query']}")
     return 0
 
 

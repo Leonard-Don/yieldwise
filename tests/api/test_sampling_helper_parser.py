@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from guided_sampling_helper import _infer_scope_kind, build_anjuke_url, parse_backlog
+from guided_sampling_helper import _infer_scope_kind, build_public_search_query, parse_backlog
 
 
 def test_scope_kind_inference() -> None:
@@ -19,12 +19,9 @@ def test_scope_kind_inference() -> None:
     assert _infer_scope_kind("something else") == "other"
 
 
-def test_anjuke_url_encodes_chinese() -> None:
-    url = build_anjuke_url("松江大学城嘉和休闲广场", "sale")
-    assert url.startswith("https://shanghai.anjuke.com/sale/?kw=")
-    # The url-encoded community name is included
-    assert "%E6%9D%BE%E6%B1%9F" in url  # 松江
-    assert build_anjuke_url("X", "rent").startswith("https://shanghai.anjuke.com/zu/?kw=")
+def test_public_search_query_includes_business_context() -> None:
+    assert build_public_search_query("松江大学城嘉和休闲广场", "sale") == "上海 松江大学城嘉和休闲广场 二手房"
+    assert build_public_search_query("X", "rent") == "上海 X 租房"
 
 
 def test_parse_backlog_extracts_priority_items() -> None:

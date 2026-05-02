@@ -4203,7 +4203,7 @@ def _system_strategy_payload_cached() -> dict[str, Any]:
         "provider_id": "public-browser-sampling",
         "scope": "staging_only",
         "read_only_public_pages": True,
-        "login_required_pages": False,
+        "account_gated_pages": False,
         "bulk_scraping": False,
         "note": "只用于公开页面字段补洞与小批量浏览器辅助采样，最终仍统一落成标准批次。",
     }

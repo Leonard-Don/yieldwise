@@ -5,7 +5,7 @@
 ## 适用场景
 
 - 上海开放数据导出的行政区 / 小区主档
-- 贝壳或内部系统整理出的 `standResblock / standBuilding` 映射
+- 自己整理或公开开放渠道下载后整理出的 `standResblock / standBuilding` 映射
 - GIS / 研究团队人工维护的小区 / 楼栋别名表
 
 ## 输入文件

@@ -1,12 +1,12 @@
 # Authorized Import Flow
 
-这份说明把“官方合作接口导出 / 人工授权导出 CSV”接进当前 MVP 的最短路径固定下来。
+这份说明把“自有或已授权 CSV”接进当前本地工作台的最短路径固定下来。
 
 这轮开始，这条链默认不再偷吃 demo 词典。脚本会优先从 PostgreSQL 主档读取 reference catalog；如果数据库还没准备好，可以先跑一批 reference dictionary，或显式设置 `ATLAS_REFERENCE_CATALOG_FILE` 指向一份离线主档。只有在 `ATLAS_ENABLE_DEMO_MOCK=true` 时，才允许退回 demo catalog。
 
 ## 适用场景
 
-- 贝壳开放平台、58/安居客开放平台或内部授权系统导出的 `CSV`
+- 自己整理、购买后合法持有、或从公开开放渠道下载后整理出的 `CSV`
 - 研究员人工整理的小批量出售 / 出租样本
 - 暂时不走在线 API，但希望先跑通地址标准化、楼层归一和逐层证据配对
 
@@ -68,7 +68,7 @@
 
 ```bash
 python3 jobs/import_authorized_listings.py \
-  --provider-id beike-open-platform \
+  --provider-id authorized-import \
   --batch-name "pudong-demo-2026-04-11" \
   --sale-file data/templates/authorized_sale_template.csv \
   --rent-file data/templates/authorized_rent_template.csv \
@@ -85,7 +85,7 @@ python3 jobs/import_authorized_listings.py \
 
 ```bash
 python3 jobs/import_authorized_listings.py \
-  --provider-id beike-open-platform \
+  --provider-id authorized-import \
   --batch-name "pudong-demo-2026-04-12" \
   --sale-file data/demo/authorized_sale_demo_2026-04-12.csv \
   --rent-file data/demo/authorized_rent_demo_2026-04-12.csv \

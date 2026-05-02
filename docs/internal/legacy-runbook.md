@@ -16,7 +16,7 @@
 
 ## 这个仓库现在是什么
 
-- 一个面向单用户研究的产品化平台 `/`（Phase 6 完工）：三模式（收益猎手 / 自住找房 / 全市观察）+ 关注夹 + 笔记 + 变化提醒 + ⌘K 全局搜索 + 区抽屉
+- 一个面向单用户研究的本地工具 `/`（Phase 6 完工）：三模式（收益猎手 / 自住找房 / 全市观察）+ 关注夹 + 笔记 + 变化提醒 + ⌘K 全局搜索 + 区抽屉
 - 一个 FastAPI 本地工作台：页面、接口和 staged/database 运行态保持一致
 - 一条 staged 优先的数据流水线：reference / import / geo / metrics 可逐批落盘
 - 一条公开页补样闭环：任务包、原文录入、attention review queue、relay contract、browser smoke 都已接通
@@ -183,14 +183,8 @@ npx serve .
 ```bash
 AMAP_API_KEY=your_amap_key
 AMAP_SECURITY_JSCODE=your_amap_security_js_code
-BEIKE_CLIENT_ID=your_beike_client_id
-BEIKE_CLIENT_SECRET=your_beike_client_secret
-BEIKE_APP_ID=your_beike_app_id
-BEIKE_APP_AK=your_beike_app_ak
 POSTGRES_DSN=postgresql://atlas:atlas_local_dev@127.0.0.1:5432/shanghai_yield_atlas
 ```
-
-如果贝壳当前拿到的是“应用 ID + 应用 AK”，也可以先放 `BEIKE_APP_ID / BEIKE_APP_AK`，工作台会把它识别成已配置的一套凭证模型。
 
 ## 如何跑授权导入演示
 
@@ -198,7 +192,7 @@ POSTGRES_DSN=postgresql://atlas:atlas_local_dev@127.0.0.1:5432/shanghai_yield_at
 
 ```bash
 python3 jobs/import_authorized_listings.py \
-  --provider-id beike-open-platform \
+  --provider-id authorized-import \
   --batch-name "pudong-demo-2026-04-11" \
   --sale-file data/templates/authorized_sale_template.csv \
   --rent-file data/templates/authorized_rent_template.csv \
@@ -206,8 +200,6 @@ python3 jobs/import_authorized_listings.py \
 ```
 
 字段模板和输出说明见 `docs/import-authorized-data.md`。
-
-如果你要推进真实世界接入，建议同时打开 `docs/provider-access-playbook.md`，里面已经整理好贝壳 / 上海开放数据 / 高德 / 58 的接入顺序、申请入口和内部推荐动作。
 
 ## 如何跑 reference dictionary 导入
 
@@ -449,7 +441,7 @@ curl "http://127.0.0.1:8000/api/export/browser-sampling-pack.csv"
 
 ```bash
 python3 jobs/import_authorized_listings.py \
-  --provider-id beike-open-platform \
+  --provider-id authorized-import \
   --batch-name "pudong-demo-2026-04-12" \
   --sale-file data/demo/authorized_sale_demo_2026-04-12.csv \
   --rent-file data/demo/authorized_rent_demo_2026-04-12.csv \
@@ -537,7 +529,6 @@ python3 jobs/load_import_run_to_postgres.py \
 - `db/schema.sql`：PostgreSQL + PostGIS 建表稿
 - `docs/api-contract.md`：接口说明
 - `docs/import-authorized-data.md`：授权导入字段模板与批次说明
-- `docs/provider-access-playbook.md`：provider 申请入口、官方文档与接入顺序
 - `docs/import-reference-dictionary.md`：reference dictionary 导入说明
 - `docs/strategy.md`：地图 / 数据 / 坐标 / 地址标准化策略
 - `data/templates/`：授权出售 / 出租 CSV 模板
@@ -556,7 +547,7 @@ python3 jobs/load_import_run_to_postgres.py \
 
 ## 原型定位
 
-这个版本仍然是“内部研究系统 Beta”，不是外部产品。当前地图已经会按小区 / 楼栋 / 楼层三种粒度切换，并在楼栋 / 楼层视图里优先读取后端 `geo-assets` 返回的 footprint 面图；当数据库或几何主档为空时，页面会明确显示空态、覆盖缺口和 staging 状态，而不是伪造结果。现阶段 demo 坐标仍然是示意级，不是最终精确上海楼栋底图；楼层结果仍然更偏证据层，不把“全市楼层精确覆盖”当作当前阶段交付标准。
+这个版本仍然是“内部研究系统 Beta”，不是对外交付物。当前地图已经会按小区 / 楼栋 / 楼层三种粒度切换，并在楼栋 / 楼层视图里优先读取后端 `geo-assets` 返回的 footprint 面图；当数据库或几何主档为空时，页面会明确显示空态、覆盖缺口和 staging 状态，而不是伪造结果。现阶段 demo 坐标仍然是示意级，不是最终精确上海楼栋底图；楼层结果仍然更偏证据层，不把“全市楼层精确覆盖”当作当前阶段交付标准。
 
 ## 下一步怎么接真实项目
 

@@ -6801,9 +6801,9 @@ function renderStrategy() {
       google_earth: "WGS-84 导出"
     },
     data_policy: {
-      priority: "官方合作 / 开放平台优先",
+      priority: "公开开放数据 / 自有 CSV 优先",
       fallback: "低频人工导入与校正",
-      risk_note: "避免把长期产品建立在不稳定抓取链路上。"
+      risk_note: "避免把长期工具建立在不稳定抓取链路上。"
     },
     address_model: ["district", "resblock", "building", "unit", "floor"]
   };

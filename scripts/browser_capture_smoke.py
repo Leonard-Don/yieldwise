@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -72,17 +73,65 @@ def cli_session_name(session: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def terminate_process_group(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=5.0)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=5.0)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def run_command_with_timeout(
+    command: list[str],
+    *,
+    timeout_seconds: float | None,
+    env: dict[str, str] | None = None,
+    cwd: Path = ROOT_DIR,
+) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        terminate_process_group(process)
+        stdout, stderr = process.communicate()
+        timeout_error = subprocess.TimeoutExpired(exc.cmd or command, timeout_seconds, output=stdout, stderr=stderr)
+        timeout_error.stdout = stdout
+        timeout_error.stderr = stderr
+        raise timeout_error from exc
+    if process.returncode:
+        raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
 def run_pwcli(session: str, *args: str, timeout_seconds: float | None = PWCLI_COMMAND_TIMEOUT_SECONDS) -> str:
     env = shell_env()
     command = [env["PWCLI"], f"-s={cli_session_name(session)}", *args]
-    completed = subprocess.run(
+    completed = run_command_with_timeout(
         command,
-        cwd=ROOT_DIR,
         env=env,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
+        timeout_seconds=timeout_seconds,
     )
     return completed.stdout
 
@@ -107,17 +156,7 @@ def is_retryable_playwright_command_error(text: str) -> bool:
     return any(marker in text for marker in retryable_markers)
 
 
-def close_session_quietly(session: str) -> None:
-    try:
-        run_pwcli(session, "close", timeout_seconds=5)
-    except subprocess.TimeoutExpired:
-        pass
-    except Exception:
-        pass
-
-
-def cleanup_session_artifacts(session: str) -> None:
-    close_session_quietly(session)
+def remove_session_artifact_sockets(session: str) -> None:
     cli_session = cli_session_name(session)
     temp_root = Path(tempfile.gettempdir())
     patterns = [
@@ -130,6 +169,61 @@ def cleanup_session_artifacts(session: str) -> None:
                 socket_path.unlink(missing_ok=True)
             except OSError:
                 pass
+
+
+def kill_session_cli_daemons(session: str) -> None:
+    cli_session = cli_session_name(session)
+    try:
+        completed = subprocess.run(
+            ["ps", "-axo", "pid=,command="],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return
+    matched_pids: list[int] = []
+    for line in completed.stdout.splitlines():
+        stripped = line.strip()
+        pid_text, _, command = stripped.partition(" ")
+        if not pid_text.isdigit() or "cliDaemon.js" not in command:
+            continue
+        if command.split()[-1:] == [cli_session]:
+            matched_pids.append(int(pid_text))
+    for pid in matched_pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            continue
+    if matched_pids:
+        time.sleep(0.2)
+    for pid in matched_pids:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            continue
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def close_session_quietly(session: str) -> None:
+    try:
+        run_pwcli(session, "close", timeout_seconds=5)
+    except subprocess.TimeoutExpired:
+        pass
+    except Exception:
+        pass
+    kill_session_cli_daemons(session)
+    remove_session_artifact_sockets(session)
+
+
+def cleanup_session_artifacts(session: str) -> None:
+    close_session_quietly(session)
+    kill_session_cli_daemons(session)
+    remove_session_artifact_sockets(session)
 
 
 def extract_playwright_result(output: str):

@@ -104,7 +104,7 @@ DISTRICTS = [
                 "sample": 30,
                 "buildingCount": 6,
                 "buildingFocus": "9幢",
-                "note": "低总价高出租活跃度，适合 MVP 试点。",
+                "note": "低总价高出租活跃度，适合本地样本演示。",
                 "buildings": [
                     {"name": "3幢", "totalFloors": 12, "low": 2.63, "mid": 2.75, "high": 2.71, "score": 83},
                     {"name": "9幢", "totalFloors": 18, "low": 2.84, "mid": 2.96, "high": 3.04, "score": 92},
@@ -246,7 +246,7 @@ DISTRICTS = [
 PIPELINE_STEPS = [
     {
         "title": "采集层",
-        "description": "安居客 / 贝壳出售与出租房源，保留原始文本、原始坐标、抓取时间与页面快照。",
+        "description": "本地 CSV 与公开页人工采样样本，保留原始文本、原始坐标、抓取时间与页面快照。",
         "meta": "raw_listings_sale / raw_listings_rent",
     },
     {
@@ -318,9 +318,9 @@ SYSTEM_STRATEGY = {
         "google_earth": "WGS-84 导出",
     },
     "data_policy": {
-        "priority": "官方合作 / 开放平台 / 公开开放数据优先",
+        "priority": "公开开放数据 / 自有 CSV / 手工校正优先",
         "fallback": "半自动导入或低频人工校正",
-        "risk_note": "避免把长期产品建立在不稳定抓取链路上。",
+        "risk_note": "避免把长期工具建立在不稳定抓取链路上。",
     },
     "address_model": [
         "district",
@@ -332,22 +332,6 @@ SYSTEM_STRATEGY = {
 }
 
 DATA_SOURCES = [
-    {
-        "id": "beike-open-platform",
-        "name": "贝壳开放平台",
-        "category": "official_api",
-        "priority": "high",
-        "coverage": "出售 / 出租 / 地址结构化 / 估值类能力",
-        "role": "主商业数据来源候选",
-    },
-    {
-        "id": "58-anjuke-platform",
-        "name": "58 / 安居客开放体系",
-        "category": "official_partner",
-        "priority": "high",
-        "coverage": "房源业务生态与平台级接入",
-        "role": "辅助商业数据来源候选",
-    },
     {
         "id": "shanghai-open-data-community",
         "name": "上海开放数据 · 物业小区信息",
@@ -376,26 +360,6 @@ DATA_SOURCES = [
 
 SOURCE_HEALTH = [
     {
-        "sourceId": "beike-open-platform",
-        "name": "贝壳开放平台",
-        "status": "ready_for_integration",
-        "freshness": "T-1",
-        "coveragePct": 78,
-        "listingCount": 326,
-        "normalizationPct": 88,
-        "note": "OAuth 与字段映射位已预留，适合做主商业源。",
-    },
-    {
-        "sourceId": "58-anjuke-platform",
-        "name": "58 / 安居客开放体系",
-        "status": "partner_negotiation",
-        "freshness": "T-2",
-        "coveragePct": 64,
-        "listingCount": 214,
-        "normalizationPct": 72,
-        "note": "生态覆盖广，但字段一致性需要更强的地址归一与去重。",
-    },
-    {
         "sourceId": "shanghai-open-data-community",
         "name": "上海开放数据 · 物业小区信息",
         "status": "online",
@@ -413,7 +377,7 @@ SOURCE_HEALTH = [
         "coveragePct": 58,
         "listingCount": 48,
         "normalizationPct": 84,
-        "note": "适合先跑小批量授权数据、地址复核和逐层证据验证。",
+        "note": "适合先跑小批量自有 CSV、地址复核和逐层证据验证。",
     },
     {
         "sourceId": "amap-aoi-poi",
@@ -433,7 +397,7 @@ ADDRESS_QUEUE = [
         "communityId": "zhangjiang-park",
         "buildingNo": "5号楼",
         "floorNo": 17,
-        "sourceId": "beike-open-platform",
+        "sourceId": "authorized-batch-import",
         "rawAddress": "浦东新区张江路xx弄5号楼17层1702",
         "normalizedPath": "浦东新区 / 张江汤臣豪园 / 5号楼 / 2单元 / 17层 / 1702",
         "status": "resolved",
@@ -446,7 +410,7 @@ ADDRESS_QUEUE = [
         "communityId": "zhangjiang-park",
         "buildingNo": "5号楼",
         "floorNo": 24,
-        "sourceId": "58-anjuke-platform",
+        "sourceId": "public-browser-sampling",
         "rawAddress": "张江汤臣豪园5号楼顶层复式",
         "normalizedPath": "浦东新区 / 张江汤臣豪园 / 5号楼 / 待识别单元 / 24层",
         "status": "needs_review",
@@ -459,7 +423,7 @@ ADDRESS_QUEUE = [
         "communityId": "qibao-yunting",
         "buildingNo": "9幢",
         "floorNo": 12,
-        "sourceId": "beike-open-platform",
+        "sourceId": "authorized-batch-import",
         "rawAddress": "七宝云庭9幢12楼1201",
         "normalizedPath": "闵行区 / 七宝云庭 / 9幢 / 1单元 / 12层 / 1201",
         "status": "resolved",
@@ -472,7 +436,7 @@ ADDRESS_QUEUE = [
         "communityId": "gongkang-hill",
         "buildingNo": "12幢",
         "floorNo": 18,
-        "sourceId": "58-anjuke-platform",
+        "sourceId": "public-browser-sampling",
         "rawAddress": "共康新城十二幢18F",
         "normalizedPath": "宝山区 / 共康新城 / 12幢 / 待识别单元 / 18层",
         "status": "matching",

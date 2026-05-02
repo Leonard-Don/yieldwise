@@ -216,8 +216,7 @@ function granularityLabel(value) {
 
 function providerModeLabel(mode) {
   return {
-    self_serve_trial: "自助试用",
-    business_contact: "商务合作",
+    self_serve_trial: "自用申请",
     catalog_apply_or_download: "目录申请 / 下载",
     console_key: "控制台申请 Key",
     internal_staging: "内部 staging",

@@ -65,6 +65,7 @@ from .service import (
     build_geo_work_order_geojson,
     build_geojson,
     build_kml,
+    clear_runtime_caches,
     floor_watchlist,
     get_building,
     get_community,
@@ -417,6 +418,12 @@ def create_review_current_task_fixture() -> dict:
         return create_browser_review_current_task_fixture()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/dev/runtime-caches/clear")
+def clear_dev_runtime_caches() -> dict:
+    clear_runtime_caches()
+    return {"cleared": True}
 
 
 @app.delete("/api/dev/browser-review-fixtures/{fixture_id}")

@@ -1,5 +1,5 @@
 source,source_listing_id,url,community_name,address_text,building_text,unit_text,floor_text,total_floors,area_sqm,bedrooms,living_rooms,bathrooms,orientation,decoration,published_at,price_total_wan,unit_price_yuan
-beike-open-platform,PUBLIC-SALE-001,https://mobile.anjuke.com/esf/ax-cm394666/,张江汤臣豪园三期,上海市浦东新区张江汤臣豪园三期5号楼2单元,5号楼,2单元,8/11,11,88.06,2,2,1,南北,精装,2026-04-12T20:10:00+08:00,1030,116966
-58-anjuke-open,PUBLIC-SALE-002,https://m.anjuke.com/sh/community/594946/,东方汇景苑,上海市浦东新区东方路1881弄1号楼1单元,1号楼,1单元,31/39,39,110.0,2,2,1,西,精装,2026-04-12T20:18:00+08:00,975.35,88668
-58-anjuke-open,PUBLIC-SALE-003,https://shanghai.anjuke.com/community/?kw=%E8%B4%A2%E5%AF%8C%E6%B5%B7%E6%99%AF%E8%8A%B1%E5%9B%AD,财富海景花园,上海市浦东新区浦明路258弄1号楼1单元,1号楼,1单元,32/38,38,337.5,3,2,3,东西,精装,2026-04-12T20:26:00+08:00,7307.55,216520
-58-anjuke-open,PUBLIC-SALE-004,https://shanghai.anjuke.com/community/?kw=%E5%98%89%E5%88%A9%E6%98%8E%E7%8F%A0%E5%9F%8E,嘉利明珠城,上海市静安区平型关路377弄1号楼1单元,1号楼,1单元,16/38,38,96.56,2,2,1,南,简装,2026-04-12T20:34:00+08:00,931.82,96526
+authorized-batch-import,PUBLIC-SALE-001,https://example.com/public-sale-001,张江汤臣豪园三期,上海市浦东新区张江汤臣豪园三期5号楼2单元,5号楼,2单元,8/11,11,88.06,2,2,1,南北,精装,2026-04-12T20:10:00+08:00,1030,116966
+public-browser-sampling,PUBLIC-SALE-002,https://example.com/public-page-002,东方汇景苑,上海市浦东新区东方路1881弄1号楼1单元,1号楼,1单元,31/39,39,110.0,2,2,1,西,精装,2026-04-12T20:18:00+08:00,975.35,88668
+public-browser-sampling,PUBLIC-SALE-003,https://example.com/public-page,财富海景花园,上海市浦东新区浦明路258弄1号楼1单元,1号楼,1单元,32/38,38,337.5,3,2,3,东西,精装,2026-04-12T20:26:00+08:00,7307.55,216520
+public-browser-sampling,PUBLIC-SALE-004,https://example.com/public-page,嘉利明珠城,上海市静安区平型关路377弄1号楼1单元,1号楼,1单元,16/38,38,96.56,2,2,1,南,简装,2026-04-12T20:34:00+08:00,931.82,96526

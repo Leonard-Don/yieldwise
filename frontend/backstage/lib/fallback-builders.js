@@ -497,7 +497,7 @@ function buildFallbackSamplePairs(building, floorItem) {
   const sourceNames = (operationsOverview?.sourceHealth ?? []).map((item) => item.name);
   const sourcePool = sourceNames.length
     ? sourceNames
-    : ["贝壳开放平台", "58 / 安居客开放体系", "上海开放数据 · 物业小区信息", "高德 AOI / POI / District"];
+    : ["授权离线批次", "公开页面辅助采样", "上海开放数据 · 物业小区信息", "高德 AOI / POI / District"];
 
   return Array.from({ length: sampleCount }, (_, index) => {
     const saleSourceName = sourcePool[index % sourcePool.length];
@@ -611,4 +611,3 @@ function buildScoreBreakdown(building, community, sampleSizeEstimate, avgPriceWa
     contribution: Number((item.score * item.weight * scale).toFixed(1))
   }));
 }
-

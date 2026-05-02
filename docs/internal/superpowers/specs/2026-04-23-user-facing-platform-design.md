@@ -2,7 +2,7 @@
 
 - **Status**: Draft (pending user review)
 - **Date**: 2026-04-23
-- **Scope**: 把现有 `/` 研究台（developer-facing workbench）改造成面向单用户的产品化平台 `/`，原研究台整体迁到 `/backstage`。实施过程中顺带完成 `api/service.py` 和 `app.js` 两个单文件的领域拆分。
+- **Scope**: 把现有 `/` 研究台（developer-facing workbench）改造成面向单用户的本地研究工具 `/`，原研究台整体迁到 `/backstage`。实施过程中顺带完成 `api/service.py` 和 `app.js` 两个单文件的领域拆分。
 
 ## 1. 背景与目标
 
@@ -12,7 +12,7 @@
 2. **自住找房**（Home Finder）：在预算 / 区域 / 面积约束下挑自己住的房
 3. **全市观察**（City Observer）：看区域分布、趋势、挂牌量变化
 
-这次改造的目标是把主前台变成贴合这三种场景的产品化研究工具，同时保留研究台的 ops 能力作为"后台入口"。
+这次改造的目标是把主前台变成贴合这三种场景的本地研究工具，同时保留研究台的 ops 能力作为"后台入口"。
 
 ### 非目标
 
