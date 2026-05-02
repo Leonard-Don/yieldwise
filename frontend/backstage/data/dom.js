@@ -50,6 +50,7 @@ const sourceHealthList = document.querySelector("#sourceHealthList");
 const browserSamplingWorkbench = document.querySelector("#browserSamplingWorkbench");
 const browserSamplingCoverageBoard = document.querySelector("#browserSamplingCoverageBoard");
 const addressQueueList = document.querySelector("#addressQueueList");
+const refreshAnomalyQueue = document.querySelector("#refreshAnomalyQueue");
 const anchorWatchlist = document.querySelector("#anchorWatchlist");
 const floorEvidence = document.querySelector("#floorEvidence");
 const exportKmlButton = document.querySelector("#exportKmlButton");

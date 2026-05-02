@@ -473,6 +473,9 @@
               <button type="button" class="segment ops-tab-button" data-ops-quality-tab="queue" role="tab" aria-selected="false">
                 Review Queue
               </button>
+              <button type="button" class="segment ops-tab-button" data-ops-quality-tab="refresh" role="tab" aria-selected="false">
+                Refresh QA
+              </button>
               <button type="button" class="segment ops-tab-button" data-ops-quality-tab="anchor" role="tab" aria-selected="false">
                 Anchor Watch
               </button>
@@ -485,6 +488,9 @@
             </div>
             <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="queue" hidden>
               <div id="addressQueueList" class="queue-list"></div>
+            </div>
+            <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="refresh" hidden>
+              <div id="refreshAnomalyQueue" class="queue-list"></div>
             </div>
             <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="anchor" hidden>
               <div id="anchorWatchlist" class="queue-list"></div>

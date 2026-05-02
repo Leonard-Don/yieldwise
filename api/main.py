@@ -37,7 +37,15 @@ from .backstage.review import (
     update_browser_capture_review_queue,
     update_browser_capture_review_queue_batch,
 )
-from .backstage.refresh_center import build_refresh_center_report, persist_refresh_center_report
+from .backstage.refresh_center import (
+    build_refresh_center_report,
+    execute_refresh_center_plan,
+    list_refresh_center_anomalies,
+    list_refresh_center_jobs,
+    persist_refresh_center_report,
+    refresh_center_job_detail,
+    update_refresh_center_anomaly,
+)
 from .backstage.runs import (
     list_geo_asset_runs,
     list_import_runs,
@@ -290,6 +298,57 @@ def ops_refresh_center_report(payload: dict = Body(default={})) -> dict:
     if bool(payload.get("persist", True)):
         return persist_refresh_center_report(report)
     return report
+
+
+@app.get("/api/ops/refresh-center/jobs")
+def ops_refresh_center_jobs(limit: int = Query(default=20, ge=1, le=100)) -> dict:
+    return list_refresh_center_jobs(limit=limit)
+
+
+@app.post("/api/ops/refresh-center/execute")
+def ops_refresh_center_execute(payload: dict = Body(default={})) -> dict:
+    return execute_refresh_center_plan(
+        write_postgres=bool(payload.get("writePostgres", False)),
+        apply_schema=bool(payload.get("applySchema", False)),
+        refresh_metrics=bool(payload.get("refreshMetrics", True)),
+        bootstrap_database=bool(payload.get("bootstrapDatabase", False)),
+        force=bool(payload.get("force", False)),
+    )
+
+
+@app.post("/api/ops/refresh-center/jobs/{job_id}/retry")
+def ops_refresh_center_retry_job(job_id: str, payload: dict = Body(default={})) -> dict:
+    previous_job = refresh_center_job_detail(job_id)
+    if not previous_job:
+        raise HTTPException(status_code=404, detail="Refresh center job not found")
+    previous_options = previous_job.get("options") if isinstance(previous_job.get("options"), dict) else {}
+    options = {**previous_options, **payload}
+    return execute_refresh_center_plan(
+        write_postgres=bool(options.get("writePostgres", False)),
+        apply_schema=bool(options.get("applySchema", False)),
+        refresh_metrics=bool(options.get("refreshMetrics", True)),
+        bootstrap_database=bool(options.get("bootstrapDatabase", False)),
+        force=bool(options.get("force", False)),
+        retry_job_id=job_id,
+    )
+
+
+@app.get("/api/ops/refresh-center/anomalies")
+def ops_refresh_center_anomalies(limit: int = Query(default=200, ge=1, le=500)) -> dict:
+    return list_refresh_center_anomalies(limit=limit)
+
+
+@app.post("/api/ops/refresh-center/anomalies/{anomaly_id:path}")
+def ops_refresh_center_update_anomaly(anomaly_id: str, payload: dict = Body(default={})) -> dict:
+    try:
+        return update_refresh_center_anomaly(
+            anomaly_id,
+            status=str(payload.get("status") or "pending"),
+            resolution_notes=payload.get("resolutionNotes"),
+            reviewer=str(payload.get("reviewer") or payload.get("reviewOwner") or "atlas-ui"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/import-runs")

@@ -8,7 +8,7 @@ ops-facing run metadata without growing api.service.
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +17,10 @@ from .runs import list_geo_asset_runs, list_import_runs, list_metrics_runs, list
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 REPORT_DIR = ROOT_DIR / "tmp" / "refresh-reports"
+JOB_DIR = ROOT_DIR / "tmp" / "refresh-jobs"
+JOB_HISTORY_PATH = JOB_DIR / "jobs.json"
+EXECUTION_LOCK_PATH = JOB_DIR / "execution.lock.json"
+ANOMALY_REVIEW_PATH = JOB_DIR / "anomaly-review.json"
 LOW_CONFIDENCE_THRESHOLD = 0.72
 LOW_PAIR_COUNT_THRESHOLD = 1
 LOW_YIELD_PCT = 1.5
@@ -25,6 +29,17 @@ HIGH_YIELD_PCT = 8.0
 
 def _now_iso() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _timestamp_slug() -> str:
+    return datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%f%z")
+
+
+def _relative_path_label(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(path)
 
 
 def _latest(items: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -76,6 +91,69 @@ def _plan_step(
         "createdAt": run.get("createdAt") if run else None,
         "reason": reason if reason else ("已选择最新批次。" if run else "当前没有可用批次。"),
     }
+
+
+def _read_json_payload(path: Path, fallback: Any) -> Any:
+    from ..service import read_json_file
+
+    payload = read_json_file(path)
+    return payload if payload is not None else deepcopy(fallback)
+
+
+def _write_json_payload(path: Path, payload: Any) -> None:
+    from ..service import write_json_file
+
+    write_json_file(path, payload)
+
+
+def _load_job_history() -> list[dict[str, Any]]:
+    payload = _read_json_payload(JOB_HISTORY_PATH, [])
+    return payload if isinstance(payload, list) else []
+
+
+def _write_job_history(jobs: list[dict[str, Any]]) -> None:
+    _write_json_payload(JOB_HISTORY_PATH, jobs[:50])
+
+
+def list_refresh_center_jobs(limit: int = 20) -> dict[str, Any]:
+    jobs = _load_job_history()
+    jobs.sort(key=lambda item: str(item.get("startedAt") or item.get("createdAt") or ""), reverse=True)
+    return {"items": jobs[: max(1, limit)]}
+
+
+def refresh_center_job_detail(job_id: str) -> dict[str, Any] | None:
+    return next((item for item in _load_job_history() if item.get("jobId") == job_id), None)
+
+
+def _save_job(job: dict[str, Any]) -> dict[str, Any]:
+    jobs = [item for item in _load_job_history() if item.get("jobId") != job.get("jobId")]
+    jobs.insert(0, deepcopy(job))
+    _write_job_history(jobs)
+    return job
+
+
+def _lock_payload() -> dict[str, Any] | None:
+    payload = _read_json_payload(EXECUTION_LOCK_PATH, None)
+    return payload if isinstance(payload, dict) else None
+
+
+def _acquire_execution_lock(job_id: str) -> None:
+    JOB_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with EXECUTION_LOCK_PATH.open("x", encoding="utf-8") as handle:
+            handle.write(f'{{"jobId":"{job_id}","startedAt":"{_now_iso()}"}}')
+    except FileExistsError as exc:
+        lock = _lock_payload() or {}
+        raise RuntimeError(f"刷新中心已有执行中的任务：{lock.get('jobId') or 'unknown'}") from exc
+
+
+def _release_execution_lock(job_id: str) -> None:
+    lock = _lock_payload() or {}
+    if lock.get("jobId") in {None, job_id}:
+        try:
+            EXECUTION_LOCK_PATH.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _count_open_geo_tasks(detail: dict[str, Any] | None) -> dict[str, int]:
@@ -299,6 +377,157 @@ def summarize_import_anomaly_filters(import_detail: dict[str, Any] | None) -> di
     }
 
 
+def _load_anomaly_review_state() -> dict[str, dict[str, Any]]:
+    payload = _read_json_payload(ANOMALY_REVIEW_PATH, {})
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): value for key, value in payload.items() if isinstance(value, dict)}
+
+
+def _write_anomaly_review_state(payload: dict[str, dict[str, Any]]) -> None:
+    _write_json_payload(ANOMALY_REVIEW_PATH, payload)
+
+
+def _anomaly_id(*parts: Any) -> str:
+    return "::".join(str(part or "-").strip().replace("::", "--") for part in parts)
+
+
+def _anomaly_status(review_state: dict[str, dict[str, Any]], anomaly_id: str) -> str:
+    return str(review_state.get(anomaly_id, {}).get("status") or "pending")
+
+
+def list_refresh_center_anomalies(limit: int = 200) -> dict[str, Any]:
+    latest_import = _latest(list_import_runs())
+    detail = latest_import_anomaly_detail(latest_import)
+    review_state = _load_anomaly_review_state()
+    items: list[dict[str, Any]] = []
+    if detail:
+        run_ref = _run_ref(detail)
+        for queue_item in detail.get("reviewQueue") or []:
+            anomaly_id = _anomaly_id("review_queue", queue_item.get("queueId"))
+            items.append(
+                {
+                    "anomalyId": anomaly_id,
+                    "type": "review_queue",
+                    "typeLabel": "地址复核队列",
+                    "severity": "warn",
+                    "status": _anomaly_status(review_state, anomaly_id),
+                    "label": queue_item.get("normalizedPath") or queue_item.get("queueId"),
+                    "detail": f"状态 {queue_item.get('status') or 'pending'} · 置信度 {queue_item.get('confidence') or '待补'}",
+                    "run": run_ref,
+                    "queueId": queue_item.get("queueId"),
+                    "suggestedAction": "确认地址归一后标记已复核，或转入补样。",
+                    "review": review_state.get(anomaly_id),
+                }
+            )
+        attention = detail.get("attention") or {}
+        for pair_item in attention.get("low_confidence_pairs") or []:
+            anomaly_id = _anomaly_id("low_confidence_pairs", detail.get("runId"), pair_item.get("pair_id"))
+            items.append(
+                {
+                    "anomalyId": anomaly_id,
+                    "type": "low_confidence_pairs",
+                    "typeLabel": "低置信样本配对",
+                    "severity": "warn",
+                    "status": _anomaly_status(review_state, anomaly_id),
+                    "label": pair_item.get("normalized_address") or pair_item.get("pair_id"),
+                    "detail": f"match_confidence={pair_item.get('match_confidence')}",
+                    "run": run_ref,
+                    "suggestedAction": "核对 sale/rent 是否同楼栋同楼层。",
+                    "review": review_state.get(anomaly_id),
+                }
+            )
+        for evidence in detail.get("floorEvidence") or []:
+            pair_count = int(evidence.get("pair_count") or evidence.get("pairCount") or 0)
+            confidence = float(evidence.get("best_pair_confidence") or evidence.get("bestPairConfidence") or 0)
+            yield_pct = float(evidence.get("yield_pct") or evidence.get("yieldPct") or 0)
+            shared = {
+                "run": run_ref,
+                "communityId": evidence.get("community_id") or evidence.get("communityId"),
+                "buildingId": evidence.get("building_id") or evidence.get("buildingId"),
+                "floorNo": evidence.get("floor_no") or evidence.get("floorNo"),
+                "pairCount": pair_count,
+                "yieldPct": round(yield_pct, 2),
+                "bestPairConfidence": round(confidence, 3),
+            }
+            label = _evidence_label(evidence)
+            if pair_count <= LOW_PAIR_COUNT_THRESHOLD:
+                anomaly_id = _anomaly_id("single_pair_floors", detail.get("runId"), shared["buildingId"], shared["floorNo"])
+                items.append(
+                    {
+                        **shared,
+                        "anomalyId": anomaly_id,
+                        "type": "single_pair_floors",
+                        "typeLabel": "单样本楼层",
+                        "severity": "warn",
+                        "status": _anomaly_status(review_state, anomaly_id),
+                        "label": label,
+                        "detail": f"pair_count={pair_count}",
+                        "suggestedAction": "进入公开页采样或授权批次补样。",
+                        "review": review_state.get(anomaly_id),
+                    }
+                )
+            if confidence and confidence < LOW_CONFIDENCE_THRESHOLD:
+                anomaly_id = _anomaly_id("low_confidence_floors", detail.get("runId"), shared["buildingId"], shared["floorNo"])
+                items.append(
+                    {
+                        **shared,
+                        "anomalyId": anomaly_id,
+                        "type": "low_confidence_floors",
+                        "typeLabel": "楼层最佳配对偏低",
+                        "severity": "warn",
+                        "status": _anomaly_status(review_state, anomaly_id),
+                        "label": label,
+                        "detail": f"best_pair_confidence={confidence:.3f}",
+                        "suggestedAction": "优先复核楼栋、单元和楼层归一。",
+                        "review": review_state.get(anomaly_id),
+                    }
+                )
+            if yield_pct and (yield_pct < LOW_YIELD_PCT or yield_pct > HIGH_YIELD_PCT):
+                anomaly_id = _anomaly_id("yield_outliers", detail.get("runId"), shared["buildingId"], shared["floorNo"])
+                items.append(
+                    {
+                        **shared,
+                        "anomalyId": anomaly_id,
+                        "type": "yield_outliers",
+                        "typeLabel": "回报率异常值",
+                        "severity": "high",
+                        "status": _anomaly_status(review_state, anomaly_id),
+                        "label": label,
+                        "detail": f"yield_pct={yield_pct:.2f}",
+                        "suggestedAction": "核对总价、月租和面积口径。",
+                        "review": review_state.get(anomaly_id),
+                    }
+                )
+    status_order = {"pending": 0, "needs_sample": 1, "reviewed": 2, "waived": 3}
+    items.sort(key=lambda item: (status_order.get(str(item.get("status")), 9), str(item.get("type")), str(item.get("label"))))
+    summary = {
+        "totalCount": len(items),
+        "pendingCount": sum(1 for item in items if item.get("status") == "pending"),
+        "needsSampleCount": sum(1 for item in items if item.get("status") == "needs_sample"),
+        "reviewedCount": sum(1 for item in items if item.get("status") == "reviewed"),
+        "waivedCount": sum(1 for item in items if item.get("status") == "waived"),
+    }
+    return {"summary": summary, "items": items[: max(1, limit)]}
+
+
+def update_refresh_center_anomaly(anomaly_id: str, *, status: str, resolution_notes: str | None = None, reviewer: str = "atlas-ui") -> dict[str, Any]:
+    if status not in {"pending", "reviewed", "needs_sample", "waived"}:
+        raise ValueError("Unsupported anomaly status")
+    review_state = _load_anomaly_review_state()
+    review_state[anomaly_id] = {
+        "anomalyId": anomaly_id,
+        "status": status,
+        "resolutionNotes": resolution_notes,
+        "reviewer": reviewer,
+        "reviewedAt": _now_iso(),
+    }
+    _write_anomaly_review_state(review_state)
+    queue = list_refresh_center_anomalies()
+    item = next((entry for entry in queue["items"] if entry.get("anomalyId") == anomaly_id), None)
+    return {"status": "updated", "item": item or review_state[anomaly_id], "summary": queue["summary"]}
+
+
 def latest_import_anomaly_detail(latest_import: dict[str, Any] | None) -> dict[str, Any] | None:
     if not latest_import:
         return None
@@ -448,7 +677,7 @@ def build_refresh_center_report() -> dict[str, Any]:
         "geometryQa": geometry_qa,
         "anomalyFilters": anomaly_filters,
         "reports": {
-            "nextReportDir": str(REPORT_DIR.relative_to(ROOT_DIR)),
+            "nextReportDir": _relative_path_label(REPORT_DIR),
             "suggestedFilename": f"refresh-center-{generated_at.replace(':', '').replace('-', '').replace('+', '-')}.json",
         },
     }
@@ -462,6 +691,135 @@ def persist_refresh_center_report(report: dict[str, Any] | None = None) -> dict[
     filename = f"refresh-center-{generated_at.replace(':', '').replace('-', '').replace('+', '-')}.json"
     report_path = REPORT_DIR / filename
     payload["persisted"] = True
-    payload["reportPath"] = str(report_path.relative_to(ROOT_DIR))
+    payload["reportPath"] = _relative_path_label(report_path)
     write_json_file(report_path, payload)
     return payload
+
+
+def _execution_step(step: str, label: str, status: str, detail: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "step": step,
+        "label": label,
+        "status": status,
+        "detail": detail,
+        "payload": payload or {},
+        "completedAt": _now_iso(),
+    }
+
+
+def execute_refresh_center_plan(
+    *,
+    write_postgres: bool = False,
+    apply_schema: bool = False,
+    refresh_metrics: bool = True,
+    bootstrap_database: bool = False,
+    force: bool = False,
+    retry_job_id: str | None = None,
+) -> dict[str, Any]:
+    from ..service import bootstrap_local_database, refresh_metrics_snapshot
+
+    job_id = f"refresh-center-{_timestamp_slug()}"
+    started_at = _now_iso()
+    job = {
+        "jobId": job_id,
+        "status": "running",
+        "createdAt": started_at,
+        "startedAt": started_at,
+        "completedAt": None,
+        "retryOfJobId": retry_job_id,
+        "options": {
+            "writePostgres": write_postgres,
+            "applySchema": apply_schema,
+            "refreshMetrics": refresh_metrics,
+            "bootstrapDatabase": bootstrap_database,
+            "force": force,
+        },
+        "steps": [],
+        "error": None,
+    }
+    _save_job(job)
+    try:
+        _acquire_execution_lock(job_id)
+    except RuntimeError as exc:
+        job["status"] = "locked"
+        job["error"] = str(exc)
+        job["completedAt"] = _now_iso()
+        job["steps"].append(_execution_step("lock", "执行锁", "locked", str(exc)))
+        return _save_job(job)
+    try:
+        report = build_refresh_center_report()
+        job["report"] = {
+            "status": report.get("status"),
+            "generatedAt": report.get("generatedAt"),
+            "selectedRuns": report.get("selectedRuns"),
+            "readiness": report.get("readiness"),
+        }
+        blocker_checks = [item for item in report.get("dryRunChecks", []) if item.get("status") == "blocker"]
+        if blocker_checks and not force:
+            job["status"] = "blocked"
+            job["steps"].append(
+                _execution_step(
+                    "dry_run",
+                    "Dry-run 检查",
+                    "blocked",
+                    f"存在 {len(blocker_checks)} 个阻断项，未执行刷新。",
+                    {"blockers": blocker_checks},
+                )
+            )
+            return job
+
+        selected_runs = report.get("selectedRuns") or {}
+        for step_key, label in [("reference", "Reference 主档"), ("import", "Sale/Rent 样本"), ("geo", "楼栋几何")]:
+            run = selected_runs.get(step_key)
+            job["steps"].append(
+                _execution_step(
+                    step_key,
+                    label,
+                    "validated" if run else "skipped",
+                    f"使用批次 {run.get('batchName') or run.get('runId')}" if run else "没有可用批次，跳过。",
+                    {"run": run},
+                )
+            )
+
+        readiness = report.get("readiness") or {}
+        if bootstrap_database:
+            if not readiness.get("canBootstrap"):
+                job["steps"].append(_execution_step("bootstrap", "本地数据库引导", "skipped", "当前未配置可执行 Bootstrap 的 DSN 或 reference run。"))
+            else:
+                bootstrap_payload = bootstrap_local_database(
+                    reference_run_id=(selected_runs.get("reference") or {}).get("runId"),
+                    import_run_id=(selected_runs.get("import") or {}).get("runId"),
+                    geo_run_id=(selected_runs.get("geo") or {}).get("runId"),
+                    apply_schema=apply_schema,
+                    refresh_metrics=False,
+                )
+                job["steps"].append(_execution_step("bootstrap", "本地数据库引导", "completed", "Bootstrap 已完成。", bootstrap_payload))
+        else:
+            job["steps"].append(_execution_step("bootstrap", "本地数据库引导", "skipped", "调用方未要求 Bootstrap。"))
+
+        if refresh_metrics:
+            snapshot_date = date.today().isoformat()
+            metrics_payload = refresh_metrics_snapshot(
+                snapshot_date=snapshot_date,
+                batch_name=f"refresh-center-{snapshot_date}-{datetime.now().strftime('%H%M%S')}",
+                write_postgres=bool(write_postgres and readiness.get("canWriteMetricsToPostgres")),
+                apply_schema=apply_schema,
+                trigger_source="refresh-center",
+            )
+            job["steps"].append(_execution_step("metrics", "指标快照", "completed", "指标快照已刷新。", metrics_payload))
+        else:
+            job["steps"].append(_execution_step("metrics", "指标快照", "skipped", "调用方关闭 metrics 刷新。"))
+
+        persisted_report = persist_refresh_center_report(build_refresh_center_report())
+        job["steps"].append(_execution_step("report", "刷新报告", "completed", "执行后报告已落盘。", {"reportPath": persisted_report.get("reportPath")}))
+        job["status"] = "completed"
+        return job
+    except Exception as exc:
+        job["status"] = "failed"
+        job["error"] = str(exc)
+        job["steps"].append(_execution_step("error", "执行错误", "failed", str(exc)))
+        return job
+    finally:
+        job["completedAt"] = _now_iso()
+        _save_job(job)
+        _release_execution_lock(job_id)

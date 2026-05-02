@@ -85,6 +85,15 @@ const state = {
   floorGeoFeatures: [],
   geoAssetSource: "fallback",
   refreshCenterReport: null,
+  refreshCenterJobs: [],
+  refreshAnomalyItems: [],
+  refreshAnomalySummary: {
+    totalCount: 0,
+    pendingCount: 0,
+    needsSampleCount: 0,
+    reviewedCount: 0,
+    waivedCount: 0,
+  },
   opsMessage: null,
   opsMessageTone: "info",
   opsMessageContext: "import",
@@ -93,6 +102,8 @@ const state = {
   busyMetricsRefresh: false,
   busyMetricsRefreshMode: null,
   busyRefreshCenterReport: false,
+  busyRefreshCenterExecute: false,
+  busyRefreshAnomalyId: null,
   busyPersistRunId: null,
   busyReviewQueueId: null,
   busyBrowserCaptureReviewQueueId: null,
@@ -331,8 +342,52 @@ async function loadRefreshCenterReport() {
   }
 }
 
+async function loadRefreshCenterJobs() {
+  try {
+    const response = await fetch("/api/ops/refresh-center/jobs", {
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+      throw new Error(`Refresh center jobs failed with ${response.status}`);
+    }
+    const payload = await response.json();
+    state.refreshCenterJobs = payload.items ?? [];
+  } catch (error) {
+    state.refreshCenterJobs = [];
+  }
+}
+
+async function loadRefreshAnomalyQueue() {
+  try {
+    const response = await fetch("/api/ops/refresh-center/anomalies", {
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+      throw new Error(`Refresh anomaly queue failed with ${response.status}`);
+    }
+    const payload = await response.json();
+    state.refreshAnomalySummary = payload.summary ?? {
+      totalCount: 0,
+      pendingCount: 0,
+      needsSampleCount: 0,
+      reviewedCount: 0,
+      waivedCount: 0,
+    };
+    state.refreshAnomalyItems = payload.items ?? [];
+  } catch (error) {
+    state.refreshAnomalySummary = {
+      totalCount: 0,
+      pendingCount: 0,
+      needsSampleCount: 0,
+      reviewedCount: 0,
+      waivedCount: 0,
+    };
+    state.refreshAnomalyItems = [];
+  }
+}
+
 async function refreshOperationsWorkbench({ reloadFloor = false } = {}) {
-  await Promise.all([loadOperationsOverview(), loadRefreshCenterReport()]);
+  await Promise.all([loadOperationsOverview(), loadRefreshCenterReport(), loadRefreshCenterJobs(), loadRefreshAnomalyQueue()]);
   ensureImportRunSelection();
   ensureGeoAssetRunSelection();
   syncOperationsBackstageLocationIfNeeded();
@@ -5059,6 +5114,87 @@ async function generateRefreshCenterReport() {
   }
 }
 
+async function executeRefreshCenterPlan({ retryJobId = null } = {}) {
+  state.busyRefreshCenterExecute = true;
+  state.opsMessage = null;
+  state.opsMessageContext = "database";
+  render();
+
+  try {
+    const endpoint = retryJobId
+      ? `/api/ops/refresh-center/jobs/${encodeURIComponent(retryJobId)}/retry`
+      : "/api/ops/refresh-center/execute";
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        refreshMetrics: true,
+        bootstrapDatabase: false,
+        writePostgres: false,
+        applySchema: false,
+        force: false
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `Refresh center execute failed with ${response.status}`);
+    }
+    const jobLabel = refreshCenterJobStatusLabel(payload.status);
+    const stepCount = (payload.steps ?? []).length;
+    state.opsMessage = `刷新计划${retryJobId ? "重试" : "执行"}完成：${jobLabel} · ${stepCount} 步。`;
+    state.opsMessageTone = payload.status === "completed" ? "success" : payload.status === "failed" ? "error" : "info";
+    state.refreshCenterJobs = [payload, ...(state.refreshCenterJobs ?? []).filter((item) => item.jobId !== payload.jobId)].slice(0, 20);
+  } catch (error) {
+    state.opsMessage = error.message || "刷新计划执行失败。";
+    state.opsMessageTone = "error";
+  } finally {
+    state.busyRefreshCenterExecute = false;
+    await Promise.all([loadRuntimeConfig(), loadOperationsOverview(), loadRefreshCenterReport(), loadRefreshCenterJobs(), loadRefreshAnomalyQueue()]);
+    render();
+  }
+}
+
+async function updateRefreshAnomalyStatus(anomalyId, status) {
+  if (!anomalyId || state.busyRefreshAnomalyId) {
+    return;
+  }
+  state.busyRefreshAnomalyId = anomalyId;
+  state.opsMessage = null;
+  state.opsMessageContext = "database";
+  render();
+
+  try {
+    const response = await fetch(`/api/ops/refresh-center/anomalies/${encodeURIComponent(anomalyId)}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status,
+        resolutionNotes: refreshAnomalyStatusLabel(status),
+        reviewer: "atlas-ui"
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || `Refresh anomaly update failed with ${response.status}`);
+    }
+    state.opsMessage = `Refresh QA 已标记为${refreshAnomalyStatusLabel(status)}。`;
+    state.opsMessageTone = "success";
+    await Promise.all([loadRefreshCenterReport(), loadRefreshAnomalyQueue()]);
+  } catch (error) {
+    state.opsMessage = error.message || "Refresh QA 状态更新失败。";
+    state.opsMessageTone = "error";
+  } finally {
+    state.busyRefreshAnomalyId = null;
+    render();
+  }
+}
+
 async function copyTextToClipboard(text, successMessage = "已复制。") {
   if (!text) {
     return;
@@ -6856,6 +6992,18 @@ function renderOperations() {
   const refreshWarningCount = refreshChecks.filter((item) => item.status === "warn").length;
   const refreshGeneratedLabel = refreshCenter?.generatedAt ? formatTimestamp(refreshCenter.generatedAt) : "读取中";
   const refreshReportLabel = refreshReportPathLabel(refreshCenter?.reportPath);
+  const refreshCenterJobs = state.refreshCenterJobs ?? [];
+  const latestRefreshJob = refreshCenterJobs[0] ?? null;
+  const latestRefreshJobSteps = latestRefreshJob?.steps ?? [];
+  const latestRefreshJobStatus = latestRefreshJob?.status ?? "waiting";
+  const latestRefreshJobLabel = latestRefreshJob?.completedAt
+    ? formatTimestamp(latestRefreshJob.completedAt)
+    : latestRefreshJob?.startedAt
+    ? formatTimestamp(latestRefreshJob.startedAt)
+    : "未执行";
+  const shouldShowRefreshRetry = Boolean(
+    latestRefreshJob?.jobId && ["failed", "blocked", "locked"].includes(String(latestRefreshJobStatus))
+  );
   const refreshPrimaryHint = refreshBlockerCount
     ? `阻断 ${refreshBlockerCount} 项，先处理主档或必需批次。`
     : refreshWarningCount
@@ -6909,6 +7057,7 @@ function renderOperations() {
         <span class="source-pill">检查 ${refreshChecks.length}</span>
         <span class="source-pill">异常候选 ${refreshAnomalyCount}</span>
         <span class="source-pill">几何任务 ${Number(refreshGeometryQa.openTaskCount ?? 0)}</span>
+        <span class="source-pill">最近执行 ${refreshCenterJobStatusLabel(latestRefreshJobStatus)}</span>
         <span class="source-pill">生成 ${refreshGeneratedLabel}</span>
       </div>
       <div class="refresh-center-grid">
@@ -6932,6 +7081,25 @@ function renderOperations() {
                     .join("")
                 : "<p class=\"helper-text\">刷新计划读取中。</p>"
             }
+            <div class="refresh-center-latest-job" data-refresh-center-latest-job-id="${latestRefreshJob?.jobId ?? ""}">
+              <div class="breakdown-top">
+                <strong>最近执行</strong>
+                <span class="trace-status ${refreshCenterStatusTone(latestRefreshJobStatus)}">${refreshCenterJobStatusLabel(latestRefreshJobStatus)}</span>
+              </div>
+              <p>${latestRefreshJob?.jobId ?? "尚未执行刷新计划"}</p>
+              <small>${latestRefreshJobLabel}${latestRefreshJob?.error ? ` · ${latestRefreshJob.error}` : ""}</small>
+              ${
+                latestRefreshJobSteps.length
+                  ? `<div class="refresh-center-job-steps">${latestRefreshJobSteps
+                      .slice(0, 4)
+                      .map(
+                        (item) =>
+                          `<span class="source-pill">${item.label ?? item.step}: ${refreshCenterJobStatusLabel(item.status)}</span>`
+                      )
+                      .join("")}</div>`
+                  : ""
+              }
+            </div>
           </div>
         </section>
         <section class="refresh-center-column">
@@ -6999,10 +7167,17 @@ function renderOperations() {
         </section>
       </div>
       <div class="ops-overview-button-row refresh-center-actions">
-        <button class="action compact primary" data-refresh-center-report ${state.busyRefreshCenterReport ? "disabled" : ""}>
-          ${state.busyRefreshCenterReport ? "生成中..." : "生成刷新报告"}
+        <button class="action compact primary" data-refresh-center-execute ${state.busyRefreshCenterExecute ? "disabled" : ""}>
+          ${state.busyRefreshCenterExecute ? "执行中..." : "执行刷新计划"}
         </button>
-        <button class="action compact" data-refresh-center-quality-tab="queue">复核异常队列</button>
+        <button class="action compact" data-refresh-center-report ${state.busyRefreshCenterReport ? "disabled" : ""}>
+          ${state.busyRefreshCenterReport ? "生成中..." : "生成报告"}
+        </button>
+        ${
+          shouldShowRefreshRetry
+            ? `<button class="action compact" data-refresh-center-retry-job-id="${latestRefreshJob.jobId}" ${state.busyRefreshCenterExecute ? "disabled" : ""}>重试失败 Job</button>`
+            : `<button class="action compact" data-refresh-center-quality-tab="refresh">处理 Refresh QA</button>`
+        }
         <button class="action compact" data-refresh-center-detail-tab="geo">查看几何 QA</button>
         <span class="source-pill refresh-center-report-path">${refreshReportLabel}</span>
       </div>
@@ -8670,6 +8845,10 @@ function renderOperations() {
           : "公开页面采样任务会在 staged 样本和任务包就绪后出现在这里。"
       }</p>`;
 
+  const refreshAnomalySummary = state.refreshAnomalySummary ?? {};
+  const refreshAnomalyItems = state.refreshAnomalyItems ?? [];
+  const openRefreshAnomalyCount =
+    Number(refreshAnomalySummary.pendingCount ?? 0) + Number(refreshAnomalySummary.needsSampleCount ?? 0);
   const anchorWatchItems = operationsOverview?.anchorWatchlist ?? [];
   addressQueueList.innerHTML = displayQueueItems
     .slice(0, 5)
@@ -8702,6 +8881,74 @@ function renderOperations() {
       `
     )
     .join("");
+
+  refreshAnomalyQueue.innerHTML = `
+    <article class="import-run-section refresh-anomaly-panel" data-refresh-anomaly-count="${refreshAnomalySummary.totalCount ?? 0}">
+      <div class="breakdown-top">
+        <strong>Refresh QA 处理队列</strong>
+        <span class="badge">${openRefreshAnomalyCount}</span>
+      </div>
+      ${
+        state.opsMessage && state.opsMessageContext === "database"
+          ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
+          : ""
+      }
+      <div class="comparison-strip">
+        <span class="source-pill">总计 ${refreshAnomalySummary.totalCount ?? 0}</span>
+        <span class="source-pill">待处理 ${refreshAnomalySummary.pendingCount ?? 0}</span>
+        <span class="source-pill">待补样 ${refreshAnomalySummary.needsSampleCount ?? 0}</span>
+        <span class="source-pill">已复核 ${refreshAnomalySummary.reviewedCount ?? 0}</span>
+        <span class="source-pill">豁免 ${refreshAnomalySummary.waivedCount ?? 0}</span>
+      </div>
+      <div class="import-run-grid refresh-anomaly-grid">
+        ${
+          refreshAnomalyItems.length
+            ? refreshAnomalyItems.slice(0, 24).map((item) => {
+                const anomalyId = item.anomalyId ?? "";
+                const busy = state.busyRefreshAnomalyId === anomalyId;
+                const canNavigate = item.communityId || item.buildingId || item.floorNo != null;
+                return `
+                  <article
+                    class="queue-item refresh-anomaly-item ${item.status === "pending" || item.status === "needs_sample" ? "is-imported" : ""}"
+                    data-refresh-anomaly-id="${escapeHtml(anomalyId)}"
+                    ${canNavigate ? `data-community-id="${item.communityId ?? ""}" data-building-id="${item.buildingId ?? ""}" data-floor-no="${item.floorNo ?? ""}"` : ""}
+                  >
+                    <div class="breakdown-top">
+                      <strong>${escapeHtml(item.label ?? item.typeLabel ?? "Refresh QA")}</strong>
+                      <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshAnomalyStatusLabel(item.status)}</span>
+                    </div>
+                    <p>${escapeHtml(item.typeLabel ?? item.type ?? "异常")} · ${escapeHtml(item.detail ?? "等待处理")}</p>
+                    <small>${escapeHtml(item.suggestedAction ?? "完成复核后标记处理结果。")}</small>
+                    <div class="comparison-strip">
+                      ${item.run?.batchName ? `<span class="source-pill">${escapeHtml(item.run.batchName)}</span>` : ""}
+                      ${item.pairCount != null ? `<span class="source-pill">样本对 ${item.pairCount}</span>` : ""}
+                      ${item.yieldPct != null ? `<span class="source-pill">yield ${Number(item.yieldPct).toFixed(2)}%</span>` : ""}
+                      ${item.bestPairConfidence != null ? `<span class="source-pill">conf ${Number(item.bestPairConfidence).toFixed(2)}</span>` : ""}
+                    </div>
+                    ${
+                      item.review?.reviewedAt
+                        ? `<small>最近处理 ${formatTimestamp(item.review.reviewedAt)} · ${refreshAnomalyStatusLabel(item.review.status)}</small>`
+                        : ""
+                    }
+                    <div class="queue-item-footer refresh-anomaly-actions">
+                      <button class="action compact" data-refresh-anomaly-id="${escapeHtml(anomalyId)}" data-refresh-anomaly-status="reviewed" ${busy || item.status === "reviewed" ? "disabled" : ""}>
+                        ${busy ? "处理中..." : "已复核"}
+                      </button>
+                      <button class="action compact" data-refresh-anomaly-id="${escapeHtml(anomalyId)}" data-refresh-anomaly-status="needs_sample" ${busy || item.status === "needs_sample" ? "disabled" : ""}>
+                        转补样
+                      </button>
+                      <button class="action compact" data-refresh-anomaly-id="${escapeHtml(anomalyId)}" data-refresh-anomaly-status="waived" ${busy || item.status === "waived" ? "disabled" : ""}>
+                        豁免
+                      </button>
+                    </div>
+                  </article>
+                `;
+              }).join("")
+            : "<p class=\"helper-text\">当前没有 Refresh QA 候选。执行 dry-run 后会把 review queue、低置信配对、单样本楼层和收益异常放到这里。</p>"
+        }
+      </div>
+    </article>
+  `;
 
   anchorWatchlist.innerHTML = `
     <article class="import-run-section">
@@ -8826,6 +9073,26 @@ function renderOperations() {
     });
   });
 
+  opsSummary.querySelectorAll("[data-refresh-center-execute]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (button.disabled) {
+        return;
+      }
+      await executeRefreshCenterPlan();
+    });
+  });
+
+  opsSummary.querySelectorAll("[data-refresh-center-retry-job-id]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (button.disabled) {
+        return;
+      }
+      await executeRefreshCenterPlan({ retryJobId: button.dataset.refreshCenterRetryJobId });
+    });
+  });
+
   opsSummary.querySelectorAll("[data-refresh-center-quality-tab]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -8927,6 +9194,7 @@ function renderOperations() {
     ...importRunDetail.querySelectorAll("[data-building-id]"),
     ...geoAssetRunDetail.querySelectorAll("[data-building-id]"),
     ...addressQueueList.querySelectorAll("[data-building-id]"),
+    ...refreshAnomalyQueue.querySelectorAll("[data-building-id]"),
     ...anchorWatchlist.querySelectorAll("[data-community-id]")
   ]
     .forEach((item) => {
@@ -8963,6 +9231,16 @@ function renderOperations() {
         });
       });
     });
+
+  refreshAnomalyQueue.querySelectorAll("[data-refresh-anomaly-status]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (button.disabled) {
+        return;
+      }
+      await updateRefreshAnomalyStatus(button.dataset.refreshAnomalyId, button.dataset.refreshAnomalyStatus);
+    });
+  });
 
   [...anchorWatchlist.querySelectorAll("[data-anchor-confirm-community-id]"), ...detailCard.querySelectorAll("[data-anchor-confirm-community-id]")]
     .forEach((button) => {
@@ -9480,21 +9758,61 @@ function refreshCenterStatusLabel(status) {
     ok: "正常",
     warn: "需关注",
     blocker: "阻断",
-    info: "提示"
+    info: "提示",
+    completed: "已完成",
+    failed: "失败",
+    running: "执行中",
+    locked: "执行锁定",
+    validated: "已校验",
+    pending: "待处理",
+    reviewed: "已复核",
+    needs_sample: "待补样",
+    waived: "已豁免"
   }[status] ?? status ?? "读取中";
+}
+
+function refreshCenterJobStatusLabel(status) {
+  return {
+    completed: "已完成",
+    failed: "失败",
+    running: "执行中",
+    blocked: "被阻断",
+    locked: "执行锁定",
+    validated: "已校验",
+    skipped: "跳过",
+    waiting: "未执行"
+  }[status] ?? refreshCenterStatusLabel(status);
+}
+
+function refreshAnomalyStatusLabel(status) {
+  return {
+    pending: "待处理",
+    reviewed: "已复核",
+    needs_sample: "待补样",
+    waived: "已豁免"
+  }[status] ?? refreshCenterStatusLabel(status);
 }
 
 function refreshCenterStatusTone(status) {
   return {
     ready: "resolved",
     ok: "resolved",
+    completed: "resolved",
+    validated: "resolved",
+    reviewed: "resolved",
     needs_review: "needs_review",
     warn: "needs_review",
+    pending: "needs_review",
+    needs_sample: "needs_review",
     blocked: "critical",
     blocker: "critical",
+    failed: "critical",
     loading: "matching",
     waiting: "matching",
+    running: "matching",
+    locked: "matching",
     skipped: "captured",
+    waived: "captured",
     info: "captured"
   }[status] ?? "captured";
 }

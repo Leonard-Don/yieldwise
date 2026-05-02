@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+from pathlib import Path
+from urllib.parse import quote
+
+import pytest
+
+from api.backstage import refresh_center
 from api.backstage.refresh_center import summarize_import_anomaly_filters
+
+
+@pytest.fixture()
+def isolated_refresh_center_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    job_dir = tmp_path / "refresh-jobs"
+    monkeypatch.setattr(refresh_center, "JOB_DIR", job_dir)
+    monkeypatch.setattr(refresh_center, "JOB_HISTORY_PATH", job_dir / "jobs.json")
+    monkeypatch.setattr(refresh_center, "EXECUTION_LOCK_PATH", job_dir / "execution.lock.json")
+    monkeypatch.setattr(refresh_center, "ANOMALY_REVIEW_PATH", job_dir / "anomaly-review.json")
+    monkeypatch.setattr(refresh_center, "REPORT_DIR", tmp_path / "refresh-reports")
+    return job_dir
 
 
 def test_refresh_center_endpoint_exposes_closed_loop_sections(client) -> None:
@@ -31,6 +48,47 @@ def test_refresh_center_report_can_run_without_persisting(client) -> None:
     assert payload["persisted"] is False
     assert payload["reportPath"] is None
     assert payload["reports"]["nextReportDir"] == "tmp/refresh-reports"
+
+
+def test_refresh_center_execute_records_job_without_metrics(client, isolated_refresh_center_paths: Path) -> None:
+    response = client.post("/api/ops/refresh-center/execute", json={"refreshMetrics": False})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["jobId"].startswith("refresh-center-")
+    assert payload["status"] in {"completed", "blocked"}
+    assert payload["completedAt"]
+
+    step_ids = {item["step"] for item in payload["steps"]}
+    if payload["status"] == "completed":
+        assert {"reference", "metrics", "report"} <= step_ids
+        assert next(item for item in payload["steps"] if item["step"] == "metrics")["status"] == "skipped"
+    else:
+        assert "dry_run" in step_ids
+
+    jobs = client.get("/api/ops/refresh-center/jobs").json()["items"]
+    assert any(item["jobId"] == payload["jobId"] for item in jobs)
+
+
+def test_refresh_center_anomaly_queue_can_record_review_state(client, isolated_refresh_center_paths: Path) -> None:
+    queue_response = client.get("/api/ops/refresh-center/anomalies")
+
+    assert queue_response.status_code == 200
+    queue_payload = queue_response.json()
+    assert queue_payload["summary"].keys() >= {"totalCount", "pendingCount", "needsSampleCount"}
+    assert isinstance(queue_payload["items"], list)
+
+    anomaly_id = queue_payload["items"][0]["anomalyId"] if queue_payload["items"] else "manual-test-anomaly"
+    update_response = client.post(
+        f"/api/ops/refresh-center/anomalies/{quote(anomaly_id, safe='')}",
+        json={"status": "waived", "resolutionNotes": "测试豁免", "reviewer": "pytest"},
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["status"] == "updated"
+    assert payload["item"]["anomalyId"] == anomaly_id
+    assert payload["item"]["status"] == "waived"
 
 
 def test_import_anomaly_filters_count_review_confidence_and_yield_outliers() -> None:

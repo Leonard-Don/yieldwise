@@ -1913,6 +1913,32 @@ input[type="range"]:focus-visible,
   gap: 8px;
 }
 
+.refresh-center-latest-job {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(151, 191, 226, 0.12);
+}
+
+.refresh-center-latest-job p,
+.refresh-center-latest-job small {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refresh-center-latest-job small {
+  color: var(--muted);
+}
+
+.refresh-center-job-steps,
+.refresh-anomaly-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .refresh-center-row p {
   display: grid;
   gap: 3px;
@@ -1934,7 +1960,7 @@ input[type="range"]:focus-visible,
 
 .refresh-center-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(160px, 1.4fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(160px, 1.4fr);
   align-items: center;
 }
 
@@ -1944,6 +1970,24 @@ input[type="range"]:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.refresh-anomaly-panel {
+  gap: 12px;
+}
+
+.refresh-anomaly-grid {
+  align-items: stretch;
+}
+
+.refresh-anomaly-item {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.refresh-anomaly-actions .action {
+  flex: 1 1 96px;
 }
 
 .import-run-list,

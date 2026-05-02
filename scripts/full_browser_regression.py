@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -18,6 +20,59 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import browser_capture_smoke as pw  # noqa: E402
+
+
+def workflow_smoke_timeout_seconds() -> float:
+    raw_value = os.getenv("ATLAS_WORKFLOW_SMOKE_TIMEOUT_SECONDS", "150")
+    try:
+        return max(30.0, float(raw_value))
+    except ValueError:
+        return 150.0
+
+
+def terminate_process_group(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=5.0)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=5.0)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def run_workflow_smoke_command(command: list[str], *, timeout_seconds: float) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        cwd=ROOT_DIR,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        terminate_process_group(process)
+        stdout, stderr = process.communicate()
+        timeout_error = subprocess.TimeoutExpired(exc.cmd or command, timeout_seconds)
+        timeout_error.stdout = stdout
+        timeout_error.stderr = stderr
+        raise timeout_error from exc
+    if process.returncode:
+        raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -643,14 +698,7 @@ def run_browser_capture_workflow_smoke(
         if headed:
             command.append("--headed")
         try:
-            completed = subprocess.run(
-                command,
-                cwd=ROOT_DIR,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=300.0,
-            )
+            completed = run_workflow_smoke_command(command, timeout_seconds=workflow_smoke_timeout_seconds())
             try:
                 return json.loads(completed.stdout)
             except json.JSONDecodeError as error:
@@ -661,6 +709,7 @@ def run_browser_capture_workflow_smoke(
                 if attempt == attempt_count:
                     raise last_error from error
         except subprocess.TimeoutExpired as error:
+            pw.close_session_quietly(smoke_session)
             last_error = RuntimeError(
                 f"公开页采样 workflow smoke 超时: {expected_workflow_action} (attempt {attempt})\n"
                 f"STDOUT:\n{error.stdout or ''}\nSTDERR:\n{error.stderr or ''}"
@@ -708,14 +757,7 @@ def run_browser_review_workflow_smoke(
         if headed:
             command.append("--headed")
         try:
-            completed = subprocess.run(
-                command,
-                cwd=ROOT_DIR,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=300.0,
-            )
+            completed = run_workflow_smoke_command(command, timeout_seconds=workflow_smoke_timeout_seconds())
             try:
                 return json.loads(completed.stdout)
             except json.JSONDecodeError as error:
@@ -729,6 +771,14 @@ def run_browser_review_workflow_smoke(
             last_error = RuntimeError(
                 f"公开页采样 review workflow smoke 失败: {expected_workflow_action} (attempt {attempt})\n"
                 f"STDOUT:\n{error.stdout}\nSTDERR:\n{error.stderr}"
+            )
+            if attempt == attempt_count:
+                raise last_error from error
+        except subprocess.TimeoutExpired as error:
+            pw.close_session_quietly(smoke_session)
+            last_error = RuntimeError(
+                f"公开页采样 review workflow smoke 超时: {expected_workflow_action} (attempt {attempt})\n"
+                f"STDOUT:\n{error.stdout or ''}\nSTDERR:\n{error.stderr or ''}"
             )
             if attempt == attempt_count:
                 raise last_error from error

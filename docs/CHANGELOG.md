@@ -11,6 +11,7 @@
 - 新增 `/api/ops/refresh-center` 与 `/api/ops/refresh-center/report`，聚合 reference/import/geo/metrics 最新批次、PostgreSQL 准备度、dry-run 检查和报告落盘路径
 - 后台 Ops 总览新增“刷新中心”卡片，直接呈现一键导入计划、阻断/关注项、异常过滤、几何 QA，并可生成 `tmp/refresh-reports/*.json`
 - 样本异常过滤覆盖地址复核队列、低置信配对、单样本楼层、楼层最佳配对偏低和回报率异常值；几何 QA 明确坐标系校正、质量评分、GIS 回传入口
+- 追加执行闭环：`/api/ops/refresh-center/execute`、job 历史/重试、Refresh QA 处理队列，并在完整浏览器回归里为 workflow smoke 增加超时清理与 session 关闭兜底
 
 ## 2026-04-28 — Phase 8i: 数据模式 + 运行选择辅助
 

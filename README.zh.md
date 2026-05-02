@@ -74,7 +74,7 @@ ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 
 - **一张地图三种工作流**：收益猎手 · 自住找房 · 全市观察
 - **OSM + 高德楼栋融合** 含 per-community 配额匹配
-- **Ops 刷新中心**：在后台 dry-run 检查 reference/import/geo/metrics 批次，汇总异常过滤、几何 QA 和一键导入准备度
+- **Ops 刷新中心**：在后台 dry-run 并执行 staged reference/import/geo/metrics 刷新 job，保留执行历史、异常处理队列和几何 QA
 
 ## 数据来源（公开透明）
 
