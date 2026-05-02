@@ -112,6 +112,7 @@ RENT_PRICE_PATTERN = re.compile(
     r"(?:(?:月租|租金)\s*(\d+(?:\.\d+)?)\s*(万)?(?:\s*元)?(?:/月)?)"
     r"|(?:(\d+(?:\.\d+)?)\s*(万)?\s*元(?:/月)?)"
 )
+MIN_PLAUSIBLE_MONTHLY_RENT = 1000
 
 
 def load_capture_rows(path: Path) -> list[dict[str, str]]:
@@ -267,10 +268,7 @@ def parse_unit_price(texts: list[str], explicit_value: str | None, sale_price_wa
     return None
 
 
-def parse_monthly_rent(texts: list[str], explicit_value: str | None) -> float | None:
-    explicit = parse_float(explicit_value)
-    if explicit is not None:
-        return explicit
+def parse_monthly_rent_from_text(texts: list[str]) -> float | None:
     for text in texts:
         match = RENT_PRICE_PATTERN.search(text)
         if not match:
@@ -282,6 +280,18 @@ def parse_monthly_rent(texts: list[str], explicit_value: str | None) -> float | 
         wan_marker = match.group(2) or match.group(4)
         amount = float(amount_text)
         return round(amount * 10000, 2) if wan_marker else round(amount, 2)
+    return None
+
+
+def parse_monthly_rent(texts: list[str], explicit_value: str | None) -> float | None:
+    explicit = parse_float(explicit_value)
+    if explicit is not None and explicit >= MIN_PLAUSIBLE_MONTHLY_RENT:
+        return explicit
+
+    parsed_from_text = parse_monthly_rent_from_text(texts)
+    if parsed_from_text is not None:
+        return parsed_from_text
+
     return None
 
 

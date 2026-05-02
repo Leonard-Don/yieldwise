@@ -8,7 +8,7 @@ real "月租12200元" because it appeared first.
 """
 from __future__ import annotations
 
-from jobs.import_public_browser_capture import parse_monthly_rent
+from jobs.import_public_browser_capture import build_structured_row, parse_monthly_rent
 
 
 def _rent(text: str) -> float | None:
@@ -56,3 +56,31 @@ def test_yuelu_prefix_wan_unit() -> None:
 def test_explicit_value_wins_over_text() -> None:
     # explicit_value short-circuits the regex
     assert parse_monthly_rent(["月租 99 元"], "8500") == 8500.0
+
+
+def test_implausible_explicit_value_falls_back_to_text() -> None:
+    text = "万盛金邸 3号楼 9层/16层 89平米 2室2厅 南向 精装 月租12200元"
+    assert parse_monthly_rent([text], "16") == 12200.0
+
+
+def test_implausible_explicit_value_without_rent_signal_is_missing() -> None:
+    assert parse_monthly_rent(["万盛金邸 3号楼 9层/16层 89平米"], "16") is None
+
+
+def test_structured_row_does_not_let_total_floors_override_rent() -> None:
+    structured, parsed = build_structured_row(
+        {
+            "source_listing_id": "rent-regression-001",
+            "business_type": "rent",
+            "url": "https://example.com/rent-regression-001",
+            "community_name": "万盛金邸",
+            "address_text": "万盛金邸 3号楼",
+            "raw_text": "万盛金邸 3号楼 9层/16层 89平米 2室2厅 南向 精装 月租12200元",
+            "published_at": "2026-04-14T10:42:00+08:00",
+            "total_floors": "16",
+            "monthly_rent": "16",
+        }
+    )
+
+    assert structured["monthly_rent"] == 12200.0
+    assert parsed["attention"] == []

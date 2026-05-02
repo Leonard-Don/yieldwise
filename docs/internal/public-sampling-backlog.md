@@ -47,7 +47,7 @@
 **修复路径（按风险倒序）**：
 
 1. **立即**：写一个一次性清理脚本，把 staged rent rows 里 `monthly_rent < 1000` 的批量清零（视为缺失），让用户平台不再被脏数据带偏。
-2. **下一步**：复现并修 UI 串位 bug — 嫌疑落在 `frontend/backstage/app.js` 的 capture 表单提交路径，或 `api/backstage/review.py` 的 `_normalize_browser_capture_row`。
+2. **已加固（2026-05-02）**：解析层不再让低于 `1000` 的显式 `monthly_rent` 覆盖原文租金；如果 UI / 脚本把 `total_floors=16` 串进 `monthly_rent`，后端会优先从 `raw_text` 解析 `月租12200元`，没有租金信号则视为缺失。
 3. **数据层重补**：用修好的工作流，对上面 22 个小区重新走一遍采样，特别是浦东三巨头（仁恒河滨城 / 张江汤臣豪园三期 / 联洋年华，合计 1289 条坏样本）。
 
 ## 当前第一优先级
