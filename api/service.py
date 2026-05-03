@@ -16,9 +16,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-import math
 import re
-import subprocess
 import sys
 from copy import deepcopy
 from datetime import date, datetime
@@ -28,8 +26,7 @@ from typing import Any
 
 from .mock_data import ADDRESS_QUEUE, DATA_SOURCES, DISTRICTS, PIPELINE_STEPS, SCHEMAS, SYSTEM_STRATEGY
 from .data_quality import attach_quality_to_communities
-from .persistence import database_has_real_data, postgres_data_snapshot, postgres_runtime_status, query_row, query_rows
-from .provider_adapters import mock_enabled, provider_readiness_snapshot
+from .persistence import postgres_data_snapshot, postgres_runtime_status, query_row, query_rows
 from .reference_catalog import load_reference_catalog
 
 # Phase 7a: run-state aggregation lives in api/backstage/runs.py.

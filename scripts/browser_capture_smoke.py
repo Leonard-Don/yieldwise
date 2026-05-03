@@ -485,7 +485,6 @@ def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: 
     open_args = [url, "--headed"] if headed else [url]
     actual_session = cli_session_name(session)
     last_error: subprocess.CalledProcessError | None = None
-    last_timeout: subprocess.TimeoutExpired | None = None
     for attempt in range(max_attempts):
         cleanup_session_artifacts(session)
         try:
@@ -499,7 +498,6 @@ def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: 
                 "headed": headed,
             }
         except subprocess.TimeoutExpired as error:
-            last_timeout = error
             if attempt + 1 < max_attempts:
                 time.sleep(0.5)
                 continue

@@ -15,8 +15,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from api.provider_adapters import adapter_contract, normalize_provider_id, validate_provider_scope
-from api.reference_catalog import BuildingReference, load_reference_catalog
+from api.provider_adapters import adapter_contract, validate_provider_scope
+from api.reference_catalog import load_reference_catalog
 
 
 CHINESE_DIGIT_MAP = {

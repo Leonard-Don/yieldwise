@@ -23,12 +23,7 @@ extend-exclude = [
 select = ["F"]
 
 [tool.ruff.lint.per-file-ignores]
-# service.py is the Phase 7 re-export hub. F401 covers intentional re-exports
-# of backstage symbols + a few unused-import leftovers (separate cleanup).
-"api/service.py" = ["F401"]
-# Each of the remaining baselines flags a single F841/F401 left over from
-# refactors. They are not blocking and will be cleaned up incrementally.
-"jobs/import_authorized_listings.py" = ["F401"]
-"scripts/browser_capture_smoke.py" = ["F841"]
-"scripts/full_browser_regression.py" = ["F841"]
-"tests/api/test_personal_storage.py" = ["F401"]
+# api/service.py re-exports a wide block of names from api/backstage/* so
+# downstream callers can keep importing them through the historical path.
+# Those re-export lines carry # noqa: E402,F401 directly, so no per-file
+# ignore is needed here.

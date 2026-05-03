@@ -1118,7 +1118,6 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
     operations_backstage_boot_frontstage = operations_backstage_boot.get("frontstageState") or {}
     operations_selection_boot = data.get("operationsSelectionBackstageBootSmoke") or {}
     operations_selection_boot_state = operations_selection_boot.get("backstageState") or {}
-    operations_run_selection = data.get("operationsRunSelectionState") or {}
     filter_display = data.get("filterDisplayState") or {}
     backstage_strategy = data.get("backstageStrategyState") or {}
     backstage_operations = data.get("backstageOperationsState") or {}
