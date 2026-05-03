@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { candidateFromItem, isCompared } from "./comparison-helpers.js";
 import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js";
 
 export async function initBoard({ container, store }) {
@@ -87,8 +88,21 @@ export async function initBoard({ container, store }) {
     countEl.textContent = String(lastItems.length);
     publishCount(lastItems.length);
     list.innerHTML = lastItems
-      .map((item) => renderRow(item, mode, state.selection))
+      .map((item) => renderRow(item, mode, state.selection, state.comparisonItems, state.mode))
       .join("");
+    list.querySelectorAll("[data-comparison-add]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const item = lastItems.find((it) => String(it.id) === button.dataset.id);
+        const candidate = candidateFromItem(item, state.mode);
+        button.dispatchEvent(
+          new CustomEvent("atlas:add-comparison", {
+            bubbles: true,
+            detail: { candidate },
+          }),
+        );
+      });
+    });
     list.querySelectorAll(".atlas-board-row").forEach((row) => {
       row.addEventListener("click", () => {
         const id = row.dataset.id;
@@ -109,24 +123,30 @@ export async function initBoard({ container, store }) {
   }
 }
 
-function renderRow(item, mode, selection) {
+function renderRow(item, mode, selection, comparisonItems, modeId) {
   const selected =
     selection && (selection.id === item.id || selection.id === item.primaryBuildingId);
+  const candidate = candidateFromItem(item, modeId);
+  const compared = candidate && isCompared(comparisonItems, candidate.target_id, candidate.target_type);
   const cells = mode.boardColumns
     .map((col) => formatCell(item, col))
     .join("");
-  return `<li class="atlas-board-row mono" data-id="${escapeAttr(item.id)}" aria-selected="${selected ? "true" : "false"}">${cells}</li>`;
+  return `<li class="atlas-board-row mono" data-id="${escapeAttr(item.id)}" aria-selected="${selected ? "true" : "false"}">${cells}${renderCompareButton(item, compared)}</li>`;
 }
 
 function formatCell(item, col) {
   const raw = item[col.key];
   if (col.key === "name") {
-    return `<span class="atlas-board-name-cell"><span class="name" title="${escapeAttr(raw ?? "")}">${escapeText(raw ?? "—")}</span>${renderQualityBadge(item.quality)}</span>`;
+    return `<span class="atlas-board-name-cell"><span class="name" title="${escapeAttr(raw ?? "")}">${escapeText(raw ?? "—")}</span>${renderQualityBadge(item.quality)}${renderDecisionBadge(item.decisionBrief)}</span>`;
   }
   if (col.key === "districtName") {
     return `<span class="name">${escapeText(raw ?? "—")}</span>`;
   }
   return `<span class="secondary">${formatValue(raw, col.format)}</span>`;
+}
+
+function renderCompareButton(item, compared) {
+  return `<button type="button" class="atlas-compare-toggle" data-comparison-add data-id="${escapeAttr(item.id)}" aria-pressed="${compared ? "true" : "false"}" title="${compared ? "已加入对比" : "加入对比"}">${compared ? "已选" : "对比"}</button>`;
 }
 
 function renderQualityBadge(quality) {
@@ -140,6 +160,18 @@ function renderQualityBadge(quality) {
   }[status] || "待复核";
   const title = quality.summary || quality.sampleLabel || label;
   return `<span class="atlas-quality-mini" data-quality-status="${escapeAttr(status)}" title="${escapeAttr(title)}">${escapeText(label)}</span>`;
+}
+
+function renderDecisionBadge(brief) {
+  if (!brief || typeof brief !== "object") return "";
+  const stance = String(brief.stance || "watch");
+  const label = brief.label || {
+    shortlist: "候选",
+    watch: "观察",
+    sample_first: "补样",
+  }[stance] || "观察";
+  const title = brief.summary || label;
+  return `<span class="atlas-decision-mini" data-decision-stance="${escapeAttr(stance)}" title="${escapeAttr(title)}">${escapeText(label)}</span>`;
 }
 
 function formatValue(value, format) {

@@ -60,7 +60,8 @@
   color: var(--text-dim);
 }
 
-.atlas-drawer-close {
+.atlas-drawer-close,
+.atlas-drawer-compare {
   appearance: none;
   border: 1px solid var(--line);
   background: var(--bg-2);
@@ -76,11 +77,23 @@
     background 120ms ease-out, transform 120ms ease-out;
 }
 
+.atlas-drawer-compare {
+  width: auto;
+  padding: 0 8px;
+}
+
 .atlas-drawer-close:hover {
   color: var(--down);
   border-color: var(--down);
   background: rgba(255, 77, 77, 0.08);
   transform: rotate(90deg);
+}
+
+.atlas-drawer-compare:hover,
+.atlas-drawer-compare[aria-pressed="true"] {
+  color: var(--up);
+  border-color: rgba(0, 214, 143, 0.36);
+  background: rgba(0, 214, 143, 0.08);
 }
 
 .atlas-drawer-body {
@@ -234,6 +247,76 @@
 .atlas-quality-check[data-state="warn"],
 .atlas-quality-check[data-state="blocker"] {
   border-color: rgba(255, 193, 112, 0.34);
+}
+
+.atlas-decision-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.atlas-decision-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.atlas-decision-head strong {
+  color: var(--text-0);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.atlas-decision-badge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-1);
+  color: var(--text-dim);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.atlas-decision-badge[data-decision-stance="shortlist"] {
+  border-color: rgba(0, 214, 143, 0.32);
+  color: var(--up);
+}
+
+.atlas-decision-badge[data-decision-stance="sample_first"] {
+  border-color: rgba(255, 193, 112, 0.34);
+  color: var(--warn);
+}
+
+.atlas-decision-factors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atlas-decision-factors span {
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.atlas-decision-risks {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.atlas-decision-panel p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
 }
 
 .atlas-bucket-chart {

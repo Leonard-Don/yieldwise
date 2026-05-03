@@ -1,0 +1,140 @@
+.atlas-comparison-tray {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-1);
+}
+
+.atlas-comparison-tray[data-open="false"] {
+  display: none;
+}
+
+.atlas-comparison-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.atlas-comparison-summary strong {
+  font-size: 11px;
+  color: var(--text-0);
+  white-space: nowrap;
+}
+
+.atlas-comparison-summary [data-role="comparison-status"] {
+  font-size: 10px;
+}
+
+.atlas-comparison-summary [data-state="ok"] {
+  color: var(--up);
+}
+
+.atlas-comparison-summary [data-state="error"] {
+  color: var(--down);
+}
+
+.atlas-comparison-list {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.atlas-comparison-item {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) auto auto auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 220px;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.atlas-comparison-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-0);
+}
+
+.atlas-comparison-metric,
+.atlas-comparison-quality {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.atlas-comparison-quality[data-quality-status="strong"],
+.atlas-comparison-quality[data-quality-status="usable"] {
+  color: var(--up);
+}
+
+.atlas-comparison-quality[data-quality-status="thin"] {
+  color: var(--warn);
+}
+
+.atlas-comparison-quality[data-quality-status="blocked"] {
+  color: var(--down);
+}
+
+.atlas-comparison-item button,
+.atlas-comparison-actions button {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out;
+}
+
+.atlas-comparison-item button {
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+}
+
+.atlas-comparison-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.atlas-comparison-actions button {
+  padding: 5px 9px;
+  font-size: 11px;
+}
+
+.atlas-comparison-actions button:hover,
+.atlas-comparison-item button:hover {
+  color: var(--text-0);
+  border-color: var(--up);
+  background: rgba(0, 214, 143, 0.06);
+}
+
+.atlas-comparison-actions button[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .atlas-comparison-tray {
+    grid-template-columns: 1fr;
+  }
+
+  .atlas-comparison-actions {
+    justify-content: flex-end;
+  }
+}

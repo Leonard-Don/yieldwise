@@ -35,3 +35,5 @@ def test_v2_opportunities_returns_items_key(client) -> None:
         item = body["items"][0]
         assert item["quality"]["status"] in {"strong", "usable", "thin", "blocked"}
         assert item["qualityLabel"] == item["quality"]["label"]
+        assert item["decisionBrief"]["stance"] in {"shortlist", "watch", "sample_first"}
+        assert item["decisionBrief"]["nextAction"]

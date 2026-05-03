@@ -12,6 +12,8 @@ import { initAnnotations } from "./annotations.js";
 import { initAlerts } from "./alerts.js";
 import { initShortcuts } from "./shortcuts.js";
 import { initSearch } from "./search.js";
+import { initComparison } from "./comparison.js";
+import { normalizeComparisonItems } from "./comparison-helpers.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
 import { bootstrapCityConfig } from "./config-bootstrap.js";
@@ -27,7 +29,9 @@ if (!root) {
 
 async function bootstrap(root) {
   const filtersStorage = createStorage("atlas:filters:v1");
+  const comparisonStorage = createStorage("atlas:comparison:v1");
   const persistedFilters = filtersStorage.read() || {};
+  const persistedComparison = normalizeComparisonItems(comparisonStorage.read());
   const initialFilters = {};
   for (const mode of MODES) {
     initialFilters[mode.id] = persistedFilters[mode.id] || defaultFiltersFor(mode.id);
@@ -44,6 +48,7 @@ async function bootstrap(root) {
     watchlist: [],
     annotationsByTarget: {},
     alerts: { items: [], last_open_at: null },
+    comparisonItems: persistedComparison,
     helpOpen: false,
     searchOpen: false,
   });
@@ -88,6 +93,7 @@ async function bootstrap(root) {
   initAlerts({ root, store });
   initShortcuts({ root, store });
   initSearch({ root, store });
+  initComparison({ root, store, storage: comparisonStorage });
 
   // Auto-open the onboarding modal when a fresh user lands on home mode AND
   // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).

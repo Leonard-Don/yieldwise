@@ -73,6 +73,7 @@ ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 ## 功能
 
 - **一张地图三种工作流**：收益猎手 · 自住找房 · 全市观察
+- **候选对比与本地备忘录**：把小区 / 楼栋 / 区域加入对比，导出含质量风险和下一步动作的 Markdown 研究备忘录
 - **OSM + 高德楼栋融合** 含 per-community 配额匹配
 - **Ops 刷新中心**：在后台 dry-run 并执行 staged reference/import/geo/metrics 刷新 job，保留执行历史、异常处理队列和几何 QA
 

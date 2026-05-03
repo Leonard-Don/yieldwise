@@ -6,6 +6,7 @@ import {
   formatWan,
   formatYuan,
   normalizeYieldPct,
+  normalizeDecisionBrief,
   normalizeQuality,
   bucketBars,
   pickKpisFor,
@@ -57,6 +58,24 @@ test("normalizeQuality: keeps compact visible fields for drawer rendering", () =
   assert.equal(quality.score, 72);
   assert.equal(quality.sampleLabel, "售 4 / 租 5");
   assert.equal(quality.checks.length, 2);
+});
+
+test("normalizeDecisionBrief: keeps decision summary fields for drawer rendering", () => {
+  const brief = normalizeDecisionBrief({
+    decisionBrief: {
+      stance: "shortlist",
+      label: "纳入候选",
+      summary: "收益和质量可用",
+      nextAction: "加入对比",
+      factors: ["租售比 4.20%", "机会分 88"],
+      risks: ["继续看稳定性"],
+    },
+  });
+
+  assert.equal(brief.stance, "shortlist");
+  assert.equal(brief.label, "纳入候选");
+  assert.deepEqual(brief.factors, ["租售比 4.20%", "机会分 88"]);
+  assert.deepEqual(brief.risks, ["继续看稳定性"]);
 });
 
 test("bucketBars: returns 3 entries with label/value/pct", () => {

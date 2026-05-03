@@ -58,6 +58,30 @@ export function normalizeQuality(detail) {
   };
 }
 
+export function normalizeDecisionBrief(detail) {
+  const brief = detail && typeof detail === "object" ? detail.decisionBrief : null;
+  if (!brief || typeof brief !== "object") {
+    return null;
+  }
+  const stance = String(brief.stance || "watch");
+  return {
+    stance,
+    label: brief.label || decisionLabelFor(stance),
+    summary: brief.summary || "",
+    nextAction: brief.nextAction || "",
+    factors: Array.isArray(brief.factors) ? brief.factors.filter(Boolean).slice(0, 5) : [],
+    risks: Array.isArray(brief.risks) ? brief.risks.filter(Boolean).slice(0, 4) : [],
+  };
+}
+
+export function decisionLabelFor(stance) {
+  return {
+    shortlist: "纳入候选",
+    watch: "继续观察",
+    sample_first: "先补样",
+  }[stance] || "继续观察";
+}
+
 export function qualityLabelFor(status) {
   return {
     strong: "高可信",

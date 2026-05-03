@@ -210,6 +210,41 @@
 - 机会评分拆解 `scoreBreakdown`
 - 相对小区收益偏离
 - 楼栋估算总价与月租
+- `quality / decisionBrief` 数据可信度与下一步动作
+
+### `POST /api/v2/decision-memo`
+
+根据前台候选对比列表生成本地 Markdown 研究备忘录。
+
+请求体：
+
+```json
+{
+  "targets": [
+    { "target_id": "zhangjiang-park", "target_type": "community" },
+    { "target_id": "zhangjiang-park-b2", "target_type": "building" }
+  ]
+}
+```
+
+约定：
+
+- `target_type` 支持 `community / building / district`
+- 单次最多 5 个候选
+- 未找到的候选会进入 `missingTargets`，已找到的候选仍会生成备忘录
+
+响应至少包含：
+
+- `generatedAt`
+- `targetCount`
+- `missingTargets`
+- `items[]`
+  - `targetId / targetType / name / districtName`
+  - `yieldPct / paybackYears / score`
+  - `quality`
+  - `decisionBrief`
+  - `nextSteps / risks`
+- `memo`: Markdown 文本
 
 ### `GET /api/buildings/{building_id}/floors/{floor_no}`
 

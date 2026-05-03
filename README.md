@@ -73,6 +73,7 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 ## Features
 
 - **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)
+- **Candidate comparison + local memo export** for communities / buildings / districts, including quality risks and next actions
 - **OSM + AMAP merged building footprints** with quota-based community matching
 - **Ops refresh center** for dry-running and executing staged reference/import/geo/metrics refresh jobs, with job history, anomaly triage, and geometry QA
 

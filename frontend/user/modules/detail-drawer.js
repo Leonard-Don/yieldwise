@@ -3,6 +3,7 @@ import {
   formatPct,
   formatWan,
   formatYuan,
+  normalizeDecisionBrief,
   normalizeQuality,
   pickKpisFor,
   topCommunitiesFromDistrict,
@@ -129,6 +130,7 @@ export function initDrawer({ root, store }) {
       paybackYears: detail.paybackYears,
       sample: detail.sample,
       osmFootprintCount: detail.osmFootprintCount,
+      decisionBrief: detail.decisionBrief,
     });
   }
 
@@ -154,6 +156,7 @@ export function initDrawer({ root, store }) {
     });
     return [
       renderKpiRow(kpis),
+      renderDecisionPanel(detail),
       renderQualityPanel(detail),
       renderFloorChart(bars),
       renderListingSummary(detail),
@@ -243,6 +246,30 @@ export function initDrawer({ root, store }) {
       </div>
       <p>${escapeText(reason || "")}</p>
       ${checks ? `<div class="atlas-quality-checks">${checks}</div>` : ""}
+    </div>`;
+  }
+
+  function renderDecisionPanel(detail) {
+    const brief = normalizeDecisionBrief(detail);
+    if (!brief) return "";
+    const factors = brief.factors.length
+      ? `<div class="atlas-decision-factors">${brief.factors
+          .map((factor) => `<span>${escapeText(factor)}</span>`)
+          .join("")}</div>`
+      : "";
+    const risks = brief.risks.length
+      ? `<ul class="atlas-decision-risks">${brief.risks
+          .map((risk) => `<li>${escapeText(risk)}</li>`)
+          .join("")}</ul>`
+      : "";
+    return `<div class="atlas-decision-panel" data-decision-stance="${escapeText(brief.stance)}">
+      <div class="atlas-decision-head">
+        <span class="atlas-decision-badge" data-decision-stance="${escapeText(brief.stance)}">${escapeText(brief.label)}</span>
+        <strong>${escapeText(brief.summary)}</strong>
+      </div>
+      ${factors}
+      ${risks}
+      <p>${escapeText(brief.nextAction)}</p>
     </div>`;
   }
 

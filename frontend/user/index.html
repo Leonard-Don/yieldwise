@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/styles/alerts.css" />
     <link rel="stylesheet" href="/styles/shortcuts.css" />
     <link rel="stylesheet" href="/styles/search.css" />
+    <link rel="stylesheet" href="/styles/comparison.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
@@ -62,6 +63,7 @@
               <span class="atlas-drawer-subtitle mono" data-role="drawer-subtitle">—</span>
             </div>
             <div class="atlas-drawer-actions">
+              <button type="button" class="atlas-drawer-compare" data-component="drawer-compare" aria-pressed="false" hidden>对比</button>
               <button type="button" class="atlas-drawer-star" data-component="drawer-star" aria-pressed="false" hidden>★</button>
               <button type="button" class="atlas-drawer-close" data-role="drawer-close" aria-label="关闭">×</button>
             </div>
@@ -140,6 +142,17 @@
           <footer class="atlas-search-status mono dim" data-role="search-status">输入后按 ↑↓ 选择，Enter 打开</footer>
         </section>
       </main>
+      <section class="atlas-comparison-tray" data-component="comparison-tray" data-open="false" aria-label="候选对比">
+        <div class="atlas-comparison-summary">
+          <strong>对比 <span data-role="comparison-count">0</span>/5</strong>
+          <span class="mono dim" data-role="comparison-status" data-state="idle">—</span>
+        </div>
+        <ol class="atlas-comparison-list" data-role="comparison-list"></ol>
+        <div class="atlas-comparison-actions">
+          <button type="button" data-role="comparison-export" disabled>导出备忘录</button>
+          <button type="button" data-role="comparison-clear" disabled>清空</button>
+        </div>
+      </section>
       <footer class="atlas-statusbar mono" data-component="statusbar">
         <span data-role="statusbar-mode">mode: --</span>
         <span data-role="statusbar-data">data: --</span>

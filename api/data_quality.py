@@ -32,12 +32,14 @@ def attach_quality_to_communities(communities: list[dict[str, Any]]) -> list[dic
         community["qualityStatus"] = community_quality["status"]
         community["qualityLabel"] = community_quality["label"]
         community["qualityScore"] = community_quality["score"]
+        community["decisionBrief"] = decision_brief(community, target_type="community")
         for building in community.get("buildings") or []:
             building_quality = quality_summary(building, target_type="building", community=community)
             building["quality"] = building_quality
             building["qualityStatus"] = building_quality["status"]
             building["qualityLabel"] = building_quality["label"]
             building["qualityScore"] = building_quality["score"]
+            building["decisionBrief"] = decision_brief(building, target_type="building", community=community)
     return communities
 
 
@@ -153,6 +155,77 @@ def quality_summary(
         "badges": _badges_for(status, sample_size, yield_pct),
         "reasons": reasons[:3],
         "checks": checks,
+    }
+
+
+def decision_brief(
+    item: dict[str, Any],
+    *,
+    target_type: str = "community",
+    community: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    quality = item.get("quality") if isinstance(item.get("quality"), dict) else None
+    if not quality:
+        quality = quality_summary(item, target_type=target_type, community=community)
+    quality_score = _optional_int(quality.get("score")) or 0
+    quality_status = str(quality.get("status") or "thin")
+    yield_pct = _optional_float(item.get("yieldAvg") if target_type == "building" else item.get("yield"))
+    if yield_pct is None:
+        yield_pct = _optional_float(item.get("yield"))
+    if yield_pct is None and community:
+        yield_pct = _optional_float(community.get("yield"))
+    opportunity_score = _optional_int(item.get("score")) or 0
+    payback_years = _optional_float(item.get("paybackYears"))
+    sample_label = str(quality.get("sampleLabel") or _sample_label(None, None, 0))
+
+    if quality_status in {"blocked", "thin"} or quality_score < 66:
+        stance = "sample_first"
+        label = "先补样"
+        summary = "数据还不足以支撑候选排序，先补齐租售成对样本再判断。"
+        next_action = "补 1 组出售 + 1 组出租样本，并复核楼栋 / 楼层挂载。"
+    elif yield_pct is not None and yield_pct >= 4.2 and opportunity_score >= 75:
+        stance = "shortlist"
+        label = "纳入候选"
+        summary = "收益、机会分和质量状态可以支撑进入候选池。"
+        next_action = "加入对比并导出备忘录，和同区候选逐项比较。"
+    else:
+        stance = "watch"
+        label = "继续观察"
+        summary = "数据可用，但收益或机会分还没有明显领先。"
+        next_action = "保留关注，优先观察租金、售价和质量分变化。"
+
+    factors = [
+        str(quality.get("summary") or ""),
+        f"机会分 {opportunity_score}",
+    ]
+    if yield_pct is not None:
+        factors.append(f"租售比 {yield_pct:.2f}%")
+    if payback_years is not None and payback_years > 0:
+        factors.append(f"回本 {payback_years:.1f} 年")
+    if sample_label:
+        factors.append(sample_label)
+
+    risks = []
+    if quality_status in {"blocked", "thin"}:
+        risks.append("样本或挂图质量仍需补强")
+    if yield_pct is None or yield_pct <= 0:
+        risks.append("缺少有效收益信号")
+    elif yield_pct < 3.5:
+        risks.append("收益水平偏低")
+    elif yield_pct > 8:
+        risks.append("收益信号异常偏高，需回看原始样本")
+    if payback_years is not None and payback_years >= 30:
+        risks.append("回本周期偏长")
+    if not risks:
+        risks.append("未发现阻断项，继续看样本稳定性")
+
+    return {
+        "stance": stance,
+        "label": label,
+        "summary": summary,
+        "nextAction": next_action,
+        "factors": [factor for factor in factors if factor][:5],
+        "risks": risks[:4],
     }
 
 

@@ -17,7 +17,7 @@
 
 .atlas-board-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) repeat(4, max-content);
   gap: 10px;
   align-items: baseline;
   padding: 8px 14px;
@@ -68,6 +68,53 @@
   line-height: 1.2;
   color: var(--text-dim);
   background: var(--bg-2);
+}
+
+.atlas-decision-mini {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-dim);
+  background: var(--bg-2);
+}
+
+.atlas-decision-mini[data-decision-stance="shortlist"] {
+  border-color: rgba(0, 214, 143, 0.32);
+  color: var(--up);
+}
+
+.atlas-decision-mini[data-decision-stance="watch"] {
+  border-color: rgba(126, 163, 255, 0.32);
+  color: var(--text-0);
+}
+
+.atlas-decision-mini[data-decision-stance="sample_first"] {
+  border-color: rgba(255, 193, 112, 0.34);
+  color: var(--warn);
+}
+
+.atlas-compare-toggle {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background 120ms ease-out;
+}
+
+.atlas-compare-toggle:hover,
+.atlas-compare-toggle[aria-pressed="true"] {
+  color: var(--up);
+  border-color: rgba(0, 214, 143, 0.36);
+  background: rgba(0, 214, 143, 0.08);
 }
 
 .atlas-quality-mini[data-quality-status="strong"],
