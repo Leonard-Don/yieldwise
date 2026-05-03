@@ -8,7 +8,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from guided_sampling_helper import _infer_scope_kind, build_public_search_query, parse_backlog
+from guided_sampling_helper import (
+    _infer_scope_kind,
+    build_public_search_query,
+    live_pack_items_to_rows,
+    parse_backlog,
+)
 
 
 def test_scope_kind_inference() -> None:
@@ -77,3 +82,55 @@ def test_parse_backlog_extracts_goal_counts_plain_digits() -> None:
     items = parse_backlog(text)
     assert items[0]["current_count"] == 2
     assert items[0]["target_count"] == 5
+
+
+def test_live_pack_items_to_rows_preserves_actionable_context() -> None:
+    rows = live_pack_items_to_rows([
+        {
+            "taskId": "browser-floor::sample::9",
+            "priorityScore": 92,
+            "priorityLabel": "极高优先",
+            "taskTypeLabel": "楼层补样",
+            "targetGranularity": "floor",
+            "districtName": "松江区",
+            "communityName": "松江大学城嘉和休闲广场",
+            "buildingName": "B座",
+            "floorNo": 9,
+            "currentPairCount": 3,
+            "targetPairCount": 4,
+            "missingPairCount": 1,
+            "pendingAttentionCount": 2,
+            "taskLifecycleLabel": "待复核",
+            "captureGoal": "至少再补 1 组 sale/rent 配对。",
+            "saleQuery": "上海 松江区 松江大学城嘉和休闲广场 B座 9层 二手房",
+            "rentQuery": "上海 松江区 松江大学城嘉和休闲广场 B座 9层 租房",
+            "recommendedAction": "先复核，再补采。",
+            "requiredFields": ["页面 URL", "小区名"],
+        }
+    ])
+
+    assert rows == [
+        {
+            "source_mode": "live_pack",
+            "task_id": "browser-floor::sample::9",
+            "priority_score": 92,
+            "priority_label": "极高优先",
+            "task_type_label": "楼层补样",
+            "target_granularity": "floor",
+            "district": "松江区",
+            "community": "松江大学城嘉和休闲广场",
+            "scope": "B座 9层",
+            "building": "B座",
+            "floor": 9,
+            "current_count": 3,
+            "target_count": 4,
+            "delta_to_target": 1,
+            "pending_attention_count": 2,
+            "task_lifecycle_label": "待复核",
+            "capture_goal": "至少再补 1 组 sale/rent 配对。",
+            "sale_search_query": "上海 松江区 松江大学城嘉和休闲广场 B座 9层 二手房",
+            "rent_search_query": "上海 松江区 松江大学城嘉和休闲广场 B座 9层 租房",
+            "recommended_action": "先复核，再补采。",
+            "required_fields": "页面 URL / 小区名",
+        }
+    ]

@@ -9,7 +9,17 @@
 - `public-browser-sampling-2026-04-17-priority3`
 - `public-browser-sampling-2026-04-17-priority4`
 
-后续待办改为以当前 `browser_sampling_pack` 开放任务为准。
+后续待办改为以当前 `browser_sampling_pack` 开放任务为准。继续补样前先生成实时工作清单：
+
+```bash
+python3 scripts/guided_sampling_helper.py --live-pack --limit 20
+```
+
+如果只想回看这份 Markdown 的历史优先级，可改用：
+
+```bash
+python3 scripts/guided_sampling_helper.py --priorities 1
+```
 
 ## 🔴 P0 — 系统性数据质量 bug（2026-04-29 发现）
 
@@ -138,11 +148,12 @@
 
 ## 操作建议
 
-1. 先在工作台看 `公开页面采样执行台`、`全局待复核收件箱` 和 run 级 `review queue 回看面板`。
-2. 再把样本补到：
+1. 先跑 `python3 scripts/guided_sampling_helper.py --live-pack --limit 20`，以实时 `browser_sampling_pack` 生成 `tmp/sampling-tasks/<timestamp>-live-pack/worklist.csv`。
+2. 再在工作台看 `公开页面采样执行台`、`全局待复核收件箱` 和 run 级 `review queue 回看面板`。
+3. 把可复核样本补到：
    - `data/public-snapshot/2026-04-12/public_browser_sampling_sale.csv`
    - `data/public-snapshot/2026-04-12/public_browser_sampling_rent.csv`
-3. 补完后跑：
+4. 补完后跑：
 
 ```bash
 python3 jobs/materialize_public_snapshot.py \

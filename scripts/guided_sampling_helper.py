@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Read docs/internal/public-sampling-backlog.md, emit a per-task worklist CSV.
+"""Emit a per-task public sampling worklist CSV.
 
 This is NOT a scraper — it does not fetch listing pages. It only converts
-the human-curated backlog markdown into a structured CSV that lets you
-work through targets one at a time without re-reading the prose.
+the live browser-sampling task pack, or the human-curated backlog markdown,
+into a structured CSV that lets you work through targets one at a time.
 
-For each backlog target it produces:
+For each target it produces:
 - community + building/floor context
 - desired sale + rent counts (to know when you can move on)
 - sale + rent search keywords you can paste into any regular browser
@@ -21,8 +21,9 @@ You then:
    not a state machine).
 
 Run:
-    python3 scripts/guided_sampling_helper.py
-    python3 scripts/guided_sampling_helper.py --priorities 1     # only P1
+    python3 scripts/guided_sampling_helper.py --live-pack
+    python3 scripts/guided_sampling_helper.py --live-pack --limit 20
+    python3 scripts/guided_sampling_helper.py --priorities 1     # markdown backlog only
     python3 scripts/guided_sampling_helper.py --backlog-file path/to/different.md
 """
 from __future__ import annotations
@@ -36,7 +37,7 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_BACKLOG = ROOT_DIR / "docs" / "public-sampling-backlog.md"
+DEFAULT_BACKLOG = ROOT_DIR / "docs" / "internal" / "public-sampling-backlog.md"
 
 # Section detection: which markdown headings count as priority groupings.
 PRIORITY_HEADERS: dict[str, int] = {
@@ -123,6 +124,72 @@ def build_public_search_query(community: str, business: str = "sale") -> str:
     return f"上海 {community} {suffix}"
 
 
+def _compact_target_scope(item: dict) -> str:
+    parts = []
+    building = str(item.get("buildingName") or "").strip()
+    floor_no = item.get("floorNo")
+    if building:
+        parts.append(building)
+    if floor_no not in (None, ""):
+        parts.append(f"{int(floor_no)}层")
+    if not parts:
+        target_granularity = str(item.get("targetGranularity") or "")
+        if target_granularity == "community":
+            return "小区补面"
+        return str(item.get("taskTypeLabel") or target_granularity or "补样")
+    return " ".join(parts)
+
+
+def _target_counts(item: dict) -> tuple[int | None, int | None, int | None]:
+    if str(item.get("targetGranularity") or "") == "floor":
+        current = item.get("currentPairCount")
+        target = item.get("targetPairCount")
+        missing = item.get("missingPairCount")
+    else:
+        current = item.get("currentSampleSize")
+        target = item.get("targetSampleSize")
+        missing = item.get("missingSampleCount")
+    return (
+        int(current) if current not in (None, "") else None,
+        int(target) if target not in (None, "") else None,
+        int(missing) if missing not in (None, "") else None,
+    )
+
+
+def live_pack_items_to_rows(items: list[dict]) -> list[dict]:
+    rows: list[dict] = []
+    for item in items:
+        current_count, target_count, missing_count = _target_counts(item)
+        rows.append(
+            {
+                "source_mode": "live_pack",
+                "task_id": item.get("taskId"),
+                "priority_score": item.get("priorityScore"),
+                "priority_label": item.get("priorityLabel"),
+                "task_type_label": item.get("taskTypeLabel"),
+                "target_granularity": item.get("targetGranularity"),
+                "district": item.get("districtName"),
+                "community": item.get("communityName"),
+                "scope": _compact_target_scope(item),
+                "building": item.get("buildingName") or "",
+                "floor": item.get("floorNo") or "",
+                "current_count": current_count,
+                "target_count": target_count,
+                "delta_to_target": missing_count,
+                "pending_attention_count": item.get("pendingAttentionCount") or 0,
+                "task_lifecycle_label": item.get("taskLifecycleLabel") or "",
+                "capture_goal": item.get("captureGoal") or "",
+                "sale_search_query": item.get("saleQuery")
+                or build_public_search_query(str(item.get("communityName") or ""), "sale"),
+                "rent_search_query": item.get("rentQuery")
+                or build_public_search_query(str(item.get("communityName") or ""), "rent"),
+                "recommended_action": item.get("recommendedAction") or "",
+                "required_fields": " / ".join(item.get("requiredFields") or []),
+            }
+        )
+    return rows
+
+
 def items_to_rows(items: list[dict]) -> list[dict]:
     rows: list[dict] = []
     for it in items:
@@ -130,44 +197,78 @@ def items_to_rows(items: list[dict]) -> list[dict]:
         sale_query = build_public_search_query(community, "sale")
         rent_query = build_public_search_query(community, "rent")
         delta = (it["target_count"] or 0) - (it["current_count"] or 0) if it["target_count"] else None
-        rows.append({
-            "priority": it["priority"],
-            "scope_kind": it["scope_kind"],
-            "community": community,
-            "scope": it["scope"],
-            "current_count": it["current_count"],
-            "target_count": it["target_count"],
-            "delta_to_target": delta,
-            "sale_search_query": sale_query,
-            "rent_search_query": rent_query,
-        })
+        rows.append(
+            {
+                "source_mode": "markdown_backlog",
+                "priority": it["priority"],
+                "scope_kind": it["scope_kind"],
+                "community": community,
+                "scope": it["scope"],
+                "current_count": it["current_count"],
+                "target_count": it["target_count"],
+                "delta_to_target": delta,
+                "sale_search_query": sale_query,
+                "rent_search_query": rent_query,
+            }
+        )
     return rows
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
+    p.add_argument("--live-pack", action="store_true",
+                   help="Read the current backend browser_sampling_pack instead of the markdown backlog")
     p.add_argument("--backlog-file", type=Path, default=DEFAULT_BACKLOG)
     p.add_argument("--priorities", type=int, nargs="+", default=None,
                    help="Only emit these priority levels (0=P0, 1=first, 2=second)")
+    p.add_argument("--limit", type=int, default=20, help="Maximum live-pack tasks to emit")
+    p.add_argument("--district", default=None, help="Optional live-pack district filter")
+    p.add_argument("--focus-scope", default=None, help="Optional live-pack focus scope filter")
+    p.add_argument("--min-yield", type=float, default=0.0, help="Optional live-pack minimum yield filter")
+    p.add_argument("--max-budget", type=float, default=10_000.0, help="Optional live-pack max budget filter")
+    p.add_argument("--min-samples", type=int, default=0, help="Optional live-pack minimum sample filter")
     p.add_argument("--output-root", type=Path, default=ROOT_DIR / "tmp" / "sampling-tasks")
     return p.parse_args()
 
 
+def _load_live_pack(args: argparse.Namespace) -> dict:
+    if str(ROOT_DIR) not in sys.path:
+        sys.path.insert(0, str(ROOT_DIR))
+    from api.backstage.review import browser_sampling_pack_payload
+
+    return browser_sampling_pack_payload(
+        district=args.district,
+        min_yield=args.min_yield,
+        max_budget=args.max_budget,
+        min_samples=args.min_samples,
+        focus_scope=args.focus_scope,
+        limit=args.limit,
+    )
+
+
 def main() -> int:
     args = parse_args()
-    if not args.backlog_file.exists():
-        raise SystemExit(f"backlog file not found: {args.backlog_file}")
-    text = args.backlog_file.read_text(encoding="utf-8")
-    items = parse_backlog(text)
-    if args.priorities is not None:
-        items = [i for i in items if i["priority"] in args.priorities]
-    if not items:
-        print("no items parsed — check backlog format or --priorities filter", file=sys.stderr)
+    pack_summary: dict | None = None
+    if args.live_pack:
+        payload = _load_live_pack(args)
+        items = payload.get("items") or []
+        pack_summary = payload.get("summary") or {}
+        rows = live_pack_items_to_rows(items)
+    else:
+        if not args.backlog_file.exists():
+            raise SystemExit(f"backlog file not found: {args.backlog_file}")
+        text = args.backlog_file.read_text(encoding="utf-8")
+        items = parse_backlog(text)
+        if args.priorities is not None:
+            items = [i for i in items if i["priority"] in args.priorities]
+        rows = items_to_rows(items)
+    if not rows:
+        print("no items parsed — check live filters, backlog format, or --priorities filter", file=sys.stderr)
         return 1
 
-    rows = items_to_rows(items)
-    ts = datetime.now().strftime("%Y%m%d%H%M%S")
-    out_dir = args.output_root / ts
+    ts = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    mode = "live-pack" if args.live_pack else "backlog"
+    out_dir = args.output_root / f"{ts}-{mode}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = out_dir / "worklist.csv"
@@ -178,6 +279,26 @@ def main() -> int:
         w.writeheader()
         w.writerows(rows)
     json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if args.live_pack and pack_summary:
+        print(f"\nworklist → {csv_path}")
+        print(
+            "  live pack: "
+            f"{pack_summary.get('taskCount')} tasks, "
+            f"{pack_summary.get('floorTaskCount')} floor / "
+            f"{pack_summary.get('buildingTaskCount')} building / "
+            f"{pack_summary.get('communityTaskCount')} community, "
+            f"pending review queue {pack_summary.get('pendingReviewQueueCount')}"
+        )
+        print("\n  next 5 tasks to work on:")
+        for r in rows[:5]:
+            delta = r["delta_to_target"]
+            suffix = f" ({delta} more to go)" if delta else ""
+            print(f"    • {r['priority_label']} · {r['community']} {r['scope']}{suffix}")
+            print(f"      goal: {r['capture_goal']}")
+            print(f"      sale query: {r['sale_search_query']}")
+            print(f"      rent query: {r['rent_search_query']}")
+        return 0
 
     by_priority: dict[int, int] = {}
     for r in rows:
