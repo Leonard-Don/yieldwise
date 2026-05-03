@@ -23,6 +23,7 @@ You then:
 Run:
     python3 scripts/guided_sampling_helper.py --live-pack
     python3 scripts/guided_sampling_helper.py --live-pack --limit 20
+    python3 scripts/guided_sampling_helper.py --live-pack --limit 20 --sync-backlog
     python3 scripts/guided_sampling_helper.py --priorities 1     # markdown backlog only
     python3 scripts/guided_sampling_helper.py --backlog-file path/to/different.md
 """
@@ -214,6 +215,85 @@ def items_to_rows(items: list[dict]) -> list[dict]:
     return rows
 
 
+def live_rows_to_backlog_sections(rows: list[dict], *, generated_at: str | None = None) -> dict[str, str]:
+    timestamp = generated_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    groups = {
+        "当前第一优先级": [],
+        "当前第二优先级": [],
+    }
+    for row in rows:
+        priority_score = int(row.get("priority_score") or 0)
+        priority_label = str(row.get("priority_label") or "")
+        section = "当前第一优先级" if priority_score >= 90 or "极高" in priority_label else "当前第二优先级"
+        groups[section].append(row)
+
+    sections: dict[str, str] = {}
+    for section, section_rows in groups.items():
+        lines = [
+            f"## {section}",
+            "",
+            f"`{timestamp}` 从实时 `browser_sampling_pack` 同步；继续补样前可重新运行 `python3 scripts/guided_sampling_helper.py --live-pack --limit 20 --sync-backlog`。",
+            "",
+        ]
+        if not section_rows:
+            lines.append("- 当前实时任务包没有该优先级未完成项。")
+        for row in section_rows:
+            community = row.get("community") or "未知小区"
+            scope = row.get("scope") or row.get("target_granularity") or "补样"
+            current = row.get("current_count")
+            target = row.get("target_count")
+            delta = row.get("delta_to_target")
+            pending = row.get("pending_attention_count") or 0
+            capture_goal = str(row.get("capture_goal") or "").strip()
+            recommended_action = str(row.get("recommended_action") or "").strip()
+            sale_query = str(row.get("sale_search_query") or "").strip()
+            rent_query = str(row.get("rent_search_query") or "").strip()
+            target_bits = []
+            if current not in (None, ""):
+                target_bits.append(f"当前 `{current}`")
+            if target not in (None, ""):
+                target_bits.append(f"目标 `{target}`")
+            if delta not in (None, "", 0):
+                target_bits.append(f"还差 `{delta}`")
+            if pending:
+                target_bits.append(f"待复核 `{pending}`")
+            goal = " / ".join(target_bits) or capture_goal or "按实时任务包继续补样"
+            lines.append(f"- {community} `{scope}`")
+            lines.append(f"  - 目标：{goal}。")
+            if capture_goal:
+                lines.append(f"  - 补样口径：{capture_goal}")
+            if recommended_action:
+                lines.append(f"  - 建议：{recommended_action}")
+            if sale_query:
+                lines.append(f"  - sale query：`{sale_query}`")
+            if rent_query:
+                lines.append(f"  - rent query：`{rent_query}`")
+        sections[section] = "\n".join(lines).rstrip() + "\n"
+    return sections
+
+
+def replace_backlog_priority_sections(text: str, sections: dict[str, str]) -> str:
+    updated = text
+    ordered_headings = ["当前第一优先级", "当前第二优先级"]
+    for heading in ordered_headings:
+        body = sections.get(heading)
+        if body is None:
+            continue
+        pattern = re.compile(
+            rf"^## {re.escape(heading)}\n.*?(?=^## |\Z)",
+            re.S | re.M,
+        )
+        if pattern.search(updated):
+            updated = pattern.sub(body.rstrip() + "\n\n", updated, count=1)
+        else:
+            insert_at = updated.find("\n## 已完成")
+            if insert_at == -1:
+                updated = updated.rstrip() + "\n\n" + body.rstrip() + "\n"
+            else:
+                updated = updated[:insert_at].rstrip() + "\n\n" + body.rstrip() + "\n" + updated[insert_at:]
+    return updated.rstrip() + "\n"
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--live-pack", action="store_true",
@@ -228,6 +308,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-budget", type=float, default=10_000.0, help="Optional live-pack max budget filter")
     p.add_argument("--min-samples", type=int, default=0, help="Optional live-pack minimum sample filter")
     p.add_argument("--output-root", type=Path, default=ROOT_DIR / "tmp" / "sampling-tasks")
+    p.add_argument("--sync-backlog", action="store_true",
+                   help="With --live-pack, replace current priority sections in the markdown backlog.")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Print the synchronized backlog instead of writing it.")
     return p.parse_args()
 
 
@@ -279,6 +363,19 @@ def main() -> int:
         w.writeheader()
         w.writerows(rows)
     json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if args.sync_backlog:
+        if not args.live_pack:
+            raise SystemExit("--sync-backlog requires --live-pack")
+        if not args.backlog_file.exists():
+            raise SystemExit(f"backlog file not found: {args.backlog_file}")
+        sections = live_rows_to_backlog_sections(rows)
+        synced = replace_backlog_priority_sections(args.backlog_file.read_text(encoding="utf-8"), sections)
+        if args.dry_run:
+            print(synced)
+        else:
+            args.backlog_file.write_text(synced, encoding="utf-8")
+            print(f"backlog synced → {args.backlog_file}")
 
     if args.live_pack and pack_summary:
         print(f"\nworklist → {csv_path}")

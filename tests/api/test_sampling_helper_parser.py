@@ -12,7 +12,9 @@ from guided_sampling_helper import (
     _infer_scope_kind,
     build_public_search_query,
     live_pack_items_to_rows,
+    live_rows_to_backlog_sections,
     parse_backlog,
+    replace_backlog_priority_sections,
 )
 
 
@@ -134,3 +136,69 @@ def test_live_pack_items_to_rows_preserves_actionable_context() -> None:
             "required_fields": "页面 URL / 小区名",
         }
     ]
+
+
+def test_live_rows_to_backlog_sections_groups_by_priority() -> None:
+    sections = live_rows_to_backlog_sections(
+        [
+            {
+                "priority_score": 95,
+                "priority_label": "极高优先",
+                "community": "松江大学城嘉和休闲广场",
+                "scope": "B座 9层",
+                "current_count": 3,
+                "target_count": 4,
+                "delta_to_target": 1,
+                "pending_attention_count": 2,
+                "capture_goal": "至少再补 1 组 sale/rent 配对。",
+                "sale_search_query": "上海 松江大学城嘉和休闲广场 二手房",
+                "rent_search_query": "上海 松江大学城嘉和休闲广场 租房",
+            },
+            {
+                "priority_score": 70,
+                "priority_label": "中优先",
+                "community": "联洋年华",
+                "scope": "小区补面",
+                "current_count": 3,
+                "target_count": 6,
+                "delta_to_target": 3,
+            },
+        ],
+        generated_at="2026-05-03 13:30:00",
+    )
+
+    assert "## 当前第一优先级" in sections["当前第一优先级"]
+    assert "松江大学城嘉和休闲广场 `B座 9层`" in sections["当前第一优先级"]
+    assert "待复核 `2`" in sections["当前第一优先级"]
+    assert "联洋年华 `小区补面`" in sections["当前第二优先级"]
+
+
+def test_replace_backlog_priority_sections_keeps_completed_history() -> None:
+    text = """# Public Sampling Backlog
+
+intro
+
+## 当前第一优先级
+
+- 旧任务 `A座`
+
+## 当前第二优先级
+
+- 旧任务二 `小区补面`
+
+## 已完成
+
+- 历史任务 `B座`
+"""
+    updated = replace_backlog_priority_sections(
+        text,
+        {
+            "当前第一优先级": "## 当前第一优先级\n\n- 新任务 `1号楼`\n",
+            "当前第二优先级": "## 当前第二优先级\n\n- 新任务二 `小区补面`\n",
+        },
+    )
+
+    assert "旧任务" not in updated
+    assert "新任务 `1号楼`" in updated
+    assert "新任务二 `小区补面`" in updated
+    assert "历史任务 `B座`" in updated

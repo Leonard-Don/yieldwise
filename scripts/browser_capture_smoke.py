@@ -10,6 +10,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime
@@ -138,6 +139,34 @@ def run_pwcli(session: str, *args: str, timeout_seconds: float | None = PWCLI_CO
 
 def command_error_text(error: subprocess.CalledProcessError) -> str:
     return f"{error.stdout or ''}\n{error.stderr or ''}".strip()
+
+
+def clean_dirty_listings_after_smoke() -> dict:
+    command = [sys.executable, str(ROOT_DIR / "jobs" / "clean_dirty_listings.py"), "--no-backup"]
+    try:
+        completed = run_command_with_timeout(command, timeout_seconds=60.0, cwd=ROOT_DIR)
+    except subprocess.TimeoutExpired as error:
+        return {
+            "ok": False,
+            "timedOut": True,
+            "command": command,
+            "stdout": (error.stdout or "").strip(),
+            "stderr": (error.stderr or "").strip(),
+        }
+    except subprocess.CalledProcessError as error:
+        return {
+            "ok": False,
+            "command": command,
+            "returncode": error.returncode,
+            "stdout": (error.stdout or "").strip(),
+            "stderr": (error.stderr or "").strip(),
+        }
+    return {
+        "ok": True,
+        "command": command,
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+    }
 
 
 def is_session_not_open_error(error: subprocess.CalledProcessError) -> bool:
@@ -332,6 +361,31 @@ def rerender_page(session: str) -> dict:
     )
 
 
+def ensure_browser_capture_workspace(session: str) -> dict:
+    return eval_json(
+        session,
+        """() => {
+          if (typeof setWorkspaceView === 'function') {
+            setWorkspaceView('backstage', { backstageTab: 'operations' });
+          } else if (typeof state !== 'undefined') {
+            state.workspaceView = 'backstage';
+            state.researchBackstageTab = 'operations';
+            if (typeof syncWorkspaceViewLocation === 'function') {
+              syncWorkspaceViewLocation();
+            }
+            if (typeof render === 'function') {
+              render();
+            }
+          }
+          return {
+            workspaceView: typeof state !== 'undefined' ? state.workspaceView ?? null : null,
+            backstageTab: typeof state !== 'undefined' ? state.researchBackstageTab ?? null : null,
+            hasPanel: !!document.querySelector('[data-browser-capture-panel]'),
+          };
+        }""",
+    )
+
+
 def browser_capture_dom_state(session: str) -> dict | None:
     return eval_json(
         session,
@@ -416,6 +470,15 @@ def run_id_matches(reported: str | None, actual: str | None) -> bool:
     if not reported or not actual:
         return True
     return reported == actual or reported.startswith(f"{actual}-")
+
+
+def console_error_output_has_messages(output: str) -> bool:
+    if "Returning 0 messages for level \"error\"" in output:
+        return False
+    match = re.search(r"Returning (\d+) messages for level \"error\"", output)
+    if match:
+        return int(match.group(1)) > 0
+    return "Errors: 0" not in output
 
 
 def open_browser_session(session: str, url: str, *, headed: bool, max_attempts: int = 3) -> dict:
@@ -775,7 +838,12 @@ def main() -> int:
     parser.add_argument("--headed", action="store_true", help="Run with a visible browser window. Default is headless.")
     parser.add_argument("--fresh-session", action="store_true", help="Force a new browser session instead of reusing an existing one.")
     parser.add_argument("--navigate", action="store_true", help="Navigate the current browser session to --url before running.")
-    parser.add_argument("--sale-price-wan", type=int, default=323)
+    parser.add_argument(
+        "--sale-price-wan",
+        type=int,
+        default=621,
+        help="Synthetic sale total price. Avoid the known UI-default signature 323万 / 36292.13元.",
+    )
     parser.add_argument("--rent-price-yuan", type=int, default=12200)
     parser.add_argument("--published-at", default="2026-04-14 14:50:00")
     parser.add_argument("--task-id", default=None, help="Optional browser sampling task id to target explicitly.")
@@ -784,6 +852,11 @@ def main() -> int:
         choices=["review_current_capture", "advance_next_capture", "stay_current"],
         default=None,
         help="Optionally assert the post-submit workflow action.",
+    )
+    parser.add_argument(
+        "--skip-dirty-cleanup",
+        action="store_true",
+        help="Skip post-submit cleanup of known synthetic dirty listing artifacts.",
     )
     parser.add_argument("--keep-session-open", action="store_true", help="Keep the Playwright browser session open after the smoke test.")
     args = parser.parse_args()
@@ -796,6 +869,8 @@ def main() -> int:
     opened_session = False
     session_meta = None
     selected_task_meta: dict | None = None
+    dirty_listing_cleanup: dict | None = None
+    submission_attempted = False
 
     initial_force_navigate = args.navigate or args.session != "default"
     opened_session, session_meta = ensure_browser_session(
@@ -818,11 +893,19 @@ def main() -> int:
         except Exception:
             pass
         try:
+            ensure_browser_capture_workspace(args.session)
+        except Exception:
+            pass
+        try:
             return wait_for_capture_panel(args.session, args.label, attempts=10 if force_navigate else 6)
         except RuntimeError:
             items = fetch_browser_sampling_pack(args.url)
             if items:
                 inject_browser_sampling_pack(args.session, items)
+                try:
+                    ensure_browser_capture_workspace(args.session)
+                except Exception:
+                    pass
                 rerender_page(args.session)
                 return wait_for_capture_panel(args.session, args.label, attempts=4)
             run_pwcli(args.session, "reload")
@@ -831,11 +914,19 @@ def main() -> int:
             except Exception:
                 pass
             try:
+                ensure_browser_capture_workspace(args.session)
+            except Exception:
+                pass
+            try:
                 return wait_for_capture_panel(args.session, args.label, attempts=10)
             except RuntimeError:
                 items = fetch_browser_sampling_pack(args.url)
                 if items:
                     inject_browser_sampling_pack(args.session, items)
+                    try:
+                        ensure_browser_capture_workspace(args.session)
+                    except Exception:
+                        pass
                     rerender_page(args.session)
                     return wait_for_capture_panel(args.session, args.label, attempts=4)
                 try:
@@ -844,6 +935,10 @@ def main() -> int:
                     pass
                 try:
                     rerender_page(args.session)
+                except Exception:
+                    pass
+                try:
+                    ensure_browser_capture_workspace(args.session)
                 except Exception:
                     pass
                 return wait_for_capture_panel(args.session, args.label, attempts=10)
@@ -915,7 +1010,9 @@ def main() -> int:
         )
 
         filled_snapshot = take_snapshot(args.session, args.label, "filled")
+        console_errors_before_submit = run_pwcli(args.session, "console", "error")
         click_submit(args.session)
+        submission_attempted = True
 
         time.sleep(2)
         success_2s = take_snapshot(args.session, args.label, "after-2s")
@@ -953,6 +1050,7 @@ def main() -> int:
             "currentTaskRecentRun": current_task_run,
             "recentSamplingCount": None if not success_text else None,
             "buttonRecovered": bool(button_state) and not button_state.get("disabled") and "生成采样批次并刷新" in button_state.get("text", ""),
+            "consoleErrorsBeforeSubmit": console_errors_before_submit.strip(),
             "consoleErrors": console_errors.strip(),
             "artifacts": {
                 "pre": str(pre_snapshot),
@@ -962,7 +1060,17 @@ def main() -> int:
             },
             "after2sState": success_state_2s,
             "after6sState": success_state,
+            "dirtyListingCleanup": {"skipped": True} if args.skip_dirty_cleanup else None,
         }
+
+        if not args.skip_dirty_cleanup:
+            dirty_listing_cleanup = clean_dirty_listings_after_smoke()
+            result["dirtyListingCleanup"] = dirty_listing_cleanup
+            if not dirty_listing_cleanup.get("ok"):
+                raise RuntimeError(
+                    "公开页采样提交后，合成脏样本清理失败："
+                    f"{dirty_listing_cleanup.get('stderr') or dirty_listing_cleanup.get('stdout') or 'unknown error'}"
+                )
 
         if import_after == import_before:
             raise RuntimeError("公开页采样提交后，没有生成新的 import run。")
@@ -1016,12 +1124,20 @@ def main() -> int:
             raise RuntimeError(f"页面结果里的 import run 与落盘结果不一致：{latest_result.get('importRunId')} != {import_after}")
         if latest_result and not run_id_matches(latest_result.get("metricsRunId"), metrics_after):
             raise RuntimeError(f"页面结果里的 metrics run 与落盘结果不一致：{latest_result.get('metricsRunId')} != {metrics_after}")
-        if "Total messages: 0" not in result["consoleErrors"] and "Returning 0 messages" not in result["consoleErrors"]:
-            raise RuntimeError("提交后浏览器 console 仍然存在 error。")
+        if (
+            console_error_output_has_messages(result["consoleErrors"])
+            and result["consoleErrors"] != result["consoleErrorsBeforeSubmit"]
+        ):
+            raise RuntimeError(f"提交后浏览器 console 出现新的 error：\n{result['consoleErrors']}")
 
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     finally:
+        if submission_attempted and not args.skip_dirty_cleanup and dirty_listing_cleanup is None:
+            try:
+                clean_dirty_listings_after_smoke()
+            except Exception:
+                pass
         if opened_session and not args.keep_session_open:
             close_session_quietly(args.session)
 

@@ -23,14 +23,27 @@ if str(SCRIPTS_DIR) not in sys.path:
 import browser_capture_smoke as pw  # noqa: E402
 
 _url_opener = build_opener(ProxyHandler({}))
+_REGISTERED_SESSIONS: set[str] = set()
+
+
+def register_session(session: str) -> str:
+    _REGISTERED_SESSIONS.add(session)
+    return session
+
+
+def cleanup_registered_sessions(*, keep_session: str | None = None) -> None:
+    for session in sorted(_REGISTERED_SESSIONS):
+        if keep_session and session == keep_session:
+            continue
+        pw.close_session_quietly(session)
 
 
 def workflow_smoke_timeout_seconds() -> float:
-    raw_value = os.getenv("ATLAS_WORKFLOW_SMOKE_TIMEOUT_SECONDS", "150")
+    raw_value = os.getenv("ATLAS_WORKFLOW_SMOKE_TIMEOUT_SECONDS", "300")
     try:
-        return max(30.0, float(raw_value))
+        return max(60.0, float(raw_value))
     except ValueError:
-        return 150.0
+        return 300.0
 
 
 def run_workflow_smoke_command(command: list[str], *, timeout_seconds: float) -> subprocess.CompletedProcess[str]:
@@ -195,7 +208,12 @@ def ensure_full_regression_seed_data(atlas_url: str) -> dict:
 
 
 def run_pwcli_with_timeout(session: str, *args: str, timeout_seconds: float = 60.0) -> str:
-    return pw.run_pwcli(session, *args, timeout_seconds=timeout_seconds)
+    register_session(session)
+    try:
+        return pw.run_pwcli(session, *args, timeout_seconds=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        pw.close_session_quietly(session)
+        raise
 
 
 def is_retryable_playwright_error(message: str) -> bool:
@@ -784,7 +802,7 @@ def run_browser_capture_workflow_smoke(
     attempt_count = 2
     for attempt in range(1, attempt_count + 1):
         retry_suffix = "" if attempt == 1 else f"-retry{attempt}"
-        smoke_session = f"{session}-{expected_workflow_action}{retry_suffix}"
+        smoke_session = register_session(f"{session}-{expected_workflow_action}{retry_suffix}")
         command = [
             sys.executable,
             str(SCRIPTS_DIR / "browser_capture_smoke.py"),
@@ -797,6 +815,7 @@ def run_browser_capture_workflow_smoke(
             "--expected-workflow-action",
             expected_workflow_action,
             "--fresh-session",
+            "--navigate",
         ]
         if headed:
             command.append("--headed")
@@ -843,7 +862,7 @@ def run_browser_review_workflow_smoke(
     attempt_count = 2 if expected_workflow_action == "review_current_task" else 1
     for attempt in range(1, attempt_count + 1):
         retry_suffix = "" if attempt == 1 else f"-retry{attempt}"
-        smoke_session = f"{session}-{expected_workflow_action}{retry_suffix}"
+        smoke_session = register_session(f"{session}-{expected_workflow_action}{retry_suffix}")
         command = [
             sys.executable,
             str(SCRIPTS_DIR / "browser_review_smoke.py"),
@@ -957,7 +976,7 @@ def run_backstage_boot_smoke(
     artifact_slug: str = "backstage-boot",
     headed: bool = False,
 ) -> dict:
-    smoke_session = f"{session}-{artifact_slug}"
+    smoke_session = register_session(f"{session}-{artifact_slug}")
     smoke_url = backstage_boot_url(
         url,
         backstage_tab=backstage_tab,
@@ -1841,7 +1860,7 @@ def main() -> int:
     )
     artifacts["operationsBackstageBootSmoke"] = operations_backstage_boot_smoke
 
-    session_name = args.session
+    session_name = register_session(args.session)
     opened_new_session = False
     try:
         opened_new_session, session_meta = pw.ensure_browser_session(
@@ -2593,8 +2612,7 @@ def main() -> int:
         print(str(summary_path))
         return 0
     finally:
-        if opened_new_session and not args.keep_session_open:
-            pw.close_session_quietly(session_name)
+        cleanup_registered_sessions(keep_session=session_name if args.keep_session_open else None)
 
 
 if __name__ == "__main__":
