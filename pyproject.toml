@@ -28,7 +28,6 @@ select = ["F"]
 "api/service.py" = ["F401"]
 # Each of the remaining baselines flags a single F841/F401 left over from
 # refactors. They are not blocking and will be cleaned up incrementally.
-"api/backstage/review.py" = ["F841"]
 "jobs/import_authorized_listings.py" = ["F401"]
 "scripts/browser_capture_smoke.py" = ["F841"]
 "scripts/full_browser_regression.py" = ["F841"]
