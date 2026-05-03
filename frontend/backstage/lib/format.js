@@ -22,6 +22,20 @@ function mapWaypointSourceLabel(source) {
   );
 }
 
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
+function tokenizeSearchQuery(value) {
+  return String(value ?? "")
+    .split(/[\s·•|/]+/g)
+    .map((token) => normalizeSearchText(token))
+    .filter(Boolean);
+}
+
 function searchScore(text, query) {
   if (!text || !query) {
     return 0;
