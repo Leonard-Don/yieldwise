@@ -7,7 +7,7 @@ heavier capture-run, review-inbox, sampling-pack and submit/update workflows.
 
 from __future__ import annotations
 
-from api.config.cities.loader import load_active_city
+from api.config import city as _city
 
 
 BROWSER_SAMPLING_REQUIRED_FIELDS = {
@@ -81,7 +81,7 @@ def browser_sampling_query(
     floor_no: int | None = None,
     business_type: str | None = None,
 ) -> str:
-    parts = [load_active_city().display_name]
+    parts = [_city.DISPLAY_NAME]
     if district_name:
         parts.append(str(district_name))
     parts.append(str(community_name))

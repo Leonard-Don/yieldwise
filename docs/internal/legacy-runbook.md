@@ -31,8 +31,6 @@
 - 浏览器回归 25/25 步全绿，pytest 123 项 + smoke 21 路由 + `node --check` 全套 JS 文件全绿
 
 **已知限制（spec 之后的增量，不在当前交付范围）**
-- **自住模式通勤分钟尚未接入**：地图色按预算 / 总价着色，但通勤栏位是占位；要接高德路线 API（需要 API key + 限流策略）
-- **全市模式街道聚合粒度未补**：当前按行政区聚合，spec 提到的「街道作为后续升级项」还在 Phase 6 之后
 - **`frontend/backstage/app.js` 还有 10077 行未拆分**：Phase 8 已抽出 9 个独立模块（`data/` × 3 + `lib/` × 8），但 `app.js` 主体仍然是经典脚本而非 ES module。**当前路线决定：继续 Phase 8 增量切片（A 路线），不做一次性 ES module 重写**。理由：spec 未强制；增量切片每步可独立验证（pwcli + node --check）；一次性重写需要重排全局 `state` 生命周期、风险中等。下次有功能改动时优先把动到的逻辑抽到 `lib/*.js` 或 `data/*.js`，而不是在 `app.js` 主体内追加。`/` 用户平台则继续保持 ES module 纯度，与 backstage 互不干涉。
 - **`tmp/browser-capture-runs/` 状态不可逆**：`reviewBrowserCaptureQueueItem` 会修改 `review_queue.json` 把 attention 标记为 resolved；`browser-review-fixtures/` 里的 fixture 删除会回滚原状，但不要批量手动删除 capture run 目录
 - **pwcli 默认 30s 单次 eval 上限**：在更慢的机器上请用 `ATLAS_PWCLI_EVAL_TIMEOUT=60` 等覆盖

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from api.config.cities.loader import load_active_city
+from api.config import city
 from api.schemas.city_config import CityConfigResponse, CityDistrictSummary
 
 router = APIRouter(tags=["config"])
@@ -15,15 +15,14 @@ router = APIRouter(tags=["config"])
     response_model_by_alias=True,
 )
 def get_city_config() -> CityConfigResponse:
-    manifest = load_active_city()
     return CityConfigResponse(
-        city_id=manifest.city_id,
-        display_name=manifest.display_name,
-        country_code=manifest.country_code,
-        center=manifest.center,
-        default_zoom=manifest.default_zoom,
+        city_id=city.CITY_ID,
+        display_name=city.DISPLAY_NAME,
+        country_code=city.COUNTRY_CODE,
+        center=city.CENTER,
+        default_zoom=city.DEFAULT_ZOOM,
         districts=[
             CityDistrictSummary(district_code=d.district_code, display_name=d.display_name)
-            for d in manifest.districts
+            for d in city.DISTRICTS
         ],
     )

@@ -19,8 +19,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from api.config.cities.loader import load_active_city  # noqa: F401  (kept for back-compat re-imports)
-
 from .sampling_labels import (  # noqa: F401
     BROWSER_SAMPLING_REQUIRED_FIELDS,
     browser_sampling_priority_label,

@@ -15,7 +15,6 @@ def test_user_prefs_empty_is_valid() -> None:
         "districts",
         "area_min_sqm",
         "area_max_sqm",
-        "office_anchor",
         "updated_at",
     ):
         assert key in dump
@@ -33,13 +32,12 @@ def test_user_prefs_round_trips_full_payload() -> None:
         "districts": ["pudong", "jingan"],
         "area_min_sqm": 60,
         "area_max_sqm": 120,
-        "office_anchor": {"lng": 121.5, "lat": 31.2, "label": "lujiazui"},
         "updated_at": "2026-04-24T10:00:00",
     }
     prefs = UserPrefs.model_validate(payload)
     assert prefs.budget_max_wan == 1500
     assert prefs.districts == ["pudong", "jingan"]
-    assert prefs.office_anchor == {"lng": 121.5, "lat": 31.2, "label": "lujiazui"}
+    assert prefs.area_min_sqm == 60
 
 
 def test_user_prefs_patch_accepts_partial_payload() -> None:

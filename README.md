@@ -91,7 +91,7 @@ Yieldwise ships **zero scrapers** and never auto-fetches anything that requires 
 ## Project status
 
 **v0.3** (April 2026) — Beta. Stable:
-- Shanghai live (city manifest is YAML-based — drop in another `<city>.yaml` to extend)
+- Shanghai-only (no multi-city abstraction; the constants live in `api/config/city.py`)
 - Backend + frontend test suites in place
 - Maintained part-time — expect rough edges, file issues if you hit them
 

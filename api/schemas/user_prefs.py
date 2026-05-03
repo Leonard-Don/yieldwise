@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -9,8 +7,7 @@ class UserPrefs(BaseModel):
     """Persistent personalization for the Home mode (predominantly).
 
     All fields optional — a fresh user has none of these set yet. The
-    onboarding modal in Phase 3c-2 collects budget/districts/area; the
-    office_anchor is reserved for Phase 6 commute calculation.
+    onboarding modal collects budget / districts / area.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -20,7 +17,6 @@ class UserPrefs(BaseModel):
     districts: list[str] = Field(default_factory=list)
     area_min_sqm: float | None = Field(default=None, ge=0)
     area_max_sqm: float | None = Field(default=None, ge=0)
-    office_anchor: dict[str, Any] | None = None
     updated_at: str | None = None
 
 
@@ -38,4 +34,3 @@ class UserPrefsPatch(BaseModel):
     districts: list[str] | None = None
     area_min_sqm: float | None = Field(default=None, ge=0)
     area_max_sqm: float | None = Field(default=None, ge=0)
-    office_anchor: dict[str, Any] | None = None

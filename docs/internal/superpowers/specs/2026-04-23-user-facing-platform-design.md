@@ -336,11 +336,9 @@ PATCH  /api/v2/user/view-state
 
 ### Phase 6 · 打磨（2–3 天）
 
-- 自住模式通勤分钟（高德 routing + daily batch cache；进入 Home 模式时按 `onboarding` 中的 office anchor 与当前视野内楼栋对调用，结果缓存到 `tmp/commute-cache/YYYY-MM-DD.json`，同一天复用）
-- 全市模式街道聚合（若数据密度够）
 - 键盘快捷键：`⌘K` 搜索、`⌘1/2/3` 切模式、`F` 加关注、`N` 写笔记
-- 可选：`view-state` 服务端镜像
 - 视觉细节（滚动阴影、骨架屏、hover 微动画）
+- 趋势 sparkline：City Observer 抽屉里把后端已返回的 6/12/24 月 yield trend 画出来
 
 **总工期**：13–18 天单人全职，可按 phase 拆分异步推进。
 
