@@ -26,7 +26,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from .mock_data import ADDRESS_QUEUE, DATA_SOURCES, DISTRICTS, PIPELINE_STEPS, SCHEMAS, SOURCE_HEALTH, SYSTEM_STRATEGY
+from .mock_data import ADDRESS_QUEUE, DATA_SOURCES, DISTRICTS, PIPELINE_STEPS, SCHEMAS, SYSTEM_STRATEGY
 from .data_quality import attach_quality_to_communities
 from .persistence import database_has_real_data, postgres_data_snapshot, postgres_runtime_status, query_row, query_rows
 from .provider_adapters import mock_enabled, provider_readiness_snapshot

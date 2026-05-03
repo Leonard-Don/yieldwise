@@ -79,7 +79,6 @@ export const api = {
   // re-fetch with the right bbox each time.
   mapOsmFootprints: (params) => getJSONFresh(`/api/v2/map/osm-footprints${buildQuery(params)}`),
   districtsAll: () => getJSON("/api/v2/map/districts"),
-  districtDetail: (id) => getJSONFresh(`/api/v2/districts/${encodeURIComponent(id)}`),
   runtimeConfig: () => getJSON("/api/runtime-config"),
   cityConfig: () => getJSON("/api/v2/config/city"),
   search: (q, limit = 10) => {

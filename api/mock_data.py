@@ -358,39 +358,6 @@ DATA_SOURCES = [
     },
 ]
 
-SOURCE_HEALTH = [
-    {
-        "sourceId": "shanghai-open-data-community",
-        "name": "上海开放数据 · 物业小区信息",
-        "status": "local_ready",
-        "freshness": "weekly",
-        "coveragePct": 92,
-        "listingCount": 128,
-        "normalizationPct": 96,
-        "note": "适合做小区字典底座和别名归一，不直接承担交易样本。",
-    },
-    {
-        "sourceId": "authorized-batch-import",
-        "name": "授权批次导入",
-        "status": "local_ready",
-        "freshness": "on_demand",
-        "coveragePct": 58,
-        "listingCount": 48,
-        "normalizationPct": 84,
-        "note": "适合先跑小批量自有 CSV、地址复核和逐层证据验证。",
-    },
-    {
-        "sourceId": "amap-aoi-poi",
-        "name": "高德 AOI / POI / District",
-        "status": "local_ready",
-        "freshness": "realtime",
-        "coveragePct": 81,
-        "listingCount": 96,
-        "normalizationPct": 83,
-        "note": "适合补全 AOI、行政区边界与地图侧地理增强。",
-    },
-]
-
 ADDRESS_QUEUE = [
     {
         "queueId": "addr-001",
