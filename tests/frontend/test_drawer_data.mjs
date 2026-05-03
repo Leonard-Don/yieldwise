@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  districtYieldDistribution,
   formatPct,
   formatWan,
   formatYuan,
@@ -177,4 +178,77 @@ test("topCommunitiesFromDistrict: tolerates missing fields", () => {
   };
   const rows = topCommunitiesFromDistrict(detail, 5);
   assert.deepEqual(rows.map((r) => r.id), ["a", "b"]);
+});
+
+test("districtYieldDistribution: empty / null / no communities → null", () => {
+  assert.equal(districtYieldDistribution(null), null);
+  assert.equal(districtYieldDistribution(undefined), null);
+  assert.equal(districtYieldDistribution({}), null);
+  assert.equal(districtYieldDistribution({ communities: [] }), null);
+  assert.equal(
+    districtYieldDistribution({ communities: [{ id: "a", name: "A", yield: null }] }),
+    null,
+  );
+});
+
+test("districtYieldDistribution: 7 communities → correct quartiles", () => {
+  const detail = {
+    communities: [
+      { id: "a", name: "A", yield: 4.2 },
+      { id: "b", name: "B", yield: 2.1 },
+      { id: "c", name: "C", yield: 5.6 },
+      { id: "d", name: "D", yield: 3.5 },
+      { id: "e", name: "E", yield: 7.3 },
+      { id: "f", name: "F", yield: 4.8 },
+      { id: "g", name: "G", yield: 6.1 },
+    ],
+  };
+  const dist = districtYieldDistribution(detail);
+  assert.equal(dist.points.length, 7);
+  assert.deepEqual(
+    dist.points.map((p) => p.id),
+    ["b", "d", "a", "f", "c", "g", "e"], // sorted ascending by value
+  );
+  assert.equal(dist.min, 2.1);
+  assert.equal(dist.max, 7.3);
+  assert.equal(dist.median, 4.8);
+  assert.equal(dist.q1, 3.85);
+  assert.equal(dist.q3, 5.85);
+});
+
+test("districtYieldDistribution: single community → degenerate but consistent (span=0)", () => {
+  const dist = districtYieldDistribution({
+    communities: [{ id: "a", name: "A", yield: 4.2 }],
+  });
+  assert.equal(dist.points.length, 1);
+  assert.equal(dist.min, 4.2);
+  assert.equal(dist.max, 4.2);
+  assert.equal(dist.median, 4.2);
+  assert.equal(dist.span, 0);
+});
+
+test("districtYieldDistribution: yield-as-fraction (0.04) is normalized to percent (4)", () => {
+  const dist = districtYieldDistribution({
+    communities: [
+      { id: "a", name: "A", yield: 0.04 },
+      { id: "b", name: "B", yield: 0.05 },
+    ],
+  });
+  assert.equal(dist.min, 4);
+  assert.equal(dist.max, 5);
+});
+
+test("districtYieldDistribution: rows missing id or yield are dropped", () => {
+  const dist = districtYieldDistribution({
+    communities: [
+      { id: "a", name: "A", yield: 4.0 },
+      { name: "B", yield: 5.0 }, // missing id
+      { id: "c", name: "C", yield: null }, // null yield
+      { id: "d", name: "D", yield: 6.0 },
+    ],
+  });
+  assert.deepEqual(
+    dist.points.map((p) => p.id),
+    ["a", "d"],
+  );
 });

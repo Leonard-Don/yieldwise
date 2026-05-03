@@ -162,6 +162,78 @@
   margin: 4px 0 0;
 }
 
+.atlas-yield-spread {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.atlas-yield-spread-track {
+  position: relative;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--bg-1);
+  overflow: visible;
+}
+
+.atlas-yield-spread-track::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 2px;
+  background: var(--line);
+  transform: translateY(-50%);
+  border-radius: 1px;
+}
+
+.atlas-yield-spread-box {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: rgba(56, 161, 105, 0.18);
+  border: 1px solid rgba(56, 161, 105, 0.5);
+  border-radius: 4px;
+}
+
+.atlas-yield-spread-median {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--accent, #2c7a4f);
+  transform: translateX(-1px);
+}
+
+.atlas-yield-spread-dot {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.55;
+  cursor: help;
+}
+
+.atlas-yield-spread-dot:hover {
+  opacity: 1;
+  transform: scale(1.4);
+}
+
+.atlas-yield-spread-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .atlas-quality-panel {
   display: grid;
   gap: 8px;

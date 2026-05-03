@@ -1,5 +1,6 @@
 import {
   bucketBars,
+  districtYieldDistribution,
   formatPct,
   formatWan,
   formatYuan,
@@ -170,8 +171,32 @@ export function initDrawer({ root, store }) {
       score: detail.score,
       sample: detail.sample,
     });
+    const distribution = districtYieldDistribution(detail);
+    const spread = distribution ? renderYieldSpread(distribution) : "";
     const top = topCommunitiesFromDistrict(detail, 8);
-    return `${renderKpiRow(kpis)}<div><h3 class="atlas-section-title">区内小区（前 ${top.length}）</h3>${renderCommunityList(top)}</div>`;
+    return `${renderKpiRow(kpis)}${spread}<div><h3 class="atlas-section-title">区内小区（前 ${top.length}）</h3>${renderCommunityList(top)}</div>`;
+  }
+
+  function renderYieldSpread(distribution) {
+    const { points, min, max, q1, median, q3, span } = distribution;
+    const safeSpan = span > 0 ? span : 1;
+    const pct = (value) => ((value - min) / safeSpan) * 100;
+    const dots = points
+      .map(
+        (p) =>
+          `<span class="atlas-yield-spread-dot" style="left: ${pct(p.value).toFixed(2)}%" title="${escapeText(p.name)} · ${escapeText(formatPct(p.value))}"></span>`,
+      )
+      .join("");
+    const summary = `<div class="atlas-yield-spread-summary"><span>min ${escapeText(formatPct(min))}</span><span>中位 ${escapeText(formatPct(median))}</span><span>max ${escapeText(formatPct(max))}</span></div>`;
+    const box =
+      span > 0
+        ? `<span class="atlas-yield-spread-box" style="left: ${pct(q1).toFixed(2)}%; right: ${(100 - pct(q3)).toFixed(2)}%"></span>`
+        : "";
+    const medianMarker =
+      span > 0
+        ? `<span class="atlas-yield-spread-median" style="left: ${pct(median).toFixed(2)}%"></span>`
+        : "";
+    return `<div class="atlas-yield-spread"><h3 class="atlas-section-title">区内 yield 分布（${points.length} 个小区）</h3><div class="atlas-yield-spread-track">${box}${medianMarker}${dots}</div>${summary}</div>`;
   }
 
   function renderCommunityList(rows) {

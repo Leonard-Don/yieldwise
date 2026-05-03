@@ -144,6 +144,42 @@ const KPI_MAP = {
   ],
 };
 
+export function districtYieldDistribution(detail) {
+  if (!detail || typeof detail !== "object") return null;
+  const items = Array.isArray(detail.communities) ? detail.communities : [];
+  const points = [];
+  for (const row of items) {
+    if (!row || !row.id) continue;
+    const value = normalizeYieldPct(row.yield);
+    if (value === null) continue;
+    points.push({ id: row.id, name: row.name || row.id, value });
+  }
+  if (points.length === 0) return null;
+  const sorted = points.slice().sort((a, b) => a.value - b.value);
+  const values = sorted.map((p) => p.value);
+  const min = values[0];
+  const max = values[values.length - 1];
+  return {
+    points: sorted,
+    min,
+    max,
+    q1: quantile(values, 0.25),
+    median: quantile(values, 0.5),
+    q3: quantile(values, 0.75),
+    span: Math.max(max - min, 0),
+  };
+}
+
+function quantile(sortedValues, p) {
+  if (sortedValues.length === 0) return null;
+  if (sortedValues.length === 1) return sortedValues[0];
+  const idx = (sortedValues.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sortedValues[lo];
+  return sortedValues[lo] + (sortedValues[hi] - sortedValues[lo]) * (idx - lo);
+}
+
 export function topCommunitiesFromDistrict(detail, limit) {
   if (!detail || typeof detail !== "object") return [];
   const items = Array.isArray(detail.communities) ? detail.communities : [];
