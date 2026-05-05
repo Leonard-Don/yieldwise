@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -34,7 +37,10 @@ jobs:
         run: python3 -m ruff check .
 
       - name: Backstage JS syntax check
-        run: node --check frontend/backstage/app.js
+        run: |
+          for file in frontend/backstage/data/*.js frontend/backstage/lib/*.js frontend/backstage/app.js; do
+            node --check "$file"
+          done
 
       - name: User shell JS syntax check
         run: node --check frontend/user/modules/main.js
