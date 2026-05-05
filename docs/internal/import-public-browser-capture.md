@@ -119,7 +119,7 @@ python3 jobs/materialize_public_snapshot.py \
 如果你想顺手验证 Atlas 工作台已经移除人工录入控件，可以直接运行：
 
 ```bash
-python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/
+python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/backstage/
 ```
 
 它会打开当前任务，检查手填控件、提交按钮和回填入口都不存在。
@@ -129,19 +129,19 @@ python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/
 
 ```bash
 python3 scripts/browser_review_smoke.py \
-  --url http://127.0.0.1:8013/ \
+  --url http://127.0.0.1:8013/backstage/ \
   --expected-workflow-action review_current_run
 ```
 
 ```bash
 python3 scripts/browser_review_smoke.py \
-  --url http://127.0.0.1:8013/ \
+  --url http://127.0.0.1:8013/backstage/ \
   --expected-workflow-action review_current_task
 ```
 
 ```bash
 python3 scripts/browser_review_smoke.py \
-  --url http://127.0.0.1:8013/ \
+  --url http://127.0.0.1:8013/backstage/ \
   --expected-workflow-action advance_next_review
 ```
 
@@ -156,7 +156,7 @@ python3 scripts/browser_review_smoke.py \
 如果你想把 Atlas 研究台的地图、榜单、楼栋/楼层切换、采样覆盖看板和导出链路也一起回归一遍，可以再运行：
 
 ```bash
-python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage/
 ```
 
 这条完整回归现在还会额外检查：

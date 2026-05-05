@@ -177,7 +177,7 @@ python3 -m compileall api jobs scripts                                 # exit 0
 定期跑：
 ```bash
 ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --port 8013 &
-python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage/  # 25 steps
+python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/backstage/  # 27 assertions
 ```
 
-最近一次完整浏览器回归：`output/playwright/atlas-rerun-fixed.json`，25/25 通过。
+最近一次完整浏览器回归：`output/playwright/atlas-full-regression-20260505140335.json`，27/27 通过。

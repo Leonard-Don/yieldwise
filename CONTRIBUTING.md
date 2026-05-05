@@ -12,7 +12,8 @@
 
 ```bash
 python3 -m compileall api jobs scripts
-node --check app.js
+node --check frontend/backstage/app.js
+node --check frontend/user/modules/main.js
 ```
 
 ## 浏览器抓取边界

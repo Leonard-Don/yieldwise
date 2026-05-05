@@ -1782,6 +1782,16 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
     }
 
 
+def require_backstage_regression_url(atlas_url: str) -> None:
+    parsed = urlparse(atlas_url)
+    normalized_path = parsed.path.rstrip("/") or "/"
+    if normalized_path != "/backstage":
+        raise SystemExit(
+            "full_browser_regression 必须指向后台工作台入口。"
+            " 请使用 --url http://127.0.0.1:<port>/backstage/，不要传根路径 /。"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a full browser regression for Yieldwise.")
     parser.add_argument("--session", default="atlas-full-regression", help="Playwright browser session")
@@ -1792,6 +1802,8 @@ def main() -> int:
     parser.add_argument("--reuse-open-session", action="store_true", help="Deprecated: sessions are reused automatically when available.")
     parser.add_argument("--keep-session-open", action="store_true", help="Keep the Playwright browser session open after the regression finishes.")
     args = parser.parse_args()
+
+    require_backstage_regression_url(args.url)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
