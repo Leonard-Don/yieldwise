@@ -102,6 +102,7 @@ from .domains import (
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
+TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 app = FastAPI(
     title="Yieldwise API",
@@ -116,6 +117,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in TRUE_ENV_VALUES
+
+
+def _dev_routes_enabled() -> bool:
+    return _env_flag_enabled("ATLAS_ENABLE_DEV_ROUTES") or _env_flag_enabled("ATLAS_ENABLE_DEMO_MOCK")
+
+
+def require_dev_routes_enabled() -> None:
+    if not _dev_routes_enabled():
+        raise HTTPException(status_code=404, detail="Development route is disabled")
 
 
 @app.get("/api/health")
@@ -416,22 +430,25 @@ def review_browser_capture_queue_item(run_id: str, queue_id: str, payload: dict 
     return result
 
 
-@app.post("/api/dev/browser-review-fixtures/review-current-task")
+@app.post("/api/dev/browser-review-fixtures/review-current-task", include_in_schema=False)
 def create_review_current_task_fixture() -> dict:
+    require_dev_routes_enabled()
     try:
         return create_browser_review_current_task_fixture()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/api/dev/runtime-caches/clear")
+@app.post("/api/dev/runtime-caches/clear", include_in_schema=False)
 def clear_dev_runtime_caches() -> dict:
+    require_dev_routes_enabled()
     clear_runtime_caches()
     return {"cleared": True}
 
 
-@app.delete("/api/dev/browser-review-fixtures/{fixture_id}")
+@app.delete("/api/dev/browser-review-fixtures/{fixture_id}", include_in_schema=False)
 def restore_review_fixture(fixture_id: str) -> dict:
+    require_dev_routes_enabled()
     try:
         return restore_browser_review_fixture(fixture_id)
     except ValueError as exc:

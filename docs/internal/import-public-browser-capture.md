@@ -168,6 +168,8 @@ python3 scripts/browser_review_smoke.py \
 其中 `review_current_task` 这条分支默认会优先走一个 server-managed 的临时 fixture：
 脚本会先把某条同 task 多 run 的 review queue 临时收成“source run 只剩 1 条 pending、其他 run 仍有 pending”，跑完 smoke 之后再自动恢复原始 `review_queue.json`，这样就不用依赖 live inbox 是否刚好存在天然候选。
 
+这些临时 fixture 入口属于 `/api/dev/*`，服务端默认关闭。运行本页 smoke / full regression 时，请用 `ATLAS_ENABLE_DEMO_MOCK=1` 启动服务，或显式设置 `ATLAS_ENABLE_DEV_ROUTES=1`。
+
 如果你想把 Atlas 研究台的地图、榜单、楼栋/楼层切换、采样覆盖看板和导出链路也一起回归一遍，可以再运行：
 
 ```bash
