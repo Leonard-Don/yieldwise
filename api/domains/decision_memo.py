@@ -20,6 +20,17 @@ def create_decision_memo(payload: DecisionMemoRequest) -> dict[str, Any]:
     resolved, missing = resolve_decision_targets(payload.targets, communities)
     if not resolved:
         raise HTTPException(status_code=404, detail="No decision memo targets found")
+    contexts = {
+        (item.target_type, item.target_id): item.model_dump()
+        for item in payload.candidate_contexts
+    }
+    resolved = [
+        {
+            **item,
+            "candidateContext": contexts.get((str(item.get("targetType")), str(item.get("targetId")))),
+        }
+        for item in resolved
+    ]
 
     generated_at = datetime.now().astimezone().isoformat(timespec="seconds")
     return {
@@ -163,13 +174,14 @@ def build_decision_memo_markdown(items: list[dict[str, Any]], *, generated_at: s
         "",
         "## 候选对比",
         "",
-        "| 候选 | 区域 | 类型 | 租售比 | 回本 | 机会分 | 质量 | 样本 |",
+        "| 候选 | 区域 | 类型 | 租售比 | 回本 | 机会分 | 质量 | 当前动作 |",
         "|---|---|---|---:|---:|---:|---|---|",
     ]
     for item in ordered:
         quality = item.get("quality") or {}
+        context = item.get("candidateContext") or {}
         lines.append(
-            "| {name} | {district} | {target_type} | {yield_pct} | {payback} | {score} | {quality} | {sample} |".format(
+            "| {name} | {district} | {target_type} | {yield_pct} | {payback} | {score} | {quality} | {action} |".format(
                 name=_md(item.get("name")),
                 district=_md(item.get("districtName") or "—"),
                 target_type=_target_type_label(str(item.get("targetType") or "")),
@@ -177,21 +189,29 @@ def build_decision_memo_markdown(items: list[dict[str, Any]], *, generated_at: s
                 payback=_fmt_years(item.get("paybackYears")),
                 score=_fmt_int(item.get("score")),
                 quality=_md(str(quality.get("label") or "—")),
-                sample=_md(str(item.get("sampleLabel") or "—")),
+                action=_md(_first_nonempty(context.get("task_labels")) or item.get("nextSteps") or "继续观察"),
             )
         )
     lines.extend(["", "## 单项记录", ""])
     for index, item in enumerate(ordered, start=1):
         brief = item.get("decisionBrief") or {}
+        quality = item.get("quality") or {}
+        context = item.get("candidateContext") or {}
+        buy_reasons = _buy_reasons(item, brief, context)
+        objections = _objections(item, brief, context)
+        evidence = _evidence_sources(item, quality, context)
+        pending = _pending_checks(item, quality, context)
         lines.extend(
             [
                 f"### {index}. {item.get('name') or item.get('targetId')}",
                 "",
                 f"- 决策：{brief.get('label') or '继续观察'}",
-                f"- 摘要：{brief.get('summary') or '暂无摘要'}",
-                f"- 依据：{'；'.join(brief.get('factors') or []) or '—'}",
-                f"- 风险：{'；'.join(item.get('risks') or brief.get('risks') or []) or '—'}",
-                f"- 下一步：{item.get('nextSteps') or brief.get('nextAction') or '继续观察'}",
+                f"- 投资假设：{context.get('thesis') or brief.get('summary') or '暂无假设'}",
+                f"- 买入理由：{'；'.join(buy_reasons) or '—'}",
+                f"- 反对理由：{'；'.join(objections) or '—'}",
+                f"- 证据来源：{'；'.join(evidence) or '—'}",
+                f"- 待核验项：{'；'.join(pending) or '—'}",
+                f"- 下一步：{context.get('notes') or item.get('nextSteps') or brief.get('nextAction') or '继续观察'}",
                 "",
             ]
         )
@@ -235,3 +255,87 @@ def _target_type_label(value: str) -> str:
 
 def _md(value: Any) -> str:
     return str(value or "—").replace("|", "\\|").replace("\n", " ")
+
+
+def _first_nonempty(values: Any) -> str | None:
+    if not isinstance(values, list):
+        return None
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return None
+
+
+def _buy_reasons(
+    item: dict[str, Any],
+    brief: dict[str, Any],
+    context: dict[str, Any],
+) -> list[str]:
+    reasons = [str(value) for value in (brief.get("factors") or []) if value]
+    reasons.extend(str(value) for value in (context.get("trigger_labels") or []) if value)
+    target_yield = context.get("target_yield_pct")
+    if target_yield is not None:
+        reasons.append(f"目标收益率 {target_yield}%")
+    if context.get("target_price_wan") is not None:
+        reasons.append(f"目标总价 {context['target_price_wan']} 万")
+    if context.get("target_monthly_rent") is not None:
+        reasons.append(f"目标租金 {context['target_monthly_rent']} 元/月")
+    if item.get("score") is not None:
+        reasons.append(f"机会分 {_fmt_int(item.get('score'))}")
+    return _dedupe(reasons)
+
+
+def _objections(
+    item: dict[str, Any],
+    brief: dict[str, Any],
+    context: dict[str, Any],
+) -> list[str]:
+    risks = [str(value) for value in (item.get("risks") or brief.get("risks") or []) if value]
+    quality = item.get("quality") or {}
+    if quality.get("status") in {"thin", "blocked"}:
+        risks.append(quality.get("summary") or "样本质量不足")
+    if context.get("status") == "rejected":
+        risks.append("已标记放弃，除非出现新样本或价格变化，否则不继续推进")
+    return _dedupe(risks)
+
+
+def _evidence_sources(
+    item: dict[str, Any],
+    quality: dict[str, Any],
+    context: dict[str, Any],
+) -> list[str]:
+    evidence = [
+        str(item.get("sampleLabel") or quality.get("sampleLabel") or ""),
+        str(quality.get("summary") or ""),
+    ]
+    if item.get("buildingFocus"):
+        evidence.append(str(item["buildingFocus"]))
+    if context.get("review_due_at"):
+        evidence.append(f"复核日 {context['review_due_at']}")
+    return _dedupe(value for value in evidence if value)
+
+
+def _pending_checks(
+    item: dict[str, Any],
+    quality: dict[str, Any],
+    context: dict[str, Any],
+) -> list[str]:
+    pending = [str(value) for value in (context.get("task_labels") or []) if value]
+    if not pending and quality.get("status") in {"thin", "blocked"}:
+        pending.append("补齐公开样本")
+    if item.get("targetType") == "district":
+        pending.append("下钻到小区和楼栋验证")
+    return _dedupe(pending)
+
+
+def _dedupe(values: Any) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        out.append(text)
+        seen.add(text)
+    return out

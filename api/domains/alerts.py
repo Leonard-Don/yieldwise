@@ -70,7 +70,13 @@ def _snapshot(target_id: str, target_type: str) -> dict[str, Any] | None:
             "name": record.get("name"),
             "yield": record.get("yieldAvg"),
             "price": record.get("saleMedianWan"),
+            "rent": record.get("rentMedianMonthly"),
             "score": record.get("score"),
+            "qualityStatus": (record.get("quality") or {}).get("status")
+            if isinstance(record.get("quality"), dict)
+            else None,
+            "topFloorPairCount": ((record.get("topFloors") or [{}])[0] or {}).get("pairCount")
+            or ((record.get("topFloors") or [{}])[0] or {}).get("latestPairCount"),
         }
     if target_type == "community":
         record = get_community(target_id)
@@ -80,7 +86,11 @@ def _snapshot(target_id: str, target_type: str) -> dict[str, Any] | None:
             "name": record.get("name"),
             "yield": record.get("yield"),
             "price": record.get("avgPriceWan"),
+            "rent": record.get("monthlyRent"),
             "score": record.get("score"),
+            "qualityStatus": (record.get("quality") or {}).get("status")
+            if isinstance(record.get("quality"), dict)
+            else None,
         }
     return None
 
@@ -95,6 +105,8 @@ def _district_snapshots() -> dict[str, dict[str, Any]]:
         snapshots[district_id] = {
             "name": row.get("name") or "",
             "yield": row.get("yield"),
+            "price": row.get("avgBudget") or row.get("avgPriceWan"),
+            "rent": row.get("avgMonthlyRent") or row.get("monthlyRent"),
         }
     return snapshots
 
@@ -123,14 +135,14 @@ def since_last_open() -> dict[str, Any]:
     state = _load_state()
     rules = _load_rules()
     watchlist_items = _load_watchlist()
+    district_snapshots = _district_snapshots()
     snapshots: dict[str, dict[str, Any] | None] = {}
     for entry in watchlist_items:
         target_id = entry.get("target_id")
         target_type = entry.get("target_type")
-        if not target_id or target_type not in ("building", "community"):
+        if not target_id or target_type not in ("building", "community", "district"):
             continue
-        snapshots[target_id] = _snapshot(target_id, target_type)
-    district_snapshots = _district_snapshots()
+        snapshots[target_id] = district_snapshots.get(target_id) if target_type == "district" else _snapshot(target_id, target_type)
     alerts = alerts_diff.compute_alerts(
         watchlist_items=watchlist_items,
         baselines=state.baselines,

@@ -98,3 +98,22 @@ def test_alert_accepts_district_target_type() -> None:
     alert = Alert.model_validate(payload)
     assert alert.target_type == "district"
     assert alert.kind == "district_delta_up"
+
+
+def test_alert_accepts_candidate_rule_kinds() -> None:
+    for kind in [
+        "target_price_hit",
+        "target_rent_hit",
+        "target_yield_hit",
+        "review_due",
+        "evidence_missing",
+        "floor_sample_change",
+    ]:
+        alert = Alert.model_validate(
+            {
+                "target_id": "x",
+                "target_type": "building",
+                "kind": kind,
+            }
+        )
+        assert alert.kind == kind

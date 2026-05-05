@@ -100,3 +100,32 @@ test("severityFor: district_delta_up → up", () => {
 test("severityFor: district_delta_down → down", () => {
   assert.equal(severityFor({ kind: "district_delta_down" }), "down");
 });
+
+test("formatAlertLine: candidate rule and review alerts render labels", () => {
+  assert.equal(
+    formatAlertLine({ kind: "target_price_hit", from_value: 900, to_value: 880 }),
+    "目标价触发 900 → 880 万",
+  );
+  assert.equal(
+    formatAlertLine({ kind: "target_rent_hit", from_value: 18000, to_value: 18500 }),
+    "目标租金触发 18000 → 18500 元/月",
+  );
+  assert.equal(
+    formatAlertLine({ kind: "target_yield_hit", from_value: 4.2, to_value: 4.5 }),
+    "目标收益触发 4.20% → 4.50%",
+  );
+  assert.equal(formatAlertLine({ kind: "review_due" }), "候选到期复核");
+  assert.equal(formatAlertLine({ kind: "evidence_missing" }), "证据不足，需补样");
+  assert.equal(
+    formatAlertLine({ kind: "floor_sample_change", from_value: 2, to_value: 5 }),
+    "同楼层样本 2 → 5 条",
+  );
+});
+
+test("severityFor: candidate rule severities", () => {
+  assert.equal(severityFor({ kind: "target_yield_hit" }), "up");
+  assert.equal(severityFor({ kind: "target_rent_hit" }), "up");
+  assert.equal(severityFor({ kind: "floor_sample_change" }), "up");
+  assert.equal(severityFor({ kind: "target_price_hit" }), "down");
+  assert.equal(severityFor({ kind: "review_due" }), "warn");
+});

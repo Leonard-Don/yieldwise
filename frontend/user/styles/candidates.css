@@ -6,7 +6,7 @@
 
 .atlas-candidate-desk[data-open="true"] {
   display: grid;
-  grid-template-rows: auto minmax(0, auto) auto;
+  grid-template-rows: auto auto minmax(0, auto) auto;
   max-height: 34vh;
 }
 
@@ -69,6 +69,41 @@
   cursor: not-allowed;
 }
 
+.atlas-candidate-queue {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  overflow-x: auto;
+}
+
+.atlas-candidate-queue button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.atlas-candidate-queue button[data-active="true"] {
+  color: var(--text-0);
+  border-color: var(--up);
+  background: rgba(0, 214, 143, 0.08);
+}
+
+.atlas-candidate-queue span {
+  font-family: var(--font-mono);
+  color: var(--text-xs);
+}
+
 .atlas-candidate-list {
   display: grid;
   gap: 8px;
@@ -80,7 +115,7 @@
 
 .atlas-candidate-item {
   display: grid;
-  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 0.9fr) minmax(280px, 1.2fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(170px, 0.75fr) minmax(260px, 0.95fr) minmax(300px, 1.15fr) minmax(360px, 1.35fr);
   gap: 10px;
   align-items: center;
   padding: 8px;
@@ -116,7 +151,7 @@
 
 .atlas-candidate-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -161,8 +196,15 @@
 
 .atlas-candidate-notes {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) minmax(120px, 1.2fr) auto;
+  grid-template-columns: minmax(90px, 1fr) minmax(120px, 1.1fr) minmax(220px, 1.4fr);
   align-items: center;
+}
+
+.atlas-candidate-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
 }
 
 .atlas-candidate-notes button {
@@ -181,18 +223,22 @@
 }
 
 .atlas-candidate-action[data-level="ready"],
-.atlas-candidate-action[data-level="changed"] {
+.atlas-candidate-action[data-level="changed"],
+.atlas-candidate-action[data-level="shortlisted"] {
   color: var(--up);
   border-color: rgba(0, 214, 143, 0.45);
 }
 
-.atlas-candidate-action[data-level="due"],
+.atlas-candidate-action[data-level="due_review"],
+.atlas-candidate-action[data-level="target_rule"],
 .atlas-candidate-action[data-level="sample"] {
   color: var(--warn);
   border-color: rgba(255, 176, 32, 0.45);
 }
 
-.atlas-candidate-action[data-level="blocked"] {
+.atlas-candidate-action[data-level="blocked"],
+.atlas-candidate-action[data-level="evidence_missing"],
+.atlas-candidate-action[data-level="rejected"] {
   color: var(--down);
   border-color: rgba(255, 82, 82, 0.45);
 }
@@ -202,8 +248,49 @@
   border-color: rgba(255, 176, 32, 0.45);
 }
 
+.atlas-candidate-taskline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.atlas-candidate-taskline span,
+.atlas-candidate-trigger {
+  width: fit-content;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-xs);
+  font-size: 10px;
+}
+
+.atlas-candidate-taskline span[data-group="due_review"],
+.atlas-candidate-taskline span[data-group="target_rule"],
+.atlas-candidate-trigger {
+  color: var(--warn);
+  border-color: rgba(255, 176, 32, 0.45);
+}
+
+.atlas-candidate-taskline span[data-group="changed"] {
+  color: var(--up);
+  border-color: rgba(0, 214, 143, 0.45);
+}
+
+.atlas-candidate-taskline span[data-group="evidence_missing"] {
+  color: var(--down);
+  border-color: rgba(255, 82, 82, 0.45);
+}
+
 .atlas-candidate-empty {
   padding: 12px;
+  color: var(--text-xs);
+  font-size: 11px;
+}
+
+.atlas-candidate-empty-row {
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
   color: var(--text-xs);
   font-size: 11px;
 }

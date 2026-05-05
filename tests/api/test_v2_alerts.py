@@ -110,6 +110,37 @@ def test_mark_seen_then_since_last_open_returns_no_alerts(
     assert response["last_open_at"] is not None
 
 
+def test_since_last_open_emits_candidate_target_rule_alerts(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_price_wan": 99999,
+            "target_monthly_rent": 1,
+            "target_yield_pct": 1.0,
+        },
+    )
+    response = client.get("/api/v2/alerts/since-last-open")
+    assert response.status_code == 200, response.text
+    kinds = {item["kind"] for item in response.json()["items"]}
+    assert {"target_price_hit", "target_rent_hit", "target_yield_hit"} <= kinds
+
+
+def test_since_last_open_emits_review_due_alert(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "review_due_at": "2000-01-01",
+        },
+    )
+    response = client.get("/api/v2/alerts/since-last-open")
+    assert response.status_code == 200, response.text
+    assert any(item["kind"] == "review_due" for item in response.json()["items"])
+
+
 def test_since_last_open_includes_target_name(
     client, isolated_personal_dir: Path
 ) -> None:

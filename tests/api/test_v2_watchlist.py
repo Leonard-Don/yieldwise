@@ -16,7 +16,22 @@ def test_get_returns_empty_items_when_no_file(client) -> None:
     assert response.status_code == 200, response.text
     assert response.json() == {
         "items": [],
-        "summary": {"total": 0, "shortlisted": 0, "due": 0, "changed": 0, "ready": 0},
+        "summary": {
+            "total": 0,
+            "shortlisted": 0,
+            "due": 0,
+            "changed": 0,
+            "ready": 0,
+            "target_rule": 0,
+            "evidence_missing": 0,
+            "task_groups": {
+                "due_review": 0,
+                "target_rule": 0,
+                "changed": 0,
+                "evidence_missing": 0,
+                "shortlisted": 0,
+            },
+        },
     }
 
 
@@ -106,7 +121,8 @@ def test_patch_updates_candidate_research_fields(client) -> None:
             "thesis": "楼层收益高于小区均值",
             "target_price_wan": 780,
             "target_monthly_rent": 22000,
-            "review_due_at": "2026-05-10",
+            "target_yield_pct": 3.0,
+            "review_due_at": "2000-01-01",
             "notes": "复核 17 层样本",
         },
     )
@@ -116,7 +132,64 @@ def test_patch_updates_candidate_research_fields(client) -> None:
     assert body["status_label"] == "候选"
     assert body["priority"] == 1
     assert body["target_price_wan"] == 780
-    assert body["candidate_action"]["level"] == "due"
+    assert body["target_yield_pct"] == 3.0
+    assert body["candidate_action"]["level"] == "due_review"
+    assert any(task["group"] == "due_review" for task in body["candidate_tasks"])
+
+
+def test_candidate_target_rules_create_tasks(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_price_wan": 99999,
+            "target_monthly_rent": 1,
+            "target_yield_pct": 0.1,
+        },
+    )
+    item = client.get("/api/v2/watchlist").json()["items"][0]
+    kinds = {trigger["kind"] for trigger in item["candidate_triggers"]}
+    assert {"target_price_hit", "target_rent_hit", "target_yield_hit"} <= kinds
+    assert any(task["group"] == "target_rule" for task in item["candidate_tasks"])
+
+
+def test_action_complete_review_updates_baseline_and_next_due(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "review_due_at": "2000-01-01",
+        },
+    )
+    response = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/actions",
+        json={"action": "complete_review", "days": 10, "notes": "已复核真实样本"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["last_reviewed_at"] is not None
+    assert body["last_seen_snapshot"]["name"]
+    assert body["review_due_at"] > "2000-01-01"
+    assert body["notes"] == "已复核真实样本"
+    assert not any(task["group"] == "due_review" for task in body["candidate_tasks"])
+
+
+def test_action_reject_removes_from_active_queue(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
+    )
+    response = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/actions",
+        json={"action": "reject"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "rejected"
+    assert body["review_due_at"] is None
+    assert body["candidate_action"]["level"] == "rejected"
 
 
 def test_post_then_get_preserves_order_oldest_first(client) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from api.schemas.watchlist import WatchlistAddPayload, WatchlistEntry
+from api.schemas.watchlist import WatchlistActionPayload, WatchlistAddPayload, WatchlistEntry
 
 
 def test_entry_round_trips_full_payload() -> None:
@@ -14,7 +14,9 @@ def test_entry_round_trips_full_payload() -> None:
         "status": "shortlisted",
         "priority": 1,
         "thesis": "收益稳定",
+        "target_yield_pct": 4.5,
         "review_due_at": "2026-05-10",
+        "last_reviewed_at": "2026-05-01T10:00:00",
         "last_seen_snapshot": {"yieldAvg": 0.04, "score": 66},
     }
     entry = WatchlistEntry.model_validate(payload)
@@ -23,6 +25,8 @@ def test_entry_round_trips_full_payload() -> None:
     assert entry.status == "shortlisted"
     assert entry.priority == 1
     assert entry.thesis == "收益稳定"
+    assert entry.target_yield_pct == 4.5
+    assert entry.last_reviewed_at == "2026-05-01T10:00:00"
     assert entry.last_seen_snapshot == {"yieldAvg": 0.04, "score": 66}
 
 
@@ -63,3 +67,14 @@ def test_add_payload_rejects_unknown_field() -> None:
 def test_add_payload_rejects_missing_required() -> None:
     with pytest.raises(ValidationError):
         WatchlistAddPayload.model_validate({"target_id": "x"})
+
+
+def test_action_payload_accepts_review_actions() -> None:
+    body = WatchlistActionPayload.model_validate({"action": "defer_review", "days": 7})
+    assert body.action == "defer_review"
+    assert body.days == 7
+
+
+def test_action_payload_rejects_unknown_action() -> None:
+    with pytest.raises(ValidationError):
+        WatchlistActionPayload.model_validate({"action": "archive"})

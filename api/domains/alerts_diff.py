@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from ..schemas.alerts import Alert, AlertRules
@@ -16,15 +17,33 @@ def compute_alerts(
     for entry in watchlist_items:
         target_id = entry.get("target_id")
         target_type = entry.get("target_type")
-        if target_type not in ("building", "community"):
+        if target_type not in ("building", "community", "district"):
             continue
+        if _is_due(entry.get("review_due_at")):
+            out.append(
+                _alert(
+                    target_id,
+                    target_type,
+                    "review_due",
+                    None,
+                    None,
+                    None,
+                    str(entry.get("target_name") or target_id),
+                )
+            )
+        snapshot = snapshots.get(target_id)
+        if snapshot:
+            out.extend(_candidate_rule_alerts(entry, target_type, snapshot))
+            evidence_alert = _evidence_alert(target_id, target_type, snapshot)
+            if evidence_alert is not None:
+                out.append(evidence_alert)
         baseline = baselines.get(target_id)
         if not baseline:
             continue
-        snapshot = snapshots.get(target_id)
         if not snapshot:
             continue
-        out.extend(_diff_target(target_id, target_type, baseline, snapshot, rules))
+        if target_type in ("building", "community"):
+            out.extend(_diff_target(target_id, target_type, baseline, snapshot, rules))
 
     if district_snapshots:
         for district_id, district_snap in district_snapshots.items():
@@ -86,7 +105,66 @@ def _diff_target(
                 _alert(target_id, target_type, "score_jump", base_score, snap_score, delta, target_name)
             )
 
+    base_floor_pairs = _maybe_float(baseline.get("topFloorPairCount"))
+    snap_floor_pairs = _maybe_float(snapshot.get("topFloorPairCount"))
+    if rules.listing_new and base_floor_pairs is not None and snap_floor_pairs is not None:
+        delta = snap_floor_pairs - base_floor_pairs
+        if delta >= 1:
+            out.append(
+                _alert(
+                    target_id,
+                    target_type,
+                    "floor_sample_change",
+                    base_floor_pairs,
+                    snap_floor_pairs,
+                    delta,
+                    target_name,
+                )
+            )
+
     return out
+
+
+def _candidate_rule_alerts(
+    entry: dict[str, Any],
+    target_type: str,
+    snapshot: dict[str, Any],
+) -> list[Alert]:
+    if entry.get("status") == "rejected":
+        return []
+    target_id = str(entry.get("target_id") or "")
+    name_raw = snapshot.get("name")
+    target_name = str(name_raw) if name_raw else None
+    out: list[Alert] = []
+
+    price = _maybe_float(snapshot.get("price"))
+    target_price = _maybe_float(entry.get("target_price_wan"))
+    if price is not None and target_price is not None and price <= target_price:
+        out.append(_alert(target_id, target_type, "target_price_hit", target_price, price, price - target_price, target_name))
+
+    rent = _maybe_float(snapshot.get("rent"))
+    target_rent = _maybe_float(entry.get("target_monthly_rent"))
+    if rent is not None and target_rent is not None and rent >= target_rent:
+        out.append(_alert(target_id, target_type, "target_rent_hit", target_rent, rent, rent - target_rent, target_name))
+
+    yield_pct = _normalize_yield(snapshot.get("yield"))
+    target_yield = _maybe_float(entry.get("target_yield_pct"))
+    if yield_pct is not None and target_yield is not None and yield_pct >= target_yield:
+        out.append(_alert(target_id, target_type, "target_yield_hit", target_yield, yield_pct, yield_pct - target_yield, target_name))
+
+    return out
+
+
+def _evidence_alert(
+    target_id: str,
+    target_type: str,
+    snapshot: dict[str, Any],
+) -> Alert | None:
+    if snapshot.get("qualityStatus") not in {"blocked", "thin"}:
+        return None
+    name_raw = snapshot.get("name")
+    target_name = str(name_raw) if name_raw else None
+    return _alert(target_id, target_type, "evidence_missing", None, None, None, target_name)
 
 
 def _diff_district(
@@ -122,6 +200,16 @@ def _normalize_yield(value: Any) -> float | None:
         return None
     # Frontend mirror: a value < 1 is a fraction (e.g. 0.04 = 4%); scale up.
     return num * 100.0 if num < 1 else num
+
+
+def _is_due(value: Any) -> bool:
+    if not value:
+        return False
+    try:
+        due_date = date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return False
+    return due_date <= date.today()
 
 
 def _maybe_float(value: Any) -> float | None:

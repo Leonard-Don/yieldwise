@@ -13,6 +13,12 @@ AlertKind = Literal[
     "score_jump",
     "district_delta_up",
     "district_delta_down",
+    "target_price_hit",
+    "target_rent_hit",
+    "target_yield_hit",
+    "review_due",
+    "evidence_missing",
+    "floor_sample_change",
 ]
 
 

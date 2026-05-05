@@ -4,10 +4,14 @@ import assert from "node:assert/strict";
 import {
   buildWatchlistMemoPayload,
   candidateStatusLabel,
+  candidateMatchesTaskGroup,
+  candidateTaskGroupLabel,
   candidateToComparisonItem,
+  countTaskGroups,
   formatCandidateMetric,
   isStarred,
   normalizeWatchlistItems,
+  reviewDateAfter,
   targetTypeLabel,
   watchlistCount,
 } from "../../frontend/user/modules/watchlist-helpers.js";
@@ -67,7 +71,13 @@ test("candidateToComparisonItem: uses current snapshot fields", () => {
 
 test("buildWatchlistMemoPayload: maps first five candidates to decision targets", () => {
   const payload = buildWatchlistMemoPayload([
-    { target_id: "a", target_type: "community" },
+    {
+      target_id: "a",
+      target_type: "community",
+      thesis: "收益稳定",
+      candidate_tasks: [{ group: "due_review", label: "到期复核" }],
+      candidate_triggers: [{ kind: "target_price_hit", label: "总价低于目标" }],
+    },
     { target_id: "b", target_type: "building" },
     { target_id: "pudong", target_type: "district" },
   ]);
@@ -77,6 +87,9 @@ test("buildWatchlistMemoPayload: maps first five candidates to decision targets"
     { target_id: "b", target_type: "building" },
     { target_id: "pudong", target_type: "district" },
   ]);
+  assert.equal(payload.candidate_contexts[0].thesis, "收益稳定");
+  assert.deepEqual(payload.candidate_contexts[0].task_labels, ["到期复核"]);
+  assert.deepEqual(payload.candidate_contexts[0].trigger_labels, ["总价低于目标"]);
 });
 
 test("labels and metric formatting are stable", () => {
@@ -85,4 +98,32 @@ test("labels and metric formatting are stable", () => {
   assert.equal(formatCandidateMetric(4.234, "%"), "4.23%");
   assert.equal(formatCandidateMetric(780, "万"), "780万");
   assert.equal(formatCandidateMetric(null, "%"), "—");
+});
+
+test("task grouping helpers count and match candidate queues", () => {
+  const items = [
+    {
+      target_id: "a",
+      target_type: "community",
+      candidate_tasks: [{ group: "due_review", label: "到期复核" }],
+    },
+    {
+      target_id: "b",
+      target_type: "building",
+      status: "shortlisted",
+      candidate_tasks: [{ group: "target_rule", label: "目标触发" }],
+    },
+  ];
+  const counts = countTaskGroups(items);
+  assert.equal(counts.all, 2);
+  assert.equal(counts.due_review, 1);
+  assert.equal(counts.target_rule, 1);
+  assert.equal(counts.shortlisted, 1);
+  assert.equal(candidateMatchesTaskGroup(items[0], "due_review"), true);
+  assert.equal(candidateMatchesTaskGroup(items[0], "shortlisted"), false);
+  assert.equal(candidateTaskGroupLabel("evidence_missing"), "证据缺口");
+});
+
+test("reviewDateAfter returns yyyy-mm-dd", () => {
+  assert.equal(reviewDateAfter(7, new Date("2026-05-05T00:00:00Z")), "2026-05-12");
 });

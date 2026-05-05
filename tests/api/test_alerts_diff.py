@@ -137,6 +137,56 @@ def test_multiple_alerts_per_target() -> None:
     assert kinds == ["price_drop", "score_jump", "yield_up"]
 
 
+def test_candidate_target_rules_emit_alerts_without_baseline() -> None:
+    items = compute_alerts(
+        watchlist_items=[
+            {
+                "target_id": "x",
+                "target_type": "building",
+                "target_price_wan": 900.0,
+                "target_monthly_rent": 18000.0,
+                "target_yield_pct": 4.0,
+            }
+        ],
+        baselines={},
+        snapshots={"x": {"yield": 4.5, "price": 880.0, "rent": 18500.0, "score": 60}},
+        rules=AlertRules(),
+    )
+    assert sorted(a.kind for a in items) == [
+        "target_price_hit",
+        "target_rent_hit",
+        "target_yield_hit",
+    ]
+
+
+def test_candidate_review_due_and_evidence_missing_emit_alerts() -> None:
+    items = compute_alerts(
+        watchlist_items=[
+            {
+                "target_id": "x",
+                "target_type": "community",
+                "review_due_at": "2000-01-01",
+            }
+        ],
+        baselines={},
+        snapshots={"x": {"qualityStatus": "thin"}},
+        rules=AlertRules(),
+    )
+    assert sorted(a.kind for a in items) == ["evidence_missing", "review_due"]
+
+
+def test_floor_sample_change_emits_when_pair_count_rises() -> None:
+    items = compute_alerts(
+        watchlist_items=_watchlist([("x", "building")]),
+        baselines={"x": {"yield": 4.0, "price": 800.0, "score": 60, "topFloorPairCount": 2}},
+        snapshots={"x": {"yield": 4.0, "price": 800.0, "score": 60, "topFloorPairCount": 5}},
+        rules=AlertRules(),
+    )
+    assert len(items) == 1
+    assert items[0].kind == "floor_sample_change"
+    assert items[0].delta == 3
+
+
 def test_compute_alerts_threads_target_name_from_snapshot() -> None:
     items = compute_alerts(
         watchlist_items=_watchlist([("x", "building")]),
