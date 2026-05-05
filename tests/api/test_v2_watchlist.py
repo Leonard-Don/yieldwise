@@ -38,11 +38,11 @@ def test_get_returns_empty_items_when_no_file(client) -> None:
 def test_post_adds_entry_with_added_at(client) -> None:
     response = client.post(
         "/api/v2/watchlist",
-        json={"target_id": "daning-jinmaofu-b1", "target_type": "building"},
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["target_id"] == "daning-jinmaofu-b1"
+    assert body["target_id"] == "zhangjiang-park-b1"
     assert body["target_type"] == "building"
     assert body["added_at"] is not None
     assert body["status"] == "watching"
@@ -53,7 +53,7 @@ def test_post_adds_entry_with_added_at(client) -> None:
 
     follow = client.get("/api/v2/watchlist").json()
     assert len(follow["items"]) == 1
-    assert follow["items"][0]["target_id"] == "daning-jinmaofu-b1"
+    assert follow["items"][0]["target_id"] == "zhangjiang-park-b1"
 
 
 def test_post_is_idempotent_replaces_existing(client) -> None:

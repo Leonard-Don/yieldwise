@@ -34,7 +34,7 @@ def compute_alerts(
         snapshot = snapshots.get(target_id)
         if snapshot:
             out.extend(_candidate_rule_alerts(entry, target_type, snapshot))
-            evidence_alert = _evidence_alert(target_id, target_type, snapshot)
+            evidence_alert = _evidence_alert(target_id, target_type, snapshot, baseline=baselines.get(target_id))
             if evidence_alert is not None:
                 out.append(evidence_alert)
         baseline = baselines.get(target_id)
@@ -159,8 +159,13 @@ def _evidence_alert(
     target_id: str,
     target_type: str,
     snapshot: dict[str, Any],
+    *,
+    baseline: dict[str, Any] | None = None,
 ) -> Alert | None:
-    if snapshot.get("qualityStatus") not in {"blocked", "thin"}:
+    status = snapshot.get("qualityStatus")
+    if status not in {"blocked", "thin"}:
+        return None
+    if baseline and baseline.get("qualityStatus") == status:
         return None
     name_raw = snapshot.get("name")
     target_name = str(name_raw) if name_raw else None

@@ -69,12 +69,11 @@ def _snapshot(target_id: str, target_type: str) -> dict[str, Any] | None:
         return {
             "name": record.get("name"),
             "yield": record.get("yieldAvg"),
-            "price": record.get("saleMedianWan"),
-            "rent": record.get("rentMedianMonthly"),
+            "price": record.get("saleMedianWan") or record.get("avgPriceWanEstimate"),
+            "rent": record.get("rentMedianMonthly") or record.get("monthlyRentEstimate"),
             "score": record.get("score"),
-            "qualityStatus": (record.get("quality") or {}).get("status")
-            if isinstance(record.get("quality"), dict)
-            else None,
+            "qualityStatus": record.get("qualityStatus")
+            or ((record.get("quality") or {}).get("status") if isinstance(record.get("quality"), dict) else None),
             "topFloorPairCount": ((record.get("topFloors") or [{}])[0] or {}).get("pairCount")
             or ((record.get("topFloors") or [{}])[0] or {}).get("latestPairCount"),
         }
