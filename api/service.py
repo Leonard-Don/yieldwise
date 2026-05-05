@@ -1751,7 +1751,9 @@ def normalize_import_pair_for_ui(
         "orientation": orientation,
         "areaSqm": area_sqm,
         "saleSourceName": source_name_by_id(pair["sale_source"]),
+        "saleSourceListingId": pair.get("sale_source_listing_id"),
         "rentSourceName": source_name_by_id(pair["rent_source"]),
+        "rentSourceListingId": pair.get("rent_source_listing_id"),
         "salePriceWan": pair.get("sale_price_wan"),
         "monthlyRent": pair.get("monthly_rent"),
         "yieldPct": pair.get("annual_yield_pct"),
@@ -1763,6 +1765,20 @@ def normalize_import_pair_for_ui(
         or (rent_row or {}).get("normalized_address"),
         "rawSaleAddress": (sale_row or {}).get("raw_address"),
         "rawRentAddress": (rent_row or {}).get("raw_address"),
+        "sourceSnapshotRefs": [
+            {
+                "kind": "sale",
+                "sourceName": source_name_by_id(pair["sale_source"]),
+                "sourceListingId": pair.get("sale_source_listing_id"),
+                "rawAddress": (sale_row or {}).get("raw_address"),
+            },
+            {
+                "kind": "rent",
+                "sourceName": source_name_by_id(pair["rent_source"]),
+                "sourceListingId": pair.get("rent_source_listing_id"),
+                "rawAddress": (rent_row or {}).get("raw_address"),
+            },
+        ],
         "updatedAt": (run_summary.get("createdAt") or "").replace("T", " ")[:16],
     }
 
@@ -3171,7 +3187,9 @@ def build_floor_sample_pairs(building: dict[str, Any], floor_item: dict[str, Any
                 "orientation": orientations[(floor_item["floorNo"] + index) % len(orientations)],
                 "areaSqm": area_sqm,
                 "saleSourceName": source_name_by_id(sale_source_id),
+                "saleSourceListingId": f"sim-sale-{building['id']}-{floor_item['floorNo']}-{index + 1}",
                 "rentSourceName": source_name_by_id(rent_source_id),
+                "rentSourceListingId": f"sim-rent-{building['id']}-{floor_item['floorNo']}-{index + 1}",
                 "salePriceWan": sale_price_wan,
                 "monthlyRent": monthly_rent,
                 "yieldPct": yield_pct,
@@ -3184,6 +3202,20 @@ def build_floor_sample_pairs(building: dict[str, Any], floor_item: dict[str, Any
                 ),
                 "rawSaleAddress": f"{building['communityName']}{building['name']}{floor_item['floorNo']}层{unit_no}",
                 "rawRentAddress": f"{building['districtName']}{building['communityName']}{building['name']}{floor_item['floorNo']}F-{unit_no}",
+                "sourceSnapshotRefs": [
+                    {
+                        "kind": "sale",
+                        "sourceName": source_name_by_id(sale_source_id),
+                        "sourceListingId": f"sim-sale-{building['id']}-{floor_item['floorNo']}-{index + 1}",
+                        "rawAddress": f"{building['communityName']}{building['name']}{floor_item['floorNo']}层{unit_no}",
+                    },
+                    {
+                        "kind": "rent",
+                        "sourceName": source_name_by_id(rent_source_id),
+                        "sourceListingId": f"sim-rent-{building['id']}-{floor_item['floorNo']}-{index + 1}",
+                        "rawAddress": f"{building['districtName']}{building['communityName']}{building['name']}{floor_item['floorNo']}F-{unit_no}",
+                    },
+                ],
                 "updatedAt": f"2026-04-11 {8 + index:02d}:3{index}",
             }
         )
@@ -4774,7 +4806,9 @@ def get_floor_detail(building_id: str, floor_no: int) -> dict[str, Any] | None:
             SELECT
                 p.pair_id,
                 p.sale_source,
+                p.sale_source_listing_id,
                 p.rent_source,
+                p.rent_source_listing_id,
                 p.sale_price_wan,
                 p.monthly_rent,
                 p.annual_yield_pct,
@@ -4798,7 +4832,9 @@ def get_floor_detail(building_id: str, floor_no: int) -> dict[str, Any] | None:
                 "orientation": "待补朝向",
                 "areaSqm": None,
                 "saleSourceName": source_name_by_id(row.get("sale_source")),
+                "saleSourceListingId": row.get("sale_source_listing_id"),
                 "rentSourceName": source_name_by_id(row.get("rent_source")),
+                "rentSourceListingId": row.get("rent_source_listing_id"),
                 "salePriceWan": row.get("sale_price_wan"),
                 "monthlyRent": row.get("monthly_rent"),
                 "yieldPct": row.get("annual_yield_pct"),
@@ -4806,6 +4842,20 @@ def get_floor_detail(building_id: str, floor_no: int) -> dict[str, Any] | None:
                 "dedupConfidence": float(row.get("match_confidence") or 0),
                 "reviewState": "已归一" if float(row.get("match_confidence") or 0) >= 0.85 else "待复核",
                 "normalizedAddress": row.get("normalized_address"),
+                "sourceSnapshotRefs": [
+                    {
+                        "kind": "sale",
+                        "sourceName": source_name_by_id(row.get("sale_source")),
+                        "sourceListingId": row.get("sale_source_listing_id"),
+                        "rawAddress": row.get("normalized_address"),
+                    },
+                    {
+                        "kind": "rent",
+                        "sourceName": source_name_by_id(row.get("rent_source")),
+                        "sourceListingId": row.get("rent_source_listing_id"),
+                        "rawAddress": row.get("normalized_address"),
+                    },
+                ],
                 "updatedAt": (row.get("created_at").isoformat() if row.get("created_at") else "").replace("T", " ")[:16],
             }
             for index, row in enumerate(pair_rows)

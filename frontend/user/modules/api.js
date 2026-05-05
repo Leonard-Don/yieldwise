@@ -95,6 +95,8 @@ export const api = {
     list: () => getJSONFresh("/api/v2/watchlist"),
     add: (targetId, targetType) =>
       postJSON("/api/v2/watchlist", { target_id: targetId, target_type: targetType }),
+    update: (targetId, payload) =>
+      patchJSON(`/api/v2/watchlist/${encodeURIComponent(targetId)}`, payload),
     remove: (targetId) =>
       deleteJSON(`/api/v2/watchlist/${encodeURIComponent(targetId)}`),
   },

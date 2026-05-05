@@ -27,6 +27,21 @@ def test_v2_building_detail_matches_legacy(client, sample_building_id) -> None:
     assert v2.json()["decisionBrief"]["label"]
 
 
+def test_v2_building_floor_detail_exposes_evidence_refs(client, sample_building_id) -> None:
+    building = client.get(f"/api/v2/buildings/{sample_building_id}").json()
+    floor_no = building["topFloors"][0]["floorNo"]
+    response = client.get(f"/api/v2/buildings/{sample_building_id}/floors/{floor_no}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["buildingId"] == sample_building_id
+    assert body["floorNo"] == floor_no
+    assert "samplePairs" in body
+    if body["samplePairs"]:
+        pair = body["samplePairs"][0]
+        assert "sourceSnapshotRefs" in pair
+        assert {ref["kind"] for ref in pair["sourceSnapshotRefs"]} == {"sale", "rent"}
+
+
 def test_v2_building_detail_404_for_unknown(client) -> None:
     response = client.get("/api/v2/buildings/does-not-exist-xyz-123")
     assert response.status_code == 404

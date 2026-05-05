@@ -1,0 +1,253 @@
+.atlas-candidate-desk {
+  display: none;
+  border-top: 1px solid var(--line);
+  background: var(--bg-1);
+}
+
+.atlas-candidate-desk[data-open="true"] {
+  display: grid;
+  grid-template-rows: auto minmax(0, auto) auto;
+  max-height: 34vh;
+}
+
+.atlas-candidate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.atlas-candidate-head strong {
+  display: block;
+  font-size: 12px;
+  color: var(--text-0);
+}
+
+.atlas-candidate-head [data-role="candidate-summary"] {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.atlas-candidate-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-candidate-actions button,
+.atlas-candidate-notes button,
+.atlas-candidate-name {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out, background 120ms ease-out;
+}
+
+.atlas-candidate-actions button {
+  min-height: 24px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.atlas-candidate-actions button:hover,
+.atlas-candidate-notes button:hover,
+.atlas-candidate-name:hover {
+  color: var(--text-0);
+  border-color: var(--up);
+  background: rgba(0, 214, 143, 0.06);
+}
+
+.atlas-candidate-actions button[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.atlas-candidate-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  list-style: none;
+}
+
+.atlas-candidate-item {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 0.9fr) minmax(280px, 1.2fr) minmax(260px, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-0);
+}
+
+.atlas-candidate-main,
+.atlas-candidate-controls,
+.atlas-candidate-notes {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.atlas-candidate-main {
+  flex-direction: column;
+}
+
+.atlas-candidate-name {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-0);
+  text-align: left;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-candidate-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.atlas-candidate-metrics span {
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-candidate-controls {
+  flex-wrap: wrap;
+}
+
+.atlas-candidate-controls label {
+  display: grid;
+  gap: 3px;
+  min-width: 78px;
+  font-size: 10px;
+  color: var(--text-xs);
+}
+
+.atlas-candidate-controls input,
+.atlas-candidate-controls select,
+.atlas-candidate-notes input {
+  min-width: 0;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-0);
+  font: inherit;
+  font-size: 11px;
+}
+
+.atlas-candidate-notes {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(120px, 1.2fr) auto;
+  align-items: center;
+}
+
+.atlas-candidate-notes button {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.atlas-candidate-action,
+.atlas-candidate-alert {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  font-size: 10px;
+}
+
+.atlas-candidate-action[data-level="ready"],
+.atlas-candidate-action[data-level="changed"] {
+  color: var(--up);
+  border-color: rgba(0, 214, 143, 0.45);
+}
+
+.atlas-candidate-action[data-level="due"],
+.atlas-candidate-action[data-level="sample"] {
+  color: var(--warn);
+  border-color: rgba(255, 176, 32, 0.45);
+}
+
+.atlas-candidate-action[data-level="blocked"] {
+  color: var(--down);
+  border-color: rgba(255, 82, 82, 0.45);
+}
+
+.atlas-candidate-alert {
+  color: var(--warn);
+  border-color: rgba(255, 176, 32, 0.45);
+}
+
+.atlas-candidate-empty {
+  padding: 12px;
+  color: var(--text-xs);
+  font-size: 11px;
+}
+
+.atlas-candidate-status {
+  padding: 0 12px 8px;
+  font-size: 10px;
+}
+
+.atlas-candidate-status[data-state="ok"] {
+  color: var(--up);
+}
+
+.atlas-candidate-status[data-state="error"] {
+  color: var(--down);
+}
+
+.atlas-star-tag {
+  cursor: pointer;
+}
+
+.atlas-star-tag[data-open="true"] {
+  color: var(--text-0);
+  border-color: var(--up);
+  background: rgba(0, 214, 143, 0.08);
+}
+
+@media (max-width: 1100px) {
+  .atlas-candidate-item {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .atlas-candidate-desk[data-open="true"] {
+    max-height: 46vh;
+  }
+
+  .atlas-candidate-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .atlas-candidate-item {
+    grid-template-columns: 1fr;
+  }
+}

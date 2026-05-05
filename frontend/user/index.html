@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/styles/shortcuts.css" />
     <link rel="stylesheet" href="/styles/search.css" />
     <link rel="stylesheet" href="/styles/comparison.css" />
+    <link rel="stylesheet" href="/styles/candidates.css" />
   </head>
   <body data-user-shell="atlas">
     <div class="atlas-shell">
@@ -33,7 +34,7 @@
         <h1>Yieldwise · 租知</h1>
         <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
         <div class="atlas-topbar-spacer"></div>
-        <span class="atlas-star-tag mono" data-component="watchlist-count" title="关注数">★ —</span>
+        <button type="button" class="atlas-star-tag mono" data-component="candidate-desk-toggle" data-active="false" title="候选研究台">★ —</button>
         <button type="button" class="atlas-prefs-button" data-component="prefs-button">偏好</button>
         <button type="button" class="atlas-help-chip" data-component="help-chip" title="键盘快捷键 (?)">?</button>
         <span class="atlas-runtime-tag mono dim" data-component="runtime-tag"></span>
@@ -142,6 +143,22 @@
           <footer class="atlas-search-status mono dim" data-role="search-status">输入后按 ↑↓ 选择，Enter 打开</footer>
         </section>
       </main>
+      <section class="atlas-candidate-desk" data-component="candidate-desk" data-open="false" aria-label="候选研究台">
+        <header class="atlas-candidate-head">
+          <div>
+            <strong>候选研究台</strong>
+            <span class="mono dim" data-role="candidate-summary">—</span>
+          </div>
+          <div class="atlas-candidate-actions">
+            <button type="button" data-role="candidate-mark-seen" disabled>更新基线</button>
+            <button type="button" data-role="candidate-export" disabled>导出候选备忘录</button>
+            <button type="button" data-role="candidate-close" aria-label="收起候选研究台">×</button>
+          </div>
+        </header>
+        <ol class="atlas-candidate-list" data-role="candidate-list"></ol>
+        <div class="atlas-candidate-empty" data-role="candidate-empty">暂无候选</div>
+        <footer class="atlas-candidate-status mono dim" data-role="candidate-status">—</footer>
+      </section>
       <section class="atlas-comparison-tray" data-component="comparison-tray" data-open="false" aria-label="候选对比">
         <div class="atlas-comparison-summary">
           <strong>对比 <span data-role="comparison-count">0</span>/5</strong>

@@ -69,7 +69,7 @@ export function initShortcuts({ root, store }) {
   async function toggleStar() {
     const state = store.get();
     const sel = state.selection;
-    if (!sel || (sel.type !== "building" && sel.type !== "community")) return;
+    if (!sel || !["building", "community", "district"].includes(sel.type)) return;
     const items = Array.isArray(state.watchlist) ? state.watchlist : [];
     const isStarred = items.some((it) => it.target_id === sel.id);
     try {

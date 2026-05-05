@@ -25,6 +25,11 @@ export function initDrawer({ root, store }) {
   closeButton.addEventListener("click", close);
   backdrop.addEventListener("click", close);
   bodyEl.addEventListener("click", (event) => {
+    const floorButton = event.target.closest("[data-floor-evidence]");
+    if (floorButton) {
+      void loadFloorEvidence(floorButton);
+      return;
+    }
     const row = event.target.closest("[data-community-id]");
     if (!row) return;
     const communityId = row.dataset.communityId;
@@ -160,6 +165,7 @@ export function initDrawer({ root, store }) {
       renderDecisionPanel(detail),
       renderQualityPanel(detail),
       renderFloorChart(bars),
+      renderTopFloorEvidence(detail),
       renderListingSummary(detail),
     ].join("");
   }
@@ -233,6 +239,24 @@ export function initDrawer({ root, store }) {
       )
       .join("");
     return `<div><h3 class="atlas-section-title">楼层段租售比</h3><div class="atlas-bucket-chart">${cols}</div></div>`;
+  }
+
+  function renderTopFloorEvidence(detail) {
+    const floors = Array.isArray(detail.topFloors) ? detail.topFloors.slice(0, 4) : [];
+    const buildingId = detail.id || detail.buildingId;
+    if (!buildingId || floors.length === 0) return "";
+    const rows = floors
+      .map((floor) => {
+        const floorNo = floor.floorNo;
+        const label = `${floorNo}层 · ${formatPct(floor.yieldPct)} · ${formatScore(floor.opportunityScore)}分`;
+        return `<button type="button" class="atlas-floor-evidence-chip" data-floor-evidence data-building-id="${escapeText(buildingId)}" data-floor-no="${escapeText(floorNo)}">${escapeText(label)}</button>`;
+      })
+      .join("");
+    return `<section class="atlas-floor-evidence">
+      <h3 class="atlas-section-title">重点楼层证据</h3>
+      <div class="atlas-floor-evidence-chips">${rows}</div>
+      <div class="atlas-floor-evidence-panel" data-role="floor-evidence-panel">选择楼层查看样本证据</div>
+    </section>`;
   }
 
   function renderListingSummary(detail) {
@@ -315,6 +339,23 @@ export function initDrawer({ root, store }) {
     }
     throw new Error(`未知的选中类型：${sel.type}`);
   }
+
+  async function loadFloorEvidence(button) {
+    const panel = bodyEl.querySelector('[data-role="floor-evidence-panel"]');
+    const buildingId = button.dataset.buildingId;
+    const floorNo = button.dataset.floorNo;
+    if (!panel || !buildingId || !floorNo) return;
+    panel.dataset.state = "loading";
+    panel.textContent = "楼层证据加载中…";
+    try {
+      const detail = await getJSON(`/api/v2/buildings/${encodeURIComponent(buildingId)}/floors/${encodeURIComponent(floorNo)}`);
+      panel.dataset.state = "ready";
+      panel.innerHTML = renderFloorEvidenceDetail(detail);
+    } catch (err) {
+      panel.dataset.state = "error";
+      panel.textContent = err.message || "楼层证据加载失败";
+    }
+  }
 }
 
 async function getJSON(url) {
@@ -339,4 +380,36 @@ function escapeText(value) {
     ">": "&gt;",
     '"': "&quot;",
   }[c]));
+}
+
+function renderFloorEvidenceDetail(detail) {
+  const pairs = Array.isArray(detail.samplePairs) ? detail.samplePairs.slice(0, 4) : [];
+  const summary = detail.historySummary || {};
+  const source = detail.evidenceSource === "imported" ? "真实导入样本" : detail.evidenceSource === "simulated" ? "演示样本" : "样本不足";
+  const pairRows = pairs.length
+    ? pairs.map(renderSamplePair).join("")
+    : '<li class="atlas-floor-pair-empty">暂无可展示样本配对</li>';
+  return `<div class="atlas-floor-evidence-head">
+      <strong>${escapeText(detail.buildingName)} · ${escapeText(detail.floorNo)}层</strong>
+      <span>${escapeText(source)} · ${escapeText(detail.importRun?.batchName || "当前快照")}</span>
+    </div>
+    <div class="atlas-floor-evidence-stats">
+      <span>收益 ${escapeText(formatPct(detail.yieldPct))}</span>
+      <span>配对 ${escapeText(summary.totalPairCount ?? detail.measuredMetrics?.pairCount ?? pairs.length)}</span>
+      <span>批次 ${escapeText(summary.observedRuns ?? detail.historyTimeline?.length ?? 0)}</span>
+    </div>
+    <ol class="atlas-floor-pair-list">${pairRows}</ol>`;
+}
+
+function renderSamplePair(pair) {
+  const refs = Array.isArray(pair.sourceSnapshotRefs) ? pair.sourceSnapshotRefs : [];
+  const refText = refs
+    .map((ref) => `${ref.kind === "sale" ? "售" : "租"} ${ref.sourceName || ""}#${ref.sourceListingId || "—"}`)
+    .join(" · ");
+  return `<li class="atlas-floor-pair">
+    <strong>${escapeText(pair.unitNo || pair.pairId || "样本")}</strong>
+    <span>${escapeText(formatPct(pair.yieldPct))} · ${escapeText(pair.salePriceWan ?? "—")}万 / ${escapeText(pair.monthlyRent ?? "—")}元</span>
+    <small>${escapeText(refText || pair.normalizedAddress || "—")}</small>
+    <small>${escapeText(pair.rawSaleAddress || "售源地址待补")} ｜ ${escapeText(pair.rawRentAddress || "租源地址待补")}</small>
+  </li>`;
 }

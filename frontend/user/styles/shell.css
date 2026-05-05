@@ -184,6 +184,7 @@
 }
 
 .atlas-star-tag {
+  appearance: none;
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--text-dim);

@@ -2,7 +2,7 @@ import { api } from "./api.js";
 import { isStarred, watchlistCount } from "./watchlist-helpers.js";
 
 export function initWatchlist({ root, store }) {
-  const countEl = root.querySelector('[data-component="watchlist-count"]');
+  const countEl = root.querySelector('[data-component="candidate-desk-toggle"]');
   const starButton = root.querySelector('[data-component="drawer-star"]');
 
   starButton.addEventListener("click", () => {
@@ -19,14 +19,14 @@ export function initWatchlist({ root, store }) {
       countEl.removeAttribute("data-active");
     } else {
       countEl.textContent = `★ ${watchlistCount(items)}`;
-      countEl.setAttribute("data-active", items.length > 0 ? "true" : "false");
+      countEl.dataset.active = items.length > 0 ? "true" : "false";
     }
     syncStarButton(state);
   }
 
   function syncStarButton(state) {
     const sel = state.selection;
-    if (!sel || (sel.type !== "building" && sel.type !== "community")) {
+    if (!sel || !["building", "community", "district"].includes(sel.type)) {
       starButton.hidden = true;
       starButton.setAttribute("aria-pressed", "false");
       return;
@@ -42,7 +42,7 @@ export function initWatchlist({ root, store }) {
   async function toggleStar() {
     const state = store.get();
     const sel = state.selection;
-    if (!sel || (sel.type !== "building" && sel.type !== "community")) return;
+    if (!sel || !["building", "community", "district"].includes(sel.type)) return;
     const items = Array.isArray(state.watchlist) ? state.watchlist : [];
     const currentlyStarred = isStarred(items, sel.id);
     starButton.disabled = true;

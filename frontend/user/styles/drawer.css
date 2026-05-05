@@ -442,6 +442,115 @@
   gap: 8px;
 }
 
+.atlas-floor-evidence {
+  display: grid;
+  gap: 8px;
+}
+
+.atlas-floor-evidence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atlas-floor-evidence-chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out, background 120ms ease-out;
+}
+
+.atlas-floor-evidence-chip:hover {
+  color: var(--text-0);
+  border-color: var(--up);
+  background: rgba(0, 214, 143, 0.06);
+}
+
+.atlas-floor-evidence-panel {
+  min-height: 36px;
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-xs);
+  font-size: 11px;
+}
+
+.atlas-floor-evidence-panel[data-state="ready"] {
+  display: grid;
+  gap: 8px;
+  color: var(--text-dim);
+  border-style: solid;
+  background: var(--bg-1);
+}
+
+.atlas-floor-evidence-panel[data-state="error"] {
+  color: var(--down);
+  border-color: rgba(255, 82, 82, 0.45);
+}
+
+.atlas-floor-evidence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.atlas-floor-evidence-head strong {
+  color: var(--text-0);
+}
+
+.atlas-floor-evidence-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.atlas-floor-evidence-stats span {
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-floor-pair-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-floor-pair {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-0);
+}
+
+.atlas-floor-pair strong {
+  color: var(--text-0);
+}
+
+.atlas-floor-pair small {
+  color: var(--text-xs);
+}
+
+.atlas-floor-pair-empty {
+  color: var(--text-xs);
+}
+
 .atlas-listing-cell {
   background: var(--bg-2);
   border: 1px solid var(--line);

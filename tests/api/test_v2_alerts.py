@@ -89,6 +89,11 @@ def test_mark_seen_creates_baselines_for_watchlist_targets(
         (isolated_personal_dir / "alerts_state.json").read_text(encoding="utf-8")
     )
     assert "zhangjiang-park-b1" in on_disk["baselines"]
+    watchlist = json.loads(
+        (isolated_personal_dir / "watchlist.json").read_text(encoding="utf-8")
+    )
+    assert watchlist["items"][0]["last_seen_snapshot"]["name"]
+    assert watchlist["items"][0]["last_seen_snapshot"]["yield"] is not None
 
 
 def test_mark_seen_then_since_last_open_returns_no_alerts(

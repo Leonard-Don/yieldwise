@@ -37,6 +37,10 @@ def _load_watchlist() -> list[dict[str, Any]]:
     return items
 
 
+def _save_watchlist(items: list[dict[str, Any]]) -> None:
+    personal_storage.write_json(WATCHLIST_FILE, {"items": items})
+
+
 def _load_state() -> AlertsState:
     raw = personal_storage.read_json(ALERTS_STATE_FILE)
     if raw is None:
@@ -144,6 +148,7 @@ def since_last_open() -> dict[str, Any]:
 def mark_seen() -> dict[str, Any]:
     watchlist_items = _load_watchlist()
     baselines: dict[str, dict[str, Any]] = {}
+    snapshots_by_target: dict[str, dict[str, Any]] = {}
     seen = 0
     for entry in watchlist_items:
         target_id = entry.get("target_id")
@@ -154,12 +159,26 @@ def mark_seen() -> dict[str, Any]:
         if snapshot is None:
             continue
         baselines[target_id] = snapshot
+        snapshots_by_target[target_id] = snapshot
         seen += 1
-    for district_id, snap in _district_snapshots().items():
+    district_snapshots = _district_snapshots()
+    for district_id, snap in district_snapshots.items():
         if snap.get("yield") is None:
             continue
         baselines[district_id] = {"yield": snap.get("yield"), "name": snap.get("name")}
+        snapshots_by_target[district_id] = {"yield": snap.get("yield"), "name": snap.get("name")}
         seen += 1
+    if watchlist_items:
+        changed = False
+        next_items: list[dict[str, Any]] = []
+        for entry in watchlist_items:
+            target_id = entry.get("target_id")
+            if target_id in snapshots_by_target:
+                entry = {**entry, "last_seen_snapshot": snapshots_by_target[target_id]}
+                changed = True
+            next_items.append(entry)
+        if changed:
+            _save_watchlist(next_items)
     state = AlertsState(baselines=baselines, last_open_at=_now())
     personal_storage.write_json(ALERTS_STATE_FILE, state.model_dump())
     return {"items_seen": seen, "last_open_at": state.last_open_at}

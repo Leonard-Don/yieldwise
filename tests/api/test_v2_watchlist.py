@@ -14,7 +14,10 @@ def isolated_personal_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pa
 def test_get_returns_empty_items_when_no_file(client) -> None:
     response = client.get("/api/v2/watchlist")
     assert response.status_code == 200, response.text
-    assert response.json() == {"items": []}
+    assert response.json() == {
+        "items": [],
+        "summary": {"total": 0, "shortlisted": 0, "due": 0, "changed": 0, "ready": 0},
+    }
 
 
 def test_post_adds_entry_with_added_at(client) -> None:
@@ -27,6 +30,10 @@ def test_post_adds_entry_with_added_at(client) -> None:
     assert body["target_id"] == "daning-jinmaofu-b1"
     assert body["target_type"] == "building"
     assert body["added_at"] is not None
+    assert body["status"] == "watching"
+    assert body["priority"] == 3
+    assert body["target_name"]
+    assert body["current_snapshot"]["name"]
     assert body["last_seen_snapshot"] is None
 
     follow = client.get("/api/v2/watchlist").json()
@@ -67,12 +74,49 @@ def test_delete_missing_id_returns_removed_false(client) -> None:
     assert response.json() == {"removed": False}
 
 
+def test_post_accepts_district_target_type(client) -> None:
+    response = client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "pudong", "target_type": "district"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["target_type"] == "district"
+    assert body["current_snapshot"]["name"]
+
+
 def test_post_rejects_invalid_target_type_with_422(client) -> None:
     response = client.post(
         "/api/v2/watchlist",
-        json={"target_id": "x", "target_type": "district"},
+        json={"target_id": "x", "target_type": "listing"},
     )
     assert response.status_code == 422
+
+
+def test_patch_updates_candidate_research_fields(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
+    )
+    response = client.patch(
+        "/api/v2/watchlist/zhangjiang-park-b1",
+        json={
+            "status": "shortlisted",
+            "priority": 1,
+            "thesis": "楼层收益高于小区均值",
+            "target_price_wan": 780,
+            "target_monthly_rent": 22000,
+            "review_due_at": "2026-05-10",
+            "notes": "复核 17 层样本",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "shortlisted"
+    assert body["status_label"] == "候选"
+    assert body["priority"] == 1
+    assert body["target_price_wan"] == 780
+    assert body["candidate_action"]["level"] == "due"
 
 
 def test_post_then_get_preserves_order_oldest_first(client) -> None:

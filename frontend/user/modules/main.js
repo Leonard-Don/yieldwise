@@ -13,6 +13,7 @@ import { initAlerts } from "./alerts.js";
 import { initShortcuts } from "./shortcuts.js";
 import { initSearch } from "./search.js";
 import { initComparison } from "./comparison.js";
+import { initCandidateDesk } from "./candidate-desk.js";
 import { normalizeComparisonItems } from "./comparison-helpers.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
@@ -48,6 +49,7 @@ async function bootstrap(root) {
     watchlist: [],
     annotationsByTarget: {},
     alerts: { items: [], last_open_at: null },
+    candidateDeskOpen: false,
     comparisonItems: persistedComparison,
     helpOpen: false,
     searchOpen: false,
@@ -91,6 +93,7 @@ async function bootstrap(root) {
   initWatchlist({ root, store });
   initAnnotations({ root, store });
   initAlerts({ root, store });
+  initCandidateDesk({ root, store });
   initShortcuts({ root, store });
   initSearch({ root, store });
   initComparison({ root, store, storage: comparisonStorage });
