@@ -73,7 +73,8 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 ## Features
 
 - **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)
-- **Candidate comparison + local memo export** for communities / buildings / districts, including quality risks and next actions
+- **Candidate research loop** for communities / buildings / districts, grouped by due review, target triggers, price/sample changes, evidence gaps, and shortlist state
+- **Candidate comparison + local memo export**, including investment thesis, buy reasons, objections, evidence sources, pending checks, and next actions
 - **OSM + AMAP merged building footprints** with quota-based community matching
 - **Ops refresh center** for dry-running and executing staged reference/import/geo/metrics refresh jobs, with job history, anomaly triage, and geometry QA
 
@@ -90,14 +91,27 @@ Yieldwise keeps the listing path to public-page browser scraping only: no manual
 
 ## Project status
 
-**v0.3** (April 2026) — Beta. Stable:
-- Shanghai-only (no multi-city abstraction; the constants live in `api/config/city.py`)
-- Backend + frontend test suites in place
-- Maintained part-time — expect rough edges, file issues if you hit them
+**v1.0 self-use final** (2026-05-05) — feature development frozen.
+
+This version is intentionally closed as a personal local real-estate research workbench, not a commercial product. The complete self-use loop is:
+
+- Discover opportunities on the map → inspect community / building / floor evidence → add to the candidate desk
+- Set target price, target rent, target yield, and review due dates
+- Track target triggers, price/yield changes, due reviews, evidence gaps, and same-floor sample changes through alerts
+- Run candidate actions: complete review, defer review, shortlist, or reject
+- Export local Markdown decision memos
+- Maintain data quality, public sampling, review queues, and geometry QA from the backstage refresh center
+
+Future work policy:
+
+- No new feature development is planned
+- Only blocking bugs, data-quality issues, or repeated real-use pain points should reopen development
+- Shanghai-only; no multi-city abstraction. City constants live in `api/config/city.py`
+- Backend, frontend, and full-browser regression tests are the closure validation baseline
 
 ## Contributing
 
-Issues, ideas, and PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+The project is now frozen for self-use. Blocking bugs and data-quality issues can still be filed. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

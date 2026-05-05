@@ -1,6 +1,6 @@
 [project]
 name = "yieldwise"
-version = "0.3.0"
+version = "1.0.0"
 description = "Yieldwise · 租知 — 租赁资产投研工作台"
 requires-python = ">=3.13"
 readme = "README.md"
