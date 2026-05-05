@@ -5,7 +5,7 @@
 
 **开源租赁资产分析工作台 —— 把房源画在一张地图上，自动算租售比 / 回本年限 / 出租率。**
 
-[English README](README.md) · [Demo 跑起来](#快速开始) · [背后的实现笔记](docs/internal/legacy-runbook.md)
+[English README](README.md) · [Demo 跑起来](#快速开始) · [浏览器抓取导入说明](docs/internal/import-public-browser-capture.md)
 
 <p align="center">
   <img src="docs/screenshots/atlas-workbench-overview.png" alt="Yieldwise 工作台" width="100%" />
@@ -31,7 +31,7 @@ Yieldwise 是一个**个人级**的房地产分析工具。它会：
 
 中国公开房产数据散在政府开放数据门户、OSM、高德 POI、给机构看的 PDF 报告里。Yieldwise 把开源那部分拼起来。
 
-**不爬数据，不碰合规灰区** —— 只用公开开放数据。
+**不碰登录态、不碰授权数据、不做高频抓取** —— 只用公开开放数据与公开页面浏览器抓取批次。
 
 ## 快速开始
 

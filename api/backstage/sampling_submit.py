@@ -1,9 +1,9 @@
 """
-Public-browser sampling capture submit pipeline.
+Public-browser capture ingestion pipeline.
 
-Extracted from api/backstage/review.py. Owns the heavy submit-capture
-workflow: receives UI capture payloads, parses, merges, runs the
-import + metrics jobs and computes the next-step workflow hint.
+Extracted from api/backstage/review.py. Owns the heavy browser-capture
+workflow: receives capture payloads, parses, merges, runs the import +
+metrics jobs and computes the next-step workflow hint.
 """
 
 from __future__ import annotations

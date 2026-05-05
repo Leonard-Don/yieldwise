@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from api.service import current_community_dataset
+
+
+def _first_decision_target() -> dict:
+    items = current_community_dataset()
+    assert items
+    return items[0]
+
 
 def test_decision_memo_requires_targets(client) -> None:
     response = client.post("/api/v2/decision-memo", json={"targets": []})
@@ -7,11 +15,7 @@ def test_decision_memo_requires_targets(client) -> None:
 
 
 def test_decision_memo_returns_markdown_for_opportunity(client) -> None:
-    opportunities = client.get("/api/v2/opportunities")
-    assert opportunities.status_code == 200, opportunities.text
-    items = opportunities.json()["items"]
-    assert items
-    candidate = items[0]
+    candidate = _first_decision_target()
 
     response = client.post(
         "/api/v2/decision-memo",
@@ -35,8 +39,7 @@ def test_decision_memo_returns_markdown_for_opportunity(client) -> None:
 
 
 def test_decision_memo_reports_missing_targets_when_some_resolve(client) -> None:
-    opportunities = client.get("/api/v2/opportunities").json()["items"]
-    candidate = opportunities[0]
+    candidate = _first_decision_target()
 
     response = client.post(
         "/api/v2/decision-memo",

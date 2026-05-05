@@ -5,7 +5,7 @@
 
 **Open-source workbench for analyzing rental-yield data across Chinese cities — visualize properties on a map, compute yield / payback / occupancy KPIs.**
 
-[中文 README](README.zh.md) · [Live demo](#quick-start) · [How it's built](docs/internal/legacy-runbook.md)
+[中文 README](README.zh.md) · [Live demo](#quick-start) · [Browser capture import](docs/internal/import-public-browser-capture.md)
 
 <p align="center">
   <img src="docs/screenshots/atlas-workbench-overview.png" alt="Yieldwise workbench overview" width="100%" />
@@ -31,7 +31,7 @@ Yieldwise is a personal-scale real-estate analysis tool. It:
 
 Public real-estate data in China is scattered across government open-data portals, OSM, AMAP POIs, and PDF reports priced for institutions. Yieldwise stitches the open-source bits into one place.
 
-No scraping, no compliance grey area — only public open-data sources.
+No login-gated or unauthorized scraping — only public open data and browser-captured public pages.
 
 ## Quick start
 
