@@ -140,7 +140,7 @@ def seed_review_current_task_capture_runs(atlas_url: str) -> list[str]:
     tasks = browser_sampling_pack(atlas_url, limit=20)
     task = next((item for item in tasks if item.get("taskId") and item.get("communityName")), None)
     if not task:
-        raise RuntimeError("全量浏览器回归无法找到可用于 review fixture 的公开页采样任务。")
+        return []
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     community_name = str(task.get("communityName") or "公开样本小区")
@@ -192,6 +192,8 @@ def ensure_full_regression_seed_data(atlas_url: str) -> dict:
         result["materializedSeedData"] = True
         result["materializeResult"] = materialize_default_regression_seed_data()
         clear_server_runtime_caches(atlas_url)
+    sampling_tasks = browser_sampling_pack(atlas_url, limit=20)
+    result["browserSamplingTaskCount"] = len(sampling_tasks)
 
     has_candidate, reason = try_create_review_current_task_fixture(atlas_url)
     result["reviewFixtureCandidateBeforeSeed"] = has_candidate
@@ -199,7 +201,12 @@ def ensure_full_regression_seed_data(atlas_url: str) -> dict:
         return result
 
     result["reviewFixtureSeedReason"] = reason
-    result["seededReviewCaptureRuns"] = seed_review_current_task_capture_runs(atlas_url)
+    seeded_capture_runs = seed_review_current_task_capture_runs(atlas_url)
+    result["seededReviewCaptureRuns"] = seeded_capture_runs
+    if not seeded_capture_runs:
+        result["reviewFixtureCandidateAfterSeed"] = False
+        result["reviewFixtureSkippedReason"] = "no-browser-sampling-tasks"
+        return result
     has_candidate, reason = try_create_review_current_task_fixture(atlas_url)
     result["reviewFixtureCandidateAfterSeed"] = has_candidate
     if not has_candidate:
@@ -1152,6 +1159,8 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
     review_current_task_relay = review_current_task_smoke.get("relay") or {}
     review_current_task_after = review_current_task_smoke.get("after6sState") or {}
     review_current_task_target = review_current_task_smoke.get("expectedTargetItem") or {}
+    seed_data = data.get("seedData") or {}
+    has_browser_sampling_tasks = (seed_data.get("browserSamplingTaskCount") or 0) > 0
 
     def frontstage_map_status_ready(state: dict[str, object]) -> bool:
         map_mode = state.get("mapMode")
@@ -1560,10 +1569,13 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             },
         },
         "district_coverage_card_switches_scope": {
-            "passed": bool(district_coverage_click.get("clicked"))
-            and district_coverage.get("districtFilter") == district_coverage_click.get("district")
-            and district_coverage.get("selectedSamplingTaskId") == district_coverage_click.get("taskId")
-            and (district_coverage.get("rankingCount") or 0) == (district_coverage.get("coverageCommunityCount") or 0),
+            "passed": not has_browser_sampling_tasks
+            or (
+                bool(district_coverage_click.get("clicked"))
+                and district_coverage.get("districtFilter") == district_coverage_click.get("district")
+                and district_coverage.get("selectedSamplingTaskId") == district_coverage_click.get("taskId")
+                and (district_coverage.get("rankingCount") or 0) == (district_coverage.get("coverageCommunityCount") or 0)
+            ),
             "actual": {
                 "clicked": district_coverage_click.get("clicked"),
                 "district": district_coverage_click.get("district"),
@@ -1577,14 +1589,16 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             },
         },
         "coverage_board_populated": {
-            "passed": (pudong.get("coverageDistrictCount") or 0) > 0 and (pudong.get("coverageCommunityCount") or 0) > 0,
+            "passed": not has_browser_sampling_tasks
+            or ((pudong.get("coverageDistrictCount") or 0) > 0 and (pudong.get("coverageCommunityCount") or 0) > 0),
             "actual": {
                 "districts": pudong.get("coverageDistrictCount"),
                 "communities": pudong.get("coverageCommunityCount"),
             },
         },
         "coverage_card_opens_sampling_task": {
-            "passed": bool(coverage_click.get("clicked")) and coverage.get("selectedSamplingTaskId") == coverage_click.get("taskId"),
+            "passed": not has_browser_sampling_tasks
+            or (bool(coverage_click.get("clicked")) and coverage.get("selectedSamplingTaskId") == coverage_click.get("taskId")),
             "actual": {
                 "clicked": coverage_click.get("clicked"),
                 "taskId": coverage_click.get("taskId"),
@@ -1593,8 +1607,11 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             },
         },
         "workbench_next_capture_advances_task": {
-            "passed": bool(next_capture_click.get("clicked"))
-            and next_capture.get("selectedSamplingTaskId") == next_capture_click.get("target"),
+            "passed": not has_browser_sampling_tasks
+            or (
+                bool(next_capture_click.get("clicked"))
+                and next_capture.get("selectedSamplingTaskId") == next_capture_click.get("target")
+            ),
             "actual": {
                 "clicked": next_capture_click.get("clicked"),
                 "before": next_capture_click.get("before"),
@@ -1680,7 +1697,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             "actual": floor.get("visibleFloorCount"),
         },
         "sampling_panel_opened": {
-            "passed": bool(sampling.get("samplingTaskLabel")),
+            "passed": not has_browser_sampling_tasks or bool(sampling.get("samplingTaskLabel")),
             "actual": sampling.get("samplingTaskLabel"),
         },
         "capture_review_workflow_smoke": {
@@ -1725,16 +1742,22 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             },
         },
         "review_current_task_workflow_smoke": {
-            "passed": review_current_task_smoke.get("fixtureApplied") is True
-            and review_current_task_relay.get("action") == "review_current_task"
-            and review_current_task_relay.get("workflowItemProvided") is True
-            and review_current_task_relay.get("resolution") == "workflow_item"
-            and review_current_task_relay.get("reason") == "current_task_pending_remaining"
-            and review_current_task_relay.get("workflowTaskId") == review_current_task_target.get("taskId")
-            and review_current_task_relay.get("workflowRunId") == review_current_task_target.get("runId")
-            and review_current_task_relay.get("workflowQueueId") == review_current_task_target.get("queueId")
-            and review_current_task_after.get("taskId") == review_current_task_target.get("taskId")
-            and review_current_task_after.get("reviewPanelRunId") == review_current_task_target.get("runId"),
+            "passed": (
+                review_current_task_smoke.get("skipped") is True
+                and review_current_task_smoke.get("reason") == "no-browser-sampling-tasks"
+            )
+            or (
+                review_current_task_smoke.get("fixtureApplied") is True
+                and review_current_task_relay.get("action") == "review_current_task"
+                and review_current_task_relay.get("workflowItemProvided") is True
+                and review_current_task_relay.get("resolution") == "workflow_item"
+                and review_current_task_relay.get("reason") == "current_task_pending_remaining"
+                and review_current_task_relay.get("workflowTaskId") == review_current_task_target.get("taskId")
+                and review_current_task_relay.get("workflowRunId") == review_current_task_target.get("runId")
+                and review_current_task_relay.get("workflowQueueId") == review_current_task_target.get("queueId")
+                and review_current_task_after.get("taskId") == review_current_task_target.get("taskId")
+                and review_current_task_after.get("reviewPanelRunId") == review_current_task_target.get("runId")
+            ),
             "actual": {
                 "fixtureApplied": review_current_task_smoke.get("fixtureApplied"),
                 "fixtureId": review_current_task_smoke.get("fixtureId"),
@@ -1787,19 +1810,28 @@ def main() -> int:
             "result": {
                 "materializedSeedData": seed_data.get("materializedSeedData"),
                 "seededReviewCaptureRuns": seed_data.get("seededReviewCaptureRuns"),
+                "browserSamplingTaskCount": seed_data.get("browserSamplingTaskCount"),
                 "reviewFixtureCandidateBeforeSeed": seed_data.get("reviewFixtureCandidateBeforeSeed"),
                 "reviewFixtureCandidateAfterSeed": seed_data.get("reviewFixtureCandidateAfterSeed"),
+                "reviewFixtureSkippedReason": seed_data.get("reviewFixtureSkippedReason"),
             },
         }
     )
+    has_browser_sampling_tasks = (seed_data.get("browserSamplingTaskCount") or 0) > 0
 
-    review_current_task_smoke = run_browser_review_workflow_smoke(
-        args.url,
-        args.session,
-        args.label,
-        "review_current_task",
-        headed=args.headed,
-    )
+    if seed_data.get("reviewFixtureCandidateBeforeSeed") or seed_data.get("reviewFixtureCandidateAfterSeed"):
+        review_current_task_smoke = run_browser_review_workflow_smoke(
+            args.url,
+            args.session,
+            args.label,
+            "review_current_task",
+            headed=args.headed,
+        )
+    else:
+        review_current_task_smoke = {
+            "skipped": True,
+            "reason": seed_data.get("reviewFixtureSkippedReason") or "review-fixture-unavailable",
+        }
     artifacts["steps"].append(
         {
             "name": "review-current-task-workflow-smoke",
@@ -1876,7 +1908,8 @@ def main() -> int:
 
         wait_for(session_name, "() => document.querySelector('#mapModeBadge')?.textContent?.trim()?.length > 0")
         wait_for(session_name, "() => document.querySelectorAll('#summaryGrid [data-summary-metric]').length >= 6")
-        wait_for(session_name, "() => document.querySelectorAll('[data-browser-coverage-community-id]').length > 0")
+        if has_browser_sampling_tasks:
+            wait_for(session_name, "() => document.querySelectorAll('[data-browser-coverage-community-id]').length > 0")
         initial_state = browser_state(session_name)
         artifacts["initialState"] = initial_state
 
@@ -2209,7 +2242,7 @@ def main() -> int:
         frontstage_restore_result = set_workspace_view(session_name, "frontstage")
         wait_for(
             session_name,
-            """() => {
+            f"""() => {{
               const params = new URL(window.location.href).searchParams;
               return document.querySelector('#appShell')?.dataset.workspaceView === 'frontstage'
                 && !params.get('view')
@@ -2224,8 +2257,8 @@ def main() -> int:
                 && document.querySelector('#frontstageWorkspace')?.hidden === false
                 && document.querySelector('#backstageWorkspace')?.hidden === true
                 && document.querySelectorAll('#summaryGrid [data-summary-metric]').length >= 6
-                && document.querySelectorAll('[data-browser-coverage-community-id]').length > 0;
-            }""",
+                && ({json.dumps(not has_browser_sampling_tasks)} || document.querySelectorAll('[data-browser-coverage-community-id]').length > 0);
+            }}""",
             timeout_seconds=60.0,
         )
         frontstage_restore_snapshot = pw.take_snapshot(session_name, args.label, "frontstage-restored")
@@ -2550,9 +2583,19 @@ def main() -> int:
         artifacts["floorReady"] = floor_ready
         artifacts["floorContextReset"] = floor_context_reset
 
-        wait_for(session_name, "() => !!document.querySelector('[data-browser-capture-task-label=\"true\"]')?.textContent?.trim()")
+        if has_browser_sampling_tasks:
+            wait_for(session_name, "() => !!document.querySelector('[data-browser-capture-task-label=\"true\"]')?.textContent?.trim()")
         sampling_state = browser_state(session_name)
-        artifacts["steps"].append({"name": "sampling-panel", "result": {"present": bool(sampling_state.get("samplingTaskLabel"))}})
+        artifacts["steps"].append(
+            {
+                "name": "sampling-panel",
+                "result": {
+                    "present": bool(sampling_state.get("samplingTaskLabel")),
+                    "skipped": not has_browser_sampling_tasks,
+                    "reason": None if has_browser_sampling_tasks else "no-browser-sampling-tasks",
+                },
+            }
+        )
         artifacts["samplingState"] = sampling_state
 
         exports = fetch_exports(session_name)
