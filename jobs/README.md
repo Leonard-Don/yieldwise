@@ -39,36 +39,36 @@ python3 jobs/import_reference_dictionary.py \
 - `summary.json`
 - `manifest.json`
 
-## 2. 授权导入任务
+## 2. 浏览器抓取导入任务
 
-`jobs/import_authorized_listings.py`
+`jobs/import_browser_scraped_listings.py`
 
 用途：
 
-- 导入授权导出的出售 / 出租 `CSV`
+- 导入浏览器抓取产出的出售 / 出租 `CSV`
 - 统一到 `district -> resblock -> building -> unit -> floor`
 - 产出地址标准化队列、楼层配对和逐层证据
 
 运行示例：
 
 ```bash
-python3 jobs/import_authorized_listings.py \
-  --provider-id authorized-import \
-  --batch-name "pudong-demo-2026-04-11" \
-  --sale-file data/templates/authorized_sale_template.csv \
-  --rent-file data/templates/authorized_rent_template.csv \
-  --output-dir tmp/import-runs/pudong-demo-2026-04-11
+python3 jobs/import_browser_scraped_listings.py \
+  --provider-id public-browser-sampling \
+  --batch-name "public-browser-sampling-2026-04-14" \
+  --sale-file data/public-snapshot/2026-04-12/public_browser_sampling_sale.csv \
+  --rent-file data/public-snapshot/2026-04-12/public_browser_sampling_rent.csv \
+  --output-dir tmp/import-runs/public-browser-sampling-2026-04-14
 ```
 
-跨批次对比演示样本：
+跨批次对比演示样本可以继续使用另一份浏览器抓取结果：
 
 ```bash
-python3 jobs/import_authorized_listings.py \
-  --provider-id authorized-import \
-  --batch-name "pudong-demo-2026-04-12" \
-  --sale-file data/demo/authorized_sale_demo_2026-04-12.csv \
-  --rent-file data/demo/authorized_rent_demo_2026-04-12.csv \
-  --output-dir tmp/import-runs/pudong-demo-2026-04-12
+python3 jobs/import_browser_scraped_listings.py \
+  --provider-id public-browser-sampling \
+  --batch-name "public-browser-sampling-2026-04-15" \
+  --sale-file path/to/public_browser_sampling_sale.csv \
+  --rent-file path/to/public_browser_sampling_rent.csv \
+  --output-dir tmp/import-runs/public-browser-sampling-2026-04-15
 ```
 
 输出：
@@ -88,7 +88,7 @@ python3 jobs/import_authorized_listings.py \
 
 用途：
 
-- 导入一批授权导出的楼栋 footprint `GeoJSON`
+- 导入一批开放地图或 AOI 产出的楼栋 footprint `GeoJSON`
 - 把 feature 归一到 `district -> community -> building`
 - 产出几何批次 manifest、标准化 footprint 和未命中清单
 
@@ -172,7 +172,7 @@ python3 jobs/load_geo_asset_run_to_postgres.py \
 
 用途：
 
-- 读取某个授权导入批次的 `manifest.json`
+- 读取某个浏览器抓取导入批次的 `manifest.json`
 - 把 `listings_*`、`address_resolution_queue`、`floor_evidence_*` 写入 PostgreSQL
 - 在需要时顺手执行 `db/schema.sql`
 
@@ -241,7 +241,7 @@ python3 jobs/refresh_metrics.py \
 
 - 把 `reference -> anchor enrichment -> listing import -> geometry import -> metrics refresh` 收口成一条本地 staging 管线
 - 适合不接 Docker / PostgreSQL 时，先把研究面按天更新出来
-- 默认读取 `data/public-snapshot/...` 目录里的主档、公开采样和手工几何文件
+- 默认读取 `data/public-snapshot/...` 目录里的主档、公开页抓取和几何文件
 
 运行示例：
 
@@ -255,12 +255,12 @@ python3 jobs/materialize_public_snapshot.py \
 
 - 一批最新 reference run
 - 一批最新 public-browser-sampling import run
-- 一批最新 manual-geometry-staging geo run
+- 一批最新 amap-aoi-poi geo run
 - 一批最新 staged metrics run
 
-如果某次只想更新 listing / metrics，可以继续单独跑 `jobs/import_authorized_listings.py` 和 `jobs/refresh_metrics.py`。
+如果某次只想更新 listing / metrics，可以继续单独跑 `jobs/import_browser_scraped_listings.py` 和 `jobs/refresh_metrics.py`。
 
-如果你这次拿到的是浏览器人工采样的 capture CSV，也可以直接加：
+如果你这次拿到的是浏览器抓取的 capture CSV，也可以直接加：
 
 ```bash
 python3 jobs/materialize_public_snapshot.py \
@@ -271,7 +271,7 @@ python3 jobs/materialize_public_snapshot.py \
 
 它会先调用 `jobs/import_public_browser_capture.py`，把 capture CSV 自动拆成标准 `sale/rent CSV`，再继续并进整套 staged 物化。
 
-单独跑人工采样导入：
+单独跑浏览器抓取导入：
 
 ```bash
 python3 jobs/import_public_browser_capture.py \
@@ -309,6 +309,6 @@ python3 jobs/bootstrap_local_postgres.py \
 
 1. 优先先跑 reference dictionary，让数据库主档替代 demo 词典。
 2. 默认不再依赖 mock；只有显式设置 `ATLAS_ENABLE_DEMO_MOCK=true` 时，脚手架才允许吃 demo catalog。
-3. 把 PostgreSQL 写入接成正式调度任务，而不是手工触发。
+3. 把 PostgreSQL 写入接成正式调度任务，而不是临时触发。
 4. 给几何缺口任务补“坐标系校正 / 质量评分 / GIS 回传”字段。
-5. 增加批次基线选择、人工复核闭环和异常值过滤。
+5. 增加批次基线选择、复核闭环和异常值过滤。

@@ -1604,8 +1604,6 @@ def build_floor_curve(
 
 
 def source_name_by_id(source_id: str) -> str:
-    if source_id == "authorized-manual":
-        return "授权手工样本"
     for source in DATA_SOURCES:
         if source["id"] == source_id:
             return source["name"]
@@ -3084,7 +3082,7 @@ def build_import_resolution_trace(
     review_detail = queue_items[0]["reviewHint"] if queue_items else "当前批次没有单独挂起的地址项，但配对结果已落到逐层证据。"
     return [
         {
-            "step": "授权导入",
+            "step": "浏览器抓取导入",
             "status": "done",
             "detail": f"批次 {run_summary['batchName']} 已把 {pair_count} 组出售 / 出租样本落到 {building['name']} {floor_item['floorNo']} 层。",
         },

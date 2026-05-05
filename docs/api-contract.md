@@ -178,18 +178,7 @@
 }
 ```
 
-2. 手工覆盖
-
-```json
-{
-  "action": "manual_override",
-  "center_lng": 121.588979,
-  "center_lat": 31.261385,
-  "anchor_source_label": "manual_override_gcj02",
-  "review_note": "已在高德地图上人工核验。",
-  "alias_hint": "碧云新天地家园"
-}
-```
+手工覆盖入口已移除；如果没有可靠候选，需要补充开放数据或浏览器抓取批次后再确认。
 
 响应会带：
 
@@ -325,7 +314,7 @@
 
 ### `GET /api/import-runs`
 
-返回当前工作区 `tmp/` 下可发现的授权导入批次列表。
+返回当前工作区 `tmp/` 下可发现的浏览器抓取导入批次列表。
 
 说明：
 
@@ -410,7 +399,7 @@
 
 ### `GET /api/browser-sampling-pack`
 
-返回当前筛选窗口下最值得继续补的公开页面人工采样任务包。
+返回当前筛选窗口下最值得继续补的公开页面浏览器抓取任务包。
 
 查询参数：
 
@@ -450,14 +439,14 @@
 
 返回体还会附带：
 
-- `recentCaptures`: 最近几次公开页采样 run
+- `recentCaptures`: 最近几次公开页浏览器抓取 run
 - `summary.capturedTaskCount`
 - `summary.attentionTaskCount`
 - `summary.latestCaptureAt`
 
 ### `GET /api/browser-capture-runs`
 
-返回最近的公开页面采样 run 历史。
+返回最近的公开页面浏览器抓取 run 历史。
 
 查询参数：
 
@@ -480,7 +469,7 @@
 
 ### `GET /api/browser-capture-runs/{run_id}`
 
-返回单个公开页面采样 run 的完整详情。
+返回单个公开页面浏览器抓取 run 的完整详情。
 
 至少包含：
 
@@ -506,7 +495,7 @@
 
 ### `POST /api/browser-sampling-captures`
 
-把人工从公开页面复制下来的 `sale / rent raw_text` 直接写成一批新的 staged 采样输入，并自动：
+把浏览器抓取器产出的 `sale / rent raw_text` 写成一批新的 staged 抓取输入，并自动：
 
 - 合并到最新 `public-browser-sampling` 基线批次
 - 生成新的 import run
@@ -938,7 +927,7 @@
 
 ### `GET /api/import-runs/{run_id}`
 
-返回单个授权导入批次的详情，包括：
+返回单个浏览器抓取导入批次的详情，包括：
 
 - `reviewQueue`
 - `reviewHistoryCount`
@@ -981,7 +970,7 @@
 
 ### `POST /api/import-runs/{run_id}/persist`
 
-把某个授权导入批次整体写入 PostgreSQL。
+把某个浏览器抓取导入批次整体写入 PostgreSQL。
 
 请求体：
 
@@ -1279,7 +1268,7 @@
 
 ### `GET /api/export/browser-sampling-pack.csv`
 
-按当前行政区和筛选窗口导出“公开页面采样任务包” CSV，适合直接作为当天人工采样清单。
+按当前行政区和筛选窗口导出“公开页面浏览器抓取任务包” CSV，适合直接作为当天抓取清单。
 
 字段包含：
 

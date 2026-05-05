@@ -198,7 +198,7 @@ def main() -> int:
         print(f"  raw={len(elems):>5}  kept={kept:>5}")
         time.sleep(args.pause_ms / 1000)
 
-    # Write the geometry_batch outputs (matching shape of manual-geometry-staging runs)
+    # Write the geometry_batch outputs used by the geo-asset review pipeline.
     geojson = {
         "type": "FeatureCollection",
         "name": f"{run_slug}-building-footprints",

@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
     external_run_id TEXT NOT NULL UNIQUE,
     provider_id TEXT REFERENCES source_providers(provider_id),
     batch_name TEXT NOT NULL,
-    acquisition_mode TEXT NOT NULL DEFAULT 'authorized_import',
+    acquisition_mode TEXT NOT NULL DEFAULT 'browser_scrape',
     business_scope TEXT NOT NULL DEFAULT 'sale_rent',
     status TEXT NOT NULL DEFAULT 'completed',
     sale_input_file TEXT,

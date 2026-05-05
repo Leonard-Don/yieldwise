@@ -377,7 +377,7 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> 
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Convert manually captured public browser notes into sale/rent staging CSVs, then optionally run the standard import pipeline.")
+    parser = argparse.ArgumentParser(description="Convert browser-scraped public page captures into sale/rent staging CSVs, then optionally run the standard import pipeline.")
     parser.add_argument("--provider-id", default="public-browser-sampling")
     parser.add_argument("--batch-name", required=True)
     parser.add_argument("--capture-file", required=True, type=Path)
@@ -429,7 +429,7 @@ def main() -> None:
         completed = subprocess.run(
             [
                 sys.executable,
-                str(ROOT_DIR / "jobs" / "import_authorized_listings.py"),
+                str(ROOT_DIR / "jobs" / "import_browser_scraped_listings.py"),
                 "--provider-id",
                 provider_id,
                 "--batch-name",

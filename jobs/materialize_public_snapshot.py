@@ -148,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--snapshot-date", default=date.today().isoformat())
     parser.add_argument("--reference-batch-name", default="shanghai-citywide-reference-2026-04-14")
     parser.add_argument("--import-batch-name", default="public-browser-sampling-2026-04-14")
-    parser.add_argument("--geo-batch-name", default="manual-priority-geometry-2026-04-14")
+    parser.add_argument("--geo-batch-name", default="amap-aoi-poi-geometry-2026-04-14")
     parser.add_argument("--metrics-batch-name", default="staged-metrics-2026-04-14")
     parser.add_argument("--pause-ms", type=int, default=60)
     parser.add_argument("--enriched-community-file", type=Path, default=None)
@@ -170,7 +170,7 @@ def main() -> None:
     building_file = snapshot_dir / "building_dictionary_seed.csv"
     sale_file = snapshot_dir / "public_browser_sampling_sale.csv"
     rent_file = snapshot_dir / "public_browser_sampling_rent.csv"
-    geojson_file = snapshot_dir / "manual_priority_building_footprints.geojson"
+    geojson_file = snapshot_dir / "building_footprints.geojson"
 
     reference_dir = ROOT_DIR / "tmp" / "reference-runs" / args.reference_batch_name
     import_dir = ROOT_DIR / "tmp" / "import-runs" / args.import_batch_name
@@ -277,7 +277,7 @@ def main() -> None:
         import_result = run_json_command(
             [
                 sys.executable,
-                "jobs/import_authorized_listings.py",
+                "jobs/import_browser_scraped_listings.py",
                 "--provider-id",
                 "public-browser-sampling",
                 "--batch-name",
@@ -299,7 +299,7 @@ def main() -> None:
                 sys.executable,
                 "jobs/import_geo_assets.py",
                 "--provider-id",
-                "manual-geometry-staging",
+                "amap-aoi-poi",
                 "--batch-name",
                 args.geo_batch_name,
                 "--geojson-file",

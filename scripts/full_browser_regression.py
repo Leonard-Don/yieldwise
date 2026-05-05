@@ -368,6 +368,7 @@ def browser_state(session: str) -> dict:
             reviewPanelRunId: reviewPanel?.dataset.browserReviewCurrentRunId || null,
             reviewPanelPendingCount: Number(reviewPanel?.dataset.browserReviewCurrentPendingCount || 0),
             attentionFillCount: document.querySelectorAll('[data-browser-capture-fill-from-attention]').length,
+            manualEntryControlCount: document.querySelectorAll('[data-browser-capture-field], [data-browser-capture-submit], [data-browser-capture-reset], [data-browser-capture-fill-from-attention]').length,
             reviewInboxCount: Number(reviewInbox?.dataset.browserReviewInboxCount || 0),
             reviewInboxVisibleCount: document.querySelectorAll('[data-browser-review-inbox-item-id]').length,
             reviewInboxActiveItemId: document.querySelector('[data-browser-review-inbox-item-id].is-active')?.dataset.browserReviewInboxItemId || null,
@@ -1609,7 +1610,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
                 and next_review.get("selectedSamplingTaskId") == next_review_click.get("target")
                 and bool(next_review.get("reviewPanelRunId"))
                 and (next_review.get("reviewPanelPendingCount") or 0) > 0
-                and (next_review.get("attentionFillCount") or 0) > 0
+                and (next_review.get("manualEntryControlCount") or 0) == 0
                 and (next_review.get("reviewInboxVisibleCount") or 0) > 0
             ),
             "actual": {
@@ -1623,6 +1624,7 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
                 "reviewInboxVisibleCount": next_review.get("reviewInboxVisibleCount"),
                 "reviewInboxActiveItemId": next_review.get("reviewInboxActiveItemId"),
                 "attentionFillCount": next_review.get("attentionFillCount"),
+                "manualEntryControlCount": next_review.get("manualEntryControlCount"),
                 "samplingTaskLabel": next_review.get("samplingTaskLabel"),
             },
         },
@@ -1682,14 +1684,13 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             "actual": sampling.get("samplingTaskLabel"),
         },
         "capture_review_workflow_smoke": {
-            "passed": capture_review_relay.get("action") == "review_current_capture"
-            and capture_review_relay.get("workflowTaskProvided") is True
-            and capture_review_relay.get("resolution") == "workflow_task"
-            and capture_review_relay.get("workflowTaskId") == capture_review_relay.get("taskId")
-            and capture_review_after.get("taskId") == capture_review_smoke.get("task", {}).get("taskId")
-            and capture_review_after.get("currentTaskRecentRun", {}).get("captureRunId") == capture_review_dom.get("captureRunId")
-            and capture_review_after.get("recentRun", {}).get("captureRunId") == capture_review_dom.get("captureRunId"),
+            "passed": capture_review_smoke.get("skipped") is True
+            and capture_review_smoke.get("reason") == "manual_capture_removed"
+            and (sampling.get("manualEntryControlCount") or 0) == 0,
             "actual": {
+                "skipped": capture_review_smoke.get("skipped"),
+                "reason": capture_review_smoke.get("reason"),
+                "manualEntryControlCount": sampling.get("manualEntryControlCount"),
                 "selectedTaskId": capture_review_smoke.get("selectedTask", {}).get("taskId"),
                 "resultCaptureRunId": capture_review_dom.get("captureRunId"),
                 "relayAction": capture_review_relay.get("action"),
@@ -1703,14 +1704,13 @@ def build_assertions(data: dict[str, object]) -> dict[str, dict[str, object]]:
             },
         },
         "capture_advance_workflow_smoke": {
-            "passed": capture_advance_relay.get("action") == "advance_next_capture"
-            and capture_advance_relay.get("workflowTaskProvided") is True
-            and capture_advance_relay.get("resolution") == "workflow_task"
-            and capture_advance_relay.get("workflowTaskId") == capture_advance_relay.get("taskId")
-            and capture_advance_after.get("taskId") == capture_advance_relay.get("taskId")
-            and capture_advance_after.get("taskId") != capture_advance_smoke.get("task", {}).get("taskId")
-            and capture_advance_after.get("recentRun", {}).get("captureRunId") == capture_advance_dom.get("captureRunId"),
+            "passed": capture_advance_smoke.get("skipped") is True
+            and capture_advance_smoke.get("reason") == "manual_capture_removed"
+            and (sampling.get("manualEntryControlCount") or 0) == 0,
             "actual": {
+                "skipped": capture_advance_smoke.get("skipped"),
+                "reason": capture_advance_smoke.get("reason"),
+                "manualEntryControlCount": sampling.get("manualEntryControlCount"),
                 "selectedTaskId": capture_advance_smoke.get("selectedTask", {}).get("taskId"),
                 "sourceTaskId": capture_advance_smoke.get("task", {}).get("taskId"),
                 "resultCaptureRunId": capture_advance_dom.get("captureRunId"),
@@ -2557,42 +2557,19 @@ def main() -> int:
 
         exports = fetch_exports(session_name)
         artifacts["exports"] = exports
-        capture_review_smoke = run_browser_capture_workflow_smoke(
-            args.url,
-            session_name,
-            args.label,
-            "review_current_capture",
-            headed=args.headed,
-        )
+        capture_review_smoke = {"skipped": True, "reason": "manual_capture_removed"}
         artifacts["steps"].append(
             {
                 "name": "capture-review-workflow-smoke",
-                "result": {
-                    "taskId": capture_review_smoke.get("selectedTask", {}).get("taskId"),
-                    "captureRunId": capture_review_smoke.get("domResult", {}).get("captureRunId"),
-                    "relayAction": capture_review_smoke.get("relay", {}).get("action"),
-                    "relayReason": capture_review_smoke.get("relay", {}).get("reason"),
-                },
+                "result": capture_review_smoke,
             }
         )
         artifacts["captureReviewWorkflowSmoke"] = capture_review_smoke
-        capture_advance_smoke = run_browser_capture_workflow_smoke(
-            args.url,
-            session_name,
-            args.label,
-            "advance_next_capture",
-            headed=args.headed,
-        )
+        capture_advance_smoke = {"skipped": True, "reason": "manual_capture_removed"}
         artifacts["steps"].append(
             {
                 "name": "capture-advance-workflow-smoke",
-                "result": {
-                    "taskId": capture_advance_smoke.get("selectedTask", {}).get("taskId"),
-                    "captureRunId": capture_advance_smoke.get("domResult", {}).get("captureRunId"),
-                    "relayAction": capture_advance_smoke.get("relay", {}).get("action"),
-                    "relayReason": capture_advance_smoke.get("relay", {}).get("reason"),
-                    "relayTaskId": capture_advance_smoke.get("relay", {}).get("taskId"),
-                },
+                "result": capture_advance_smoke,
             }
         )
         artifacts["captureAdvanceWorkflowSmoke"] = capture_advance_smoke

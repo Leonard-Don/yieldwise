@@ -159,7 +159,7 @@ npx serve .
 现在工作台已经支持在 `小区锚点待补榜` 中直接做两件事：
 
 - `确认当前候选`：把当前预锚点写回最新 reference run
-- `手工覆盖坐标`：直接录入 `GCJ-02` 坐标并写回主档
+- 如果候选不足，先补充开放地图或浏览器抓取批次，再回到候选确认
 
 写回会同步更新：
 
@@ -184,20 +184,20 @@ AMAP_SECURITY_JSCODE=your_amap_security_js_code
 POSTGRES_DSN=postgresql://atlas:atlas_local_dev@127.0.0.1:5432/shanghai_yield_atlas
 ```
 
-## 如何跑授权导入演示
+## 如何跑浏览器抓取导入演示
 
-如果你已经拿到一批授权导出的出售 / 出租 `CSV`，或者只是先用模板试跑，可以直接执行：
+如果你已经拿到一批浏览器抓取产出的出售 / 出租 `CSV`，可以直接执行：
 
 ```bash
-python3 jobs/import_authorized_listings.py \
-  --provider-id authorized-import \
-  --batch-name "pudong-demo-2026-04-11" \
-  --sale-file data/templates/authorized_sale_template.csv \
-  --rent-file data/templates/authorized_rent_template.csv \
-  --output-dir tmp/import-runs/pudong-demo-2026-04-11
+python3 jobs/import_browser_scraped_listings.py \
+  --provider-id public-browser-sampling \
+  --batch-name "public-browser-sampling-2026-04-14" \
+  --sale-file data/public-snapshot/2026-04-12/public_browser_sampling_sale.csv \
+  --rent-file data/public-snapshot/2026-04-12/public_browser_sampling_rent.csv \
+  --output-dir tmp/import-runs/public-browser-sampling-2026-04-14
 ```
 
-字段模板和输出说明见 `docs/import-authorized-data.md`。
+抓取输入说明见 `docs/internal/import-public-browser-capture.md`。
 
 ## 如何跑 reference dictionary 导入
 
@@ -290,7 +290,7 @@ python3 jobs/import_reference_dictionary.py \
     - `python3 -m compileall api jobs scripts`
     - `node --check frontend/backstage/app.js`
 - `.github/ISSUE_TEMPLATE/public-sampling-task.yml`
-  - 用来派发公开页人工采样任务
+  - 用来派发公开页浏览器抓取任务
 - `.github/ISSUE_TEMPLATE/bug-report.yml`
   - 用来记录页面、导入链和地图联动问题
 
@@ -316,12 +316,12 @@ python3 jobs/materialize_public_snapshot.py \
 1. reference dictionary
 2. community anchor enrichment
 3. public-browser-sampling listing import
-4. manual geometry staging import
+4. amap-aoi-poi geometry enrichment
 5. metrics run refresh
 
 的顺序把 staging 研究面全部更新一遍。
 
-如果你这次拿到的是浏览器人工采样的 capture CSV，也可以直接并进这条链：
+如果你这次拿到的是公开页浏览器抓取的 capture CSV，也可以直接并进这条链：
 
 ```bash
 python3 jobs/materialize_public_snapshot.py \
@@ -335,7 +335,7 @@ python3 jobs/materialize_public_snapshot.py \
 如果手头还没有正式 API，只想先用公开页面做 staging 补洞，可以走 `public-browser-sampling`：
 
 ```bash
-python3 jobs/import_authorized_listings.py \
+python3 jobs/import_browser_scraped_listings.py \
   --provider-id public-browser-sampling \
   --batch-name "public-browser-sampling-2026-04-12" \
   --sale-file data/public-snapshot/2026-04-12/public_browser_sampling_sale.csv \
@@ -438,17 +438,17 @@ curl "http://127.0.0.1:8000/api/export/browser-sampling-pack.csv"
 如果你想直接看“昨天 vs 今天”的批次变化，还可以再跑一组第二天样本：
 
 ```bash
-python3 jobs/import_authorized_listings.py \
-  --provider-id authorized-import \
-  --batch-name "pudong-demo-2026-04-12" \
-  --sale-file data/demo/authorized_sale_demo_2026-04-12.csv \
-  --rent-file data/demo/authorized_rent_demo_2026-04-12.csv \
-  --output-dir tmp/import-runs/pudong-demo-2026-04-12
+python3 jobs/import_browser_scraped_listings.py \
+  --provider-id public-browser-sampling \
+  --batch-name "public-browser-sampling-2026-04-15" \
+  --sale-file path/to/public_browser_sampling_sale.csv \
+  --rent-file path/to/public_browser_sampling_rent.csv \
+  --output-dir tmp/import-runs/public-browser-sampling-2026-04-15
 ```
 
 跑完后，工作台里的导入批次详情会自动出现“相对基线批次的变化”区块，你也可以手动切到更老的批次做窗口比较。
 
-如果你已经拿到一批授权导出的楼栋 footprint `GeoJSON`，还可以把空间几何单独导入：
+如果你已经拿到一批开放地图或 AOI 产出的楼栋 footprint `GeoJSON`，还可以把空间几何单独导入：
 
 ```bash
 python3 jobs/import_geo_assets.py \
@@ -459,16 +459,6 @@ python3 jobs/import_geo_assets.py \
 ```
 
 导入后，楼栋 / 楼层地图会优先读取这批 footprint；如果某些楼栋还没有几何资产，前端会自动回退到本地推导几何。
-
-如果是研究阶段自己手工勾绘的一批重点区楼栋 footprint，则建议走 `manual-geometry-staging`：
-
-```bash
-python3 jobs/import_geo_assets.py \
-  --provider-id manual-geometry-staging \
-  --batch-name "manual-priority-geometry-2026-04-14" \
-  --geojson-file data/public-snapshot/2026-04-12/manual_priority_building_footprints.geojson \
-  --output-dir tmp/geo-assets/manual-priority-geometry-2026-04-14
-```
 
 这样工作台里会明确把它标成 staging 几何，而不是伪装成官方 AOI。
 现在工作台里还能直接切换不同几何批次，查看该批次的目录覆盖率、缺口楼栋和未命中 feature；导出的楼层榜 `GeoJSON / KML` 也会跟着携带当前 `geo_run_id`。
@@ -523,22 +513,21 @@ python3 jobs/load_import_run_to_postgres.py \
 - `api/provider_adapters.py`：本地数据源清单、批次契约和就绪规则
 - `api/reference_catalog.py`：数据库 / 文件 / mock 三层 reference catalog 读取
 - `api/service.py`：数据库优先的领域查询、小区 / 楼栋 / 楼层证据明细、批次复核回写、几何任务回写、几何基线对比和 GeoJSON / KML 生成逻辑
-- `api/persistence.py`：授权批次、几何批次和 reference dictionary 写入 PostgreSQL 的持久化层
+- `api/persistence.py`：浏览器抓取批次、几何批次和 reference dictionary 写入 PostgreSQL 的持久化层
 - `db/schema.sql`：PostgreSQL + PostGIS 建表稿
 - `docs/api-contract.md`：接口说明
-- `docs/import-authorized-data.md`：授权导入字段模板与批次说明
+- `docs/internal/import-public-browser-capture.md`：浏览器抓取字段与批次说明
 - `docs/import-reference-dictionary.md`：reference dictionary 导入说明
 - `docs/strategy.md`：地图 / 数据 / 坐标 / 地址标准化策略
-- `data/templates/`：授权出售 / 出租 CSV 模板
 - `data/templates/*dictionary_template.csv`：district / community / building 主档模板
 - `data/demo/`：用于跨批次对比演示的第二批样本
 - `data/demo/building_footprints_demo_previous.geojson`：几何批次基线对比样本
-- `jobs/import_authorized_listings.py`：授权导入、地址标准化和楼层配对脚手架
+- `jobs/import_browser_scraped_listings.py`：浏览器抓取导入、地址标准化和楼层配对脚手架
 - `jobs/import_reference_dictionary.py`：district / community / building 主档导入脚手架
 - `jobs/enrich_community_anchors.py`：用高德 Web 服务给小区主档补真实锚点
-- `jobs/import_geo_assets.py`：授权 `GeoJSON` 几何批次导入脚手架
+- `jobs/import_geo_assets.py`：开放地图 / AOI `GeoJSON` 几何批次导入脚手架
 - `jobs/load_geo_asset_run_to_postgres.py`：把几何批次、缺口任务和任务历史写入 PostgreSQL
-- `jobs/load_import_run_to_postgres.py`：把授权批次和逐层证据写入 PostgreSQL
+- `jobs/load_import_run_to_postgres.py`：把浏览器抓取批次和逐层证据写入 PostgreSQL
 - `jobs/load_reference_dictionary_to_postgres.py`：把 reference dictionary 批次写入 PostgreSQL
 - `jobs/refresh_metrics.py`：指标快照任务脚手架
 - `.env.example`：高德地图与本地辅助任务的环境变量模板
@@ -550,13 +539,13 @@ python3 jobs/load_import_run_to_postgres.py \
 ## 下一步怎么接真实项目
 
 1. 先用 `jobs/import_reference_dictionary.py` 把上海行政区 / 小区 / 楼栋主档落进 PostgreSQL。
-2. 再用 `docs/import-authorized-data.md` 的模板接一批真实授权 listing 数据，跑通地址标准化和楼层证据。
+2. 再用 `docs/internal/import-public-browser-capture.md` 接一批浏览器抓取 listing 数据，跑通地址标准化和楼层证据。
 3. 用 `jobs/load_import_run_to_postgres.py` 把 listing 批次落进 PostgreSQL。
 4. 用 `jobs/import_geo_assets.py` 和 `jobs/load_geo_asset_run_to_postgres.py` 逐步补齐楼栋 footprint。
 5. 继续提升真实底图质量，把重点区楼栋 footprint 与公开页采样证据做得更厚。
 6. 用楼层榜导出按钮把当前批次 / 基线窗口导出成 `KML` 或 `GeoJSON`，给内部分析或 Google Earth 巡检使用。
 7. 把 `jobs/refresh_metrics.py` 改成真实定时任务，并接上数据库写入。
-8. 保持离线导入和手工公开样本路线；不把本地工作台升级成外部平台自动拉取器。
+8. 保持离线导入和浏览器公开页抓取路线；不把本地工作台升级成外部平台自动拉取器。
 
 ## 建议的后续拆分
 

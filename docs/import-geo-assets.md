@@ -1,12 +1,12 @@
 # Geo Assets Import Flow
 
-这份说明固定了“授权导出的楼栋 footprint / AOI `GeoJSON`”接入当前 MVP 的最短路径。
+这份说明固定了开放地图或 AOI `GeoJSON` 接入当前 MVP 的最短路径。
 
 ## 适用场景
 
 - 高德 AOI / POI 批量导出后的再整理结果
-- 第三方授权提供的楼栋 footprint `GeoJSON`
-- 内部人工勾绘或 GIS 同事导出的楼栋多边形
+- 开放地图或 AOI 产出的楼栋 footprint `GeoJSON`
+- GIS 工具整理后的楼栋多边形
 
 ## 输入格式
 

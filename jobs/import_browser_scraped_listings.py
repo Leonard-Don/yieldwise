@@ -566,13 +566,13 @@ def build_manifest(
     pair_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
     timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-    run_slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", (batch_name or "authorized-import").strip()).strip("-").lower()
+    run_slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", (batch_name or "public-browser-sampling").strip()).strip("-").lower()
     return {
         "run_id": f"{run_slug}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
         "provider_id": provider_id,
         "adapter_scope": "sale_rent_batch",
         "adapter_contract": adapter_contract("sale_rent_batch"),
-        "batch_name": batch_name or "authorized-import",
+        "batch_name": batch_name or "public-browser-sampling",
         "created_at": timestamp,
         "inputs": {
             "sale_file": str(sale_file) if sale_file else None,
@@ -594,11 +594,11 @@ def build_manifest(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import authorized sale/rent listing CSV files into normalized MVP payloads.")
+    parser = argparse.ArgumentParser(description="Import browser-scraped sale/rent listing CSV files into normalized MVP payloads.")
     parser.add_argument("--sale-file", type=Path, help="CSV file for sale listings.")
     parser.add_argument("--rent-file", type=Path, help="CSV file for rent listings.")
     parser.add_argument("--output-dir", type=Path, required=True, help="Directory where normalized outputs will be written.")
-    parser.add_argument("--provider-id", default="authorized-import", help="Data source id for the import run.")
+    parser.add_argument("--provider-id", default="public-browser-sampling", help="Data source id for the import run.")
     parser.add_argument("--batch-name", help="Optional human-readable batch name.")
     args = parser.parse_args()
 

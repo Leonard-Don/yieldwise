@@ -1,6 +1,0 @@
-source,source_listing_id,url,community_name,address_text,building_text,unit_text,floor_text,total_floors,area_sqm,bedrooms,living_rooms,bathrooms,orientation,decoration,monthly_rent,published_at
-authorized-batch-import,RENT-201,https://example.com/rent-201,张江汤臣豪园,上海市浦东新区张江汤臣豪园5号楼2单元,5号楼,2单元,17/24,24,95.9,2,2,1,南,精装,23300,2026-04-12T18:18:00+08:00
-authorized-batch-import,RENT-202,https://example.com/rent-202,张江汤臣豪园,上海市浦东新区张江汤臣豪园5号楼1单元,5号楼,1单元,9/24,24,88.9,2,1,1,南,简装,21000,2026-04-12T18:39:00+08:00
-authorized-manual,RENT-203,https://example.com/rent-203,七宝云庭,上海市闵行区七宝云庭9幢1单元,9幢,1单元,15/18,18,78.8,2,1,1,南北,精装,15750,2026-04-12T19:02:00+08:00
-authorized-manual,RENT-204,https://example.com/rent-204,碧云天第,上海市浦东新区碧云天第B座3单元,B座,3单元,11/20,20,109.0,3,2,2,南,精装,19300,2026-04-12T19:18:00+08:00
-authorized-manual,RENT-205,https://example.com/rent-205,七宝云庭,上海市闵行区七宝云庭9幢2单元,9幢,2单元,11/18,18,74.6,2,1,1,南,简装,15050,2026-04-12T19:30:00+08:00

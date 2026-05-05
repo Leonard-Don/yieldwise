@@ -1,6 +1,0 @@
-source,source_listing_id,url,community_name,address_text,building_text,unit_text,floor_text,total_floors,area_sqm,bedrooms,living_rooms,bathrooms,orientation,decoration,price_total_wan,unit_price_yuan,published_at
-authorized-batch-import,SALE-201,https://example.com/sale-201,张江汤臣豪园,上海市浦东新区张江汤臣豪园5号楼2单元,5号楼,2单元,17/24,24,96.4,2,2,1,南,精装,948,98340,2026-04-12T18:10:00+08:00
-authorized-batch-import,SALE-202,https://example.com/sale-202,张江汤臣豪园,上海市浦东新区张江汤臣豪园5号楼1单元,5号楼,1单元,9/24,24,89.0,2,1,1,南,简装,905,101685,2026-04-12T18:26:00+08:00
-authorized-manual,SALE-203,https://example.com/sale-203,七宝云庭,上海市闵行区七宝云庭9幢1单元,9幢,1单元,15/18,18,78.6,2,1,1,南北,精装,645,82061,2026-04-12T18:58:00+08:00
-authorized-manual,SALE-204,https://example.com/sale-204,碧云天第,上海市浦东新区碧云天第B座3单元,B座,3单元,11/20,20,110.4,3,2,2,南,精装,952,86232,2026-04-12T19:10:00+08:00
-authorized-manual,SALE-205,https://example.com/sale-205,七宝云庭,上海市闵行区七宝云庭9幢2单元,9幢,2单元,11/18,18,75.0,2,1,1,南,简装,629,83866,2026-04-12T19:24:00+08:00

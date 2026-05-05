@@ -348,7 +348,7 @@ def summarize_import_anomaly_filters(import_detail: dict[str, Any] | None) -> di
             "单样本楼层",
             len(low_pair_examples),
             threshold=f"pair_count <= {LOW_PAIR_COUNT_THRESHOLD}",
-            action="把这些楼层放入公开页采样或授权批次补样。",
+            action="把这些楼层放入浏览器公开页抓取补样。",
             examples=low_pair_examples[:6],
         ),
         _anomaly_filter(
@@ -464,7 +464,7 @@ def list_refresh_center_anomalies(limit: int = 200) -> dict[str, Any]:
                         "status": _anomaly_status(review_state, anomaly_id),
                         "label": label,
                         "detail": f"pair_count={pair_count}",
-                        "suggestedAction": "进入公开页采样或授权批次补样。",
+                        "suggestedAction": "进入浏览器公开页抓取补样。",
                         "review": review_state.get(anomaly_id),
                     }
                 )
@@ -601,7 +601,7 @@ def build_refresh_center_report() -> dict[str, Any]:
             "样本批次",
             "ok" if latest_import else "warn",
             f"最新 import run: {latest_import['batchName']}" if latest_import else "没有 sale/rent import run。",
-            "补一轮授权离线样本或公开页采样。" if not latest_import else "可进入异常过滤与指标刷新。",
+            "补一轮浏览器公开页抓取样本。" if not latest_import else "可进入异常过滤与指标刷新。",
         ),
         _check(
             "geo_run",

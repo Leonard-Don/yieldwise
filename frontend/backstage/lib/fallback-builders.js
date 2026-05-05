@@ -55,7 +55,7 @@ function buildFallbackImportRunDetail(runId) {
     return null;
   }
   const reviewQueue = (effectiveOperationsOverview().addressQueue ?? []).filter(
-    (item) => item.runId === runId || item.sourceId === "authorized-batch-import"
+    (item) => item.runId === runId || item.sourceId === "public-browser-sampling"
   );
   const topEvidence = [
     {
@@ -91,9 +91,9 @@ function buildFallbackImportRunDetail(runId) {
   ];
   const recentReviews = [
     {
-      eventId: `${runId}::authorized-manual::SALE-003::20260411225038`,
-      queueId: `${runId}::authorized-manual::SALE-003`,
-      sourceId: "authorized-manual",
+      eventId: `${runId}::public-browser-sampling::SALE-003::20260411225038`,
+      queueId: `${runId}::public-browser-sampling::SALE-003`,
+      sourceId: "public-browser-sampling",
       communityId: "qibao-yunting",
       communityName: "七宝云庭",
       buildingId: "qibao-yunting-b2",
@@ -103,7 +103,7 @@ function buildFallbackImportRunDetail(runId) {
       newStatus: "resolved",
       reviewOwner: "atlas-ui",
       reviewedAt: "2026-04-11T22:50:38+08:00",
-      resolutionNotes: "工作台烟测：人工复核确认。"
+      resolutionNotes: "工作台烟测：复核确认。"
     }
   ];
   return {
@@ -224,7 +224,7 @@ function buildFallbackGeoAssetRunDetail(runId, baselineRunId = null) {
       buildingId: "qibao-yunting-b1",
       buildingName: "8幢",
       sourceRef: "qibao-yunting-b1",
-      resolutionNotes: "当前批次未提供该楼栋 footprint，建议补采或人工勾绘。",
+      resolutionNotes: "当前批次未提供该楼栋 footprint，建议通过开放地图数据补采。",
       reviewOwner: null,
       reviewedAt: null,
       updatedAt: run.createdAt,
@@ -497,7 +497,7 @@ function buildFallbackSamplePairs(building, floorItem) {
   const sourceNames = (operationsOverview?.sourceHealth ?? []).map((item) => item.name);
   const sourcePool = sourceNames.length
     ? sourceNames
-    : ["授权离线批次", "公开页面辅助采样", "上海开放数据 · 物业小区信息", "高德 AOI / POI / District"];
+    : ["浏览器公开页抓取", "上海开放数据 · 物业小区信息", "高德 AOI / POI / District"];
 
   return Array.from({ length: sampleCount }, (_, index) => {
     const saleSourceName = sourcePool[index % sourcePool.length];
@@ -521,7 +521,7 @@ function buildFallbackSamplePairs(building, floorItem) {
       yieldPct: Number(((monthlyRent * 12) / (salePriceWan * 10000) * 100).toFixed(2)),
       resolutionConfidence,
       dedupConfidence,
-      reviewState: resolutionConfidence >= 0.9 ? "已归一" : resolutionConfidence >= 0.8 ? "待复核" : "需人工确认",
+      reviewState: resolutionConfidence >= 0.9 ? "已归一" : resolutionConfidence >= 0.8 ? "待复核" : "需确认",
       normalizedAddress: `${building.districtName} / ${building.communityName} / ${building.name} / ${index + 1}单元 / ${floorItem.floorNo}层 / ${unitNo}`,
       rawSaleAddress: `${building.communityName}${building.name}${floorItem.floorNo}层${unitNo}`,
       rawRentAddress: `${building.districtName}${building.communityName}${building.name}${floorItem.floorNo}F-${unitNo}`,
@@ -557,7 +557,7 @@ function buildFallbackResolutionTrace(building, floorItem, queueItems) {
       detail: "已挂到 AOI / 楼栋 footprint，可用于地图定位和 Google Earth 导出。"
     },
     {
-      step: "人工复核闸门",
+      step: "复核闸门",
       status: gateStatus,
       detail: gateDetail
     }

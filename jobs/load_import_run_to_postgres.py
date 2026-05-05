@@ -16,7 +16,7 @@ def run_id_from_manifest(path: Path) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Persist an authorized import run into PostgreSQL.")
+    parser = argparse.ArgumentParser(description="Persist a browser-scraped import run into PostgreSQL.")
     parser.add_argument("--run-id", help="Import run id, e.g. pudong-demo-2026-04-11-20260411223336.")
     parser.add_argument("--manifest", type=Path, help="Path to manifest.json. If provided, run_id will be read from it.")
     parser.add_argument("--apply-schema", action="store_true", help="Apply db/schema.sql before writing data.")

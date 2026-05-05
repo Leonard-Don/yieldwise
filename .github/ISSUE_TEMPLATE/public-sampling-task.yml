@@ -1,5 +1,5 @@
-name: Public Sampling Task
-description: 为公开页面人工采样补一组小区 / 楼栋 / 楼层样本
+name: Public Browser Scrape Task
+description: 为公开页面浏览器抓取补一组小区 / 楼栋 / 楼层样本
 title: "[sampling] "
 labels:
   - sampling
@@ -68,4 +68,4 @@ body:
     id: notes
     attributes:
       label: 备注
-      description: 记录需要人工判断的别名、楼栋文本、楼层歧义等
+      description: 记录需要复核的别名、楼栋文本、楼层歧义等

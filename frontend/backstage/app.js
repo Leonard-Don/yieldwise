@@ -117,31 +117,7 @@ const state = {
   busyBrowserCaptureRunId: null,
   lastBrowserCaptureSubmission: null,
   optimisticBrowserCaptureRunSummary: null,
-  lastBrowserCaptureReviewAction: null,
-  anchorEditorCommunityId: null,
-  browserCaptureDraft: {
-    sale: {
-      sourceListingId: "",
-      url: "",
-      publishedAt: "",
-      rawText: "",
-      note: ""
-    },
-    rent: {
-      sourceListingId: "",
-      url: "",
-      publishedAt: "",
-      rawText: "",
-      note: ""
-    }
-  },
-  anchorDraft: {
-    lng: "",
-    lat: "",
-    note: "",
-    aliasHint: "",
-    sourceLabel: "manual_override_gcj02"
-  }
+  lastBrowserCaptureReviewAction: null
 };
 
 let mapRequestId = 0;
@@ -164,36 +140,6 @@ let mapWaypointTimer = null;
 
 
 
-
-function seedAnchorDraft(community) {
-  const preview = communityAnchorPreview(community);
-  state.anchorDraft = {
-    lng: preview?.centerLng != null ? String(preview.centerLng) : community?.centerLng != null ? String(community.centerLng) : "",
-    lat: preview?.centerLat != null ? String(preview.centerLat) : community?.centerLat != null ? String(community.centerLat) : "",
-    note: "",
-    aliasHint: "",
-    sourceLabel: "manual_override_gcj02"
-  };
-}
-
-function openAnchorManualEditor(community) {
-  if (!community) {
-    return;
-  }
-  state.anchorEditorCommunityId = community.id;
-  seedAnchorDraft(community);
-}
-
-function closeAnchorManualEditor() {
-  state.anchorEditorCommunityId = null;
-  state.anchorDraft = {
-    lng: "",
-    lat: "",
-    note: "",
-    aliasHint: "",
-    sourceLabel: "manual_override_gcj02"
-  };
-}
 
 async function init() {
   await Promise.all([loadRuntimeConfig(), loadBootstrapData()]);
@@ -2695,7 +2641,7 @@ function renderAmapCommunities(visibleCommunities) {
               { label: "候选名", value: preview.anchorName ?? "待确认候选", tone: "warning" },
               {
                 label: "置信度",
-                value: preview.anchorQuality != null ? `${Math.round(Number(preview.anchorQuality) * 100)}%` : "待人工确认",
+                value: preview.anchorQuality != null ? `${Math.round(Number(preview.anchorQuality) * 100)}%` : "待确认",
                 tone: "warning"
               }
             ],
@@ -2907,7 +2853,7 @@ function updateMapNote() {
     ? `当前焦点 ${waypoint.label}${waypoint.detail ? `，${waypoint.detail}` : ""}。`
     : null;
   const previewText = selectedPreview
-    ? `${selectedCommunity?.name ?? "当前小区"} 正在使用候选锚点 ${selectedPreview.anchorName ?? "待确认候选"} 作为人工判断参考。`
+    ? `${selectedCommunity?.name ?? "当前小区"} 正在使用候选锚点 ${selectedPreview.anchorName ?? "待确认候选"} 作为确认参考。`
     : `当前仍有 ${Number(opsSummaryData.pendingAnchorCount ?? unanchoredCommunityCount)} 个小区待确认锚点${latestAnchorReviewAt ? `，最近确认 ${formatTimestamp(latestAnchorReviewAt)}` : ""}。`;
   const compactScopeText =
     isFloorWatchlistLoading
@@ -3281,7 +3227,6 @@ function renderAmapInfoCard({ kicker = "", title = "", subtitle = "", stats = []
 async function navigateToBrowserSamplingTask(
   task,
   {
-    resetDraft = false,
     waypoint = null,
     revealLatestCaptureRun = "auto",
     preferredReviewRunId = null,
@@ -3301,7 +3246,7 @@ async function navigateToBrowserSamplingTask(
   if (!(state.browserSamplingPackItems ?? []).some((item) => item.taskId === task.taskId)) {
     upsertBrowserSamplingTask(task, { pinSelection: false });
   }
-  selectBrowserSamplingTask(task.taskId, { resetDraft });
+  selectBrowserSamplingTask(task.taskId);
   await navigateToEvidenceTarget(task.communityId, task.buildingId || null, task.floorNo || null, {
     waypoint:
       waypoint ??
@@ -3490,13 +3435,12 @@ function getBrowserReviewInboxQueue(task = currentBrowserSamplingTask(), { exclu
   };
 }
 
-async function navigateToBrowserReviewInboxItem(item, { resetDraft = false } = {}) {
+async function navigateToBrowserReviewInboxItem(item) {
   if (!item?.taskId) {
     return;
   }
   const task = browserReviewInboxTaskSnapshot(item);
   await navigateToBrowserSamplingTask(task, {
-    resetDraft,
     revealLatestCaptureRun: true,
     preferredReviewRunId: item.runId ?? null,
     preferredReviewQueueId: item.queueId ?? null,
@@ -3848,7 +3792,6 @@ function buildBrowserCaptureSubmission(task, body, optimisticRun, optimisticTask
     reviewPendingCount: browserCapturePendingAttentionCount(optimisticRun),
     reviewInboxPendingCount: Number(body?.reviewInboxSummary?.pendingQueueCount ?? state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
     metricsBatchName: body.metricsRun?.batchName ?? null,
-    autoFilledChannels: [],
   };
 }
 
@@ -4320,10 +4263,9 @@ async function finalizeBrowserCaptureReviewAction(
         });
       }
     } else if (resolvedReviewTarget.item?.taskId) {
-      await navigateToBrowserReviewInboxItem(resolvedReviewTarget.item, { resetDraft: false });
+      await navigateToBrowserReviewInboxItem(resolvedReviewTarget.item);
     } else {
       await navigateToBrowserSamplingTask(resolvedReviewTarget.task ?? refreshedSourceTask, {
-        resetDraft: false,
         revealLatestCaptureRun: true,
         preferredReviewRunId: resolvedReviewTarget.workflowRunId ?? refreshedSourceTask?.pendingReviewRunId ?? null,
         preferredReviewQueueId: resolvedReviewTarget.workflowQueueId ?? refreshedSourceTask?.pendingReviewQueueId ?? null,
@@ -4368,10 +4310,9 @@ async function finalizeBrowserCaptureReviewAction(
 
   if (workflowAction === "advance_next_review" && (resolvedReviewTarget.item?.taskId || resolvedReviewTarget.task?.taskId)) {
     if (resolvedReviewTarget.item?.taskId) {
-      await navigateToBrowserReviewInboxItem(resolvedReviewTarget.item, { resetDraft: false });
+      await navigateToBrowserReviewInboxItem(resolvedReviewTarget.item);
     } else {
       await navigateToBrowserSamplingTask(resolvedReviewTarget.task, {
-        resetDraft: false,
         revealLatestCaptureRun: true,
         preferredReviewRunId: resolvedReviewTarget.workflowRunId ?? null,
         preferredReviewQueueId: resolvedReviewTarget.workflowQueueId ?? null,
@@ -4418,7 +4359,6 @@ async function finalizeBrowserCaptureReviewAction(
     upsertBrowserSamplingTask(refreshedSourceTask, { pinSelection: true });
     state.selectedBrowserSamplingTaskId = refreshedSourceTask.taskId;
     await navigateToBrowserSamplingTask(refreshedSourceTask, {
-      resetDraft: false,
       revealLatestCaptureRun: false,
     });
   }
@@ -4490,12 +4430,9 @@ async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask)
     const reviewTask = resolvedPostSubmitTask.task ?? refreshedSourceTask ?? task;
     if (reviewTask?.taskId) {
       await navigateToBrowserSamplingTask(reviewTask, {
-        resetDraft: false,
         revealLatestCaptureRun: true
       });
     }
-    const reviewItems = currentPendingBrowserCaptureReviewItems();
-    const filledChannels = fillBrowserCaptureDraftFromAttentionByChannel(reviewItems);
     updateLastBrowserCaptureSubmission({
       workflowAction,
       workflowReason,
@@ -4506,7 +4443,6 @@ async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask)
       postSubmitTaskLabel: browserSamplingTaskLabel(reviewTask ?? task),
       reviewPendingCount: browserCapturePendingAttentionCount(currentBrowserCaptureRun()),
       reviewInboxPendingCount: Number(state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
-      autoFilledChannels: filledChannels,
     });
     render();
     return;
@@ -4517,9 +4453,7 @@ async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask)
     if (nextTask?.taskId) {
       const shouldSwitchTask = currentBrowserSamplingTask()?.taskId !== nextTask.taskId;
       if (shouldSwitchTask) {
-        selectBrowserSamplingTask(nextTask.taskId, {
-          resetDraft: true,
-        });
+        selectBrowserSamplingTask(nextTask.taskId);
       }
       updateLastBrowserCaptureSubmission({
         workflowAction,
@@ -4531,12 +4465,10 @@ async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask)
         postSubmitTaskLabel: browserSamplingTaskLabel(nextTask),
         reviewPendingCount: Number(body?.reviewSummary?.pendingCount ?? browserCapturePendingAttentionCount(optimisticTask)),
         reviewInboxPendingCount: Number(state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
-        autoFilledChannels: [],
       });
       if (shouldSwitchTask) {
         render();
         await navigateToBrowserSamplingTask(nextTask, {
-          resetDraft: false,
           revealLatestCaptureRun: false
         });
       }
@@ -4547,7 +4479,6 @@ async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask)
 
   if (refreshedSourceTask?.taskId) {
     await navigateToBrowserSamplingTask(refreshedSourceTask, {
-      resetDraft: false,
       revealLatestCaptureRun: false
     });
   }
@@ -4561,7 +4492,6 @@ async function finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask)
     postSubmitTaskLabel: browserSamplingTaskLabel(refreshedSourceTask ?? task),
     reviewPendingCount: browserCapturePendingAttentionCount(currentBrowserCaptureRun() ?? refreshedSourceTask ?? {}),
     reviewInboxPendingCount: Number(state.browserReviewInboxSummary?.pendingQueueCount ?? 0),
-    autoFilledChannels: [],
   });
   render();
 }
@@ -4617,23 +4547,6 @@ async function loadSelectedBrowserCaptureRunDetail(runId, { preferredQueueId = n
   }
 }
 
-function browserCaptureEmptyEntry() {
-  return {
-    sourceListingId: "",
-    url: "",
-    publishedAt: "",
-    rawText: "",
-    note: ""
-  };
-}
-
-function resetBrowserCaptureDraft() {
-  state.browserCaptureDraft = {
-    sale: browserCaptureEmptyEntry(),
-    rent: browserCaptureEmptyEntry()
-  };
-}
-
 function ensureBrowserSamplingTaskSelection() {
   const tasks = state.browserSamplingPackItems ?? [];
   if (!tasks.length) {
@@ -4642,7 +4555,6 @@ function ensureBrowserSamplingTaskSelection() {
     state.selectedBrowserCaptureRunDetail = null;
     state.selectedBrowserCaptureReviewQueueId = null;
     clearBrowserCaptureReviewBatchSelection();
-    resetBrowserCaptureDraft();
     return;
   }
   const selectedTask = tasks.find((task) => task.taskId === state.selectedBrowserSamplingTaskId);
@@ -4652,11 +4564,10 @@ function ensureBrowserSamplingTaskSelection() {
     state.selectedBrowserCaptureRunDetail = null;
     state.selectedBrowserCaptureReviewQueueId = null;
     clearBrowserCaptureReviewBatchSelection();
-    resetBrowserCaptureDraft();
   }
 }
 
-function selectBrowserSamplingTask(taskId, { resetDraft = true } = {}) {
+function selectBrowserSamplingTask(taskId) {
   if (!taskId || state.selectedBrowserSamplingTaskId === taskId) {
     return;
   }
@@ -4665,9 +4576,6 @@ function selectBrowserSamplingTask(taskId, { resetDraft = true } = {}) {
   state.selectedBrowserCaptureRunDetail = null;
   state.selectedBrowserCaptureReviewQueueId = null;
   clearBrowserCaptureReviewBatchSelection();
-  if (resetDraft) {
-    resetBrowserCaptureDraft();
-  }
 }
 
 function dedupeGeoTasks(tasks, keyResolver) {
@@ -4741,7 +4649,7 @@ async function navigateToGeoTask(task, { waypoint = null } = {}) {
   });
 }
 
-async function submitAnchorConfirmation(communityId, payload, { closeEditor = false } = {}) {
+async function submitAnchorConfirmation(communityId, payload) {
   if (!communityId) {
     return;
   }
@@ -4767,12 +4675,9 @@ async function submitAnchorConfirmation(communityId, payload, { closeEditor = fa
     if (!response.ok) {
       throw new Error(body.detail || `Anchor confirmation failed with ${response.status}`);
     }
-    if (closeEditor) {
-      closeAnchorManualEditor();
-    }
     state.opsMessage =
       body.databaseSync?.message ||
-      (payload.action === "manual_override" ? "小区锚点已手工覆盖。" : "小区锚点已确认写回。");
+      "小区锚点已确认写回。";
     state.opsMessageTone = body.databaseSync?.status === "error" ? "error" : "success";
     await Promise.all([refreshData(), refreshOperationsWorkbench({ reloadFloor: false })]);
     render();
@@ -4798,25 +4703,6 @@ async function confirmCurrentAnchorCandidate(community, referenceRunId = null) {
       reference_run_id: referenceRunId ?? null,
       review_note: "已在 Atlas 工作台确认当前候选锚点。"
     }
-  );
-}
-
-async function saveManualAnchorOverride(community, referenceRunId = null) {
-  if (!community) {
-    return;
-  }
-  await submitAnchorConfirmation(
-    community.id,
-    {
-      action: "manual_override",
-      reference_run_id: referenceRunId ?? null,
-      center_lng: state.anchorDraft.lng === "" ? null : Number(state.anchorDraft.lng),
-      center_lat: state.anchorDraft.lat === "" ? null : Number(state.anchorDraft.lat),
-      anchor_source_label: state.anchorDraft.sourceLabel || "manual_override_gcj02",
-      review_note: state.anchorDraft.note || undefined,
-      alias_hint: state.anchorDraft.aliasHint || undefined
-    },
-    { closeEditor: true }
   );
 }
 
@@ -5125,163 +5011,6 @@ async function copyTextToClipboard(text, successMessage = "已复制。") {
     state.opsMessageContext = "sampling";
   }
   render();
-}
-
-function updateBrowserCaptureDraft(channel, field, value) {
-  if (!state.browserCaptureDraft[channel]) {
-    return;
-  }
-  state.browserCaptureDraft = {
-    ...state.browserCaptureDraft,
-    [channel]: {
-      ...state.browserCaptureDraft[channel],
-      [field]: value
-    }
-  };
-}
-
-function fillBrowserCaptureDraftFromAttention(item) {
-  const channel = item?.businessType === "rent" ? "rent" : "sale";
-  const attentionNote = Array.isArray(item?.attention) && item.attention.length ? `attention: ${item.attention.join(" / ")}` : "";
-  const parseSummary = [
-    item?.buildingText ? `楼栋=${item.buildingText}` : "",
-    item?.unitText ? `单元=${item.unitText}` : "",
-    item?.floorText ? `楼层=${item.floorText}` : "",
-    item?.totalFloors ? `总层数=${item.totalFloors}` : "",
-    item?.areaSqm ? `面积=${item.areaSqm}` : "",
-    item?.priceTotalWan ? `总价=${item.priceTotalWan}万` : "",
-    item?.monthlyRent ? `月租=${item.monthlyRent}` : "",
-  ]
-    .filter(Boolean)
-    .join("；");
-  state.browserCaptureDraft = {
-    ...state.browserCaptureDraft,
-    [channel]: {
-      sourceListingId: String(item?.sourceListingId ?? ""),
-      url: String(item?.url ?? ""),
-      publishedAt: String(item?.publishedAt ?? ""),
-      rawText: String(item?.rawText ?? ""),
-      note: [item?.captureNotes ?? "", attentionNote, parseSummary].filter(Boolean).join("\n"),
-    },
-  };
-}
-
-function fillBrowserCaptureDraftFromAttentionByChannel(items = []) {
-  const filledChannels = [];
-  const seenChannels = new Set();
-  items.forEach((item) => {
-    const channel = item?.businessType === "rent" ? "rent" : "sale";
-    if (seenChannels.has(channel)) {
-      return;
-    }
-    fillBrowserCaptureDraftFromAttention(item);
-    seenChannels.add(channel);
-    filledChannels.push(channel);
-  });
-  return filledChannels;
-}
-
-function buildBrowserCapturePayload(task) {
-  const captures = ["sale", "rent"]
-    .map((channel) => {
-      const draft = state.browserCaptureDraft[channel];
-      if (!draft?.rawText?.trim()) {
-        return null;
-      }
-      return {
-        business_type: channel,
-        source_listing_id: draft.sourceListingId.trim(),
-        url: draft.url.trim(),
-        published_at: draft.publishedAt.trim(),
-        raw_text: draft.rawText.trim(),
-        capture_notes: draft.note.trim(),
-        community_name: task?.communityName ?? "",
-        building_text: task?.buildingName ?? "",
-        address_text: [task?.communityName, task?.buildingName, task?.floorNo != null ? `${task.floorNo}层` : ""]
-          .filter(Boolean)
-          .join(" ")
-      };
-    })
-    .filter(Boolean);
-  return {
-    task_id: task?.taskId ?? null,
-    task,
-    captures,
-    refresh_metrics: true
-  };
-}
-
-async function submitBrowserSamplingCapture(task) {
-  if (!task) {
-    return;
-  }
-  const payload = buildBrowserCapturePayload(task);
-  if (!payload.captures.length) {
-    state.opsMessage = "至少粘贴一条 sale 或 rent 公开页原文。";
-    state.opsMessageTone = "error";
-    state.opsMessageContext = "sampling";
-    render();
-    return;
-  }
-
-  state.busyBrowserSamplingSubmit = true;
-  state.opsMessage = null;
-  state.opsMessageContext = "sampling";
-  render();
-
-  try {
-    const response = await fetch("/api/browser-sampling-captures", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(body.detail || `公开页面采样导入失败 (${response.status})`);
-    }
-    state.opsMessage = `已生成采样批次 ${body.importRunId ?? body.captureRunId}，并刷新 staged metrics。`;
-    state.opsMessageTone = "success";
-    if (body.importRunId) {
-      state.selectedImportRunId = body.importRunId;
-      state.selectedBaselineRunId = null;
-      syncOperationsBackstageLocationIfNeeded();
-    }
-    const optimisticRun = buildOptimisticBrowserCaptureRun(task, body);
-    const optimisticTask = buildOptimisticBrowserSamplingTask(task, optimisticRun, body?.taskProgress ?? null);
-    state.lastBrowserCaptureSubmission = buildBrowserCaptureSubmission(task, body, optimisticRun, optimisticTask);
-    state.optimisticBrowserCaptureRunSummary = optimisticRun;
-    state.selectedBrowserCaptureRunId = body.captureRunId ?? null;
-    state.selectedBrowserCaptureRunDetail = null;
-    upsertBrowserCaptureRunSummary(optimisticRun);
-    upsertBrowserSamplingTask(optimisticTask, { pinSelection: true });
-    resetBrowserCaptureDraft();
-    state.busyBrowserSamplingSubmit = false;
-    render();
-    void finalizeBrowserSamplingCaptureRefresh(task, body, optimisticTask).catch((error) => {
-      state.opsMessage = error.message || "公开页面采样导入成功，但后续刷新失败。";
-      state.opsMessageTone = "error";
-      state.opsMessageContext = "sampling";
-      render();
-    });
-  } catch (error) {
-    state.lastBrowserCaptureSubmission = {
-      status: "error",
-      taskId: task.taskId,
-      message: error.message || "公开页面采样导入失败。",
-      createdAt: new Date().toISOString()
-    };
-    state.opsMessage = error.message || "公开页面采样导入失败。";
-    state.opsMessageTone = "error";
-    render();
-  } finally {
-    if (state.busyBrowserSamplingSubmit) {
-      state.busyBrowserSamplingSubmit = false;
-      render();
-    }
-  }
 }
 
 async function reviewBrowserCaptureQueueItem(runId, queueId, { status = "resolved", resolutionNotes = "" } = {}) {
@@ -5671,7 +5400,6 @@ function renderDetail() {
     community?.anchorDecisionState ??
     (anchorPreview ? "pending" : community?.centerLng != null && community?.centerLat != null ? "confirmed" : "pending");
   const latestAnchorReview = community?.latestAnchorReview ?? null;
-  const anchorEditorOpen = community ? state.anchorEditorCommunityId === community.id : false;
   const selectedFloor =
     building?.floorCurve?.find((floor) => floor.floorNo === state.selectedFloorNo) ??
     building?.floorCurve?.find((floor) => floor.floorNo === building?.focusFloorNo) ??
@@ -5684,7 +5412,7 @@ function renderDetail() {
         currentDataMode() === "empty"
           ? runtimeConfig.hasPostgresDsn
             ? "数据库 DSN 已配置，但还没完成首轮 bootstrap。先落 reference、import、geo，再刷新 metrics。"
-            : "当前还没有数据库主读数据。请先导入授权 / 官方批次并写入 PostgreSQL，页面才会切到真实的全市楼栋研究模式。"
+            : "当前还没有数据库主读数据。请先写入浏览器抓取 / 官方开放批次，页面才会切到真实的全市楼栋研究模式。"
           : "当前筛选条件下没有可展示的小区，请适当放宽预算、回报率或样本量。"
       }</p>
     `;
@@ -5791,7 +5519,7 @@ function renderDetail() {
                         <strong>${anchorPreview.anchorName ?? "候选锚点"}</strong>
                         <span>${anchorPreview.anchorSource ?? "candidate_preview"}</span>
                       </div>
-                      <p>${anchorPreview.anchorAddress ?? "地图已投出预锚点，等待人工确认后写回主档。"}</p>
+                      <p>${anchorPreview.anchorAddress ?? "地图已投出预锚点，等待确认后写回主档。"}</p>
                     </article>
                   </div>
                 `
@@ -5810,7 +5538,7 @@ function renderDetail() {
                               <strong>${item.name ?? "候选 POI"}</strong>
                               <span>${item.score != null ? `${Math.round(Number(item.score) * 100)}%` : "待确认"}</span>
                             </div>
-                            <p>${item.address ?? item.query ?? "等待人工确认该候选锚点。"}</p>
+                            <p>${item.address ?? item.query ?? "等待确认该候选锚点。"}</p>
                             ${
                               index === 0
                                 ? `<div class="queue-item-footer"><button class="action compact primary" data-anchor-confirm-community-id="${community.id}">${state.busyAnchorCommunityId === community.id ? "写回中..." : "确认当前候选"}</button></div>`
@@ -5823,14 +5551,9 @@ function renderDetail() {
                   </div>
                 `
                 : `
-                  <p class="helper-text">当前没有可靠候选，建议直接手工覆盖坐标。</p>
+                  <p class="helper-text">当前没有可靠候选，等待开放数据或浏览器抓取批次补充锚点线索。</p>
                 `
             }
-            <div class="queue-item-footer anchor-action-row">
-              <button class="action compact" data-anchor-open-editor-community-id="${community.id}">
-                ${anchorEditorOpen ? "收起手工覆盖" : "手工覆盖坐标"}
-              </button>
-            </div>
             ${
               latestAnchorReview
                 ? `
@@ -5845,45 +5568,6 @@ function renderDetail() {
                         ${latestAnchorReview.reviewNote ?? latestAnchorReview.candidateName ?? "已写回最新 reference 主档。"}
                       </small>
                     </article>
-                  </div>
-                `
-                : ""
-            }
-            ${
-              anchorEditorOpen
-                ? `
-                  <div class="anchor-manual-editor">
-                    <div class="field compact">
-                      <span>手工覆盖坐标（GCJ-02 / 当前高德坐标系）</span>
-                      <div class="anchor-manual-grid">
-                        <label class="anchor-input">
-                          <span>Lng</span>
-                          <input type="text" data-anchor-draft-field="lng" value="${state.anchorDraft.lng}" placeholder="121.588979" />
-                        </label>
-                        <label class="anchor-input">
-                          <span>Lat</span>
-                          <input type="text" data-anchor-draft-field="lat" value="${state.anchorDraft.lat}" placeholder="31.261385" />
-                        </label>
-                        <label class="anchor-input">
-                          <span>来源标签</span>
-                          <input type="text" data-anchor-draft-field="sourceLabel" value="${state.anchorDraft.sourceLabel}" placeholder="manual_override_gcj02" />
-                        </label>
-                        <label class="anchor-input">
-                          <span>别名提示（可选）</span>
-                          <input type="text" data-anchor-draft-field="aliasHint" value="${state.anchorDraft.aliasHint}" placeholder="碧云新天地家园" />
-                        </label>
-                      </div>
-                    </div>
-                    <div class="field compact">
-                      <span>备注（可选）</span>
-                      <textarea data-anchor-draft-field="note" rows="3" placeholder="例如：已在高德地图和公开页面人工核验。">${state.anchorDraft.note}</textarea>
-                    </div>
-                    <div class="queue-item-footer anchor-action-row">
-                      <button class="action compact primary" data-anchor-save-manual-community-id="${community.id}">
-                        ${state.busyAnchorCommunityId === community.id ? "写回中..." : "保存手工覆盖"}
-                      </button>
-                      <button class="action compact" data-anchor-close-editor-community-id="${community.id}">取消</button>
-                    </div>
                   </div>
                 `
                 : ""
@@ -6277,7 +5961,7 @@ function renderRanking() {
         currentDataMode() === "empty"
           ? runtimeConfig.hasPostgresDsn
             ? "数据库已连接，但还没完成首轮 bootstrap。先写入 reference / import / geo，再刷新 metrics。"
-            : "当前还没有落库的小区 / 楼栋数据。请先导入授权批次并写入 PostgreSQL，或显式开启 demo mock。"
+            : "当前还没有落库的小区 / 楼栋数据。请先写入浏览器抓取批次并同步 PostgreSQL，或显式开启 demo mock。"
           : "当前筛选窗口下没有命中的小区机会。"
       }</p>`;
 
@@ -6349,7 +6033,7 @@ function renderRanking() {
     : `<p class="helper-text">${
         currentDataMode() === "database"
           ? "当前数据库里还没有满足阈值的逐层真实证据，所以楼层榜暂时为空。"
-          : "楼层榜会在授权批次落库后出现。"
+          : "楼层榜会在浏览器抓取批次落库后出现。"
       }</p>`;
 
   floorWatchlist.querySelectorAll(".ranking-item").forEach((item) => {
@@ -6528,7 +6212,7 @@ function renderRanking() {
               <div class="queue-item-footer anchor-action-row">
                 <button class="action compact" data-browser-copy-sale="${item.taskId}">复制 Sale</button>
                 <button class="action compact" data-browser-copy-rent="${item.taskId}">复制 Rent</button>
-                <button class="action compact primary" data-browser-open-capture="${item.taskId}">录入原文</button>
+                <button class="action compact primary" data-browser-open-capture="${item.taskId}">查看抓取任务</button>
               </div>
             </article>
           `;
@@ -6547,7 +6231,6 @@ function renderRanking() {
         return;
       }
       await navigateToBrowserSamplingTask(task, {
-        resetDraft: false,
         waypoint: {
           source: "browser_sampling",
           label: item.querySelector("strong")?.textContent?.replace(/^\d+\.\s*/, "") ?? "公开页采样任务",
@@ -6583,7 +6266,6 @@ function renderRanking() {
         return;
       }
       await navigateToBrowserSamplingTask(task, {
-        resetDraft: true,
         waypoint: {
           source: "browser_sampling",
           label: `${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}`,
@@ -6704,9 +6386,9 @@ function renderStrategy() {
       google_earth: "WGS-84 导出"
     },
     data_policy: {
-      priority: "公开开放数据 / 自有 CSV 优先",
-      fallback: "低频人工导入与校正",
-      risk_note: "避免把长期工具建立在不稳定抓取链路上。"
+      priority: "公开开放数据 / 浏览器公开页抓取优先",
+      fallback: "浏览器抓取补洞",
+      risk_note: "只处理公开页面，不保留人工录入入口。"
     },
     address_model: ["district", "resblock", "building", "unit", "floor"]
   };
@@ -6819,7 +6501,7 @@ function renderOperations() {
   const dataModeHint = summary.hasRealData
     ? "地图与详情优先读 PostgreSQL"
     : summary.activeDataMode === "staged"
-    ? "当前优先展示最新离线授权 / 公开样本批次"
+    ? "当前优先展示最新浏览器抓取 / 公开样本批次"
     : summary.mockEnabled
     ? "当前允许 demo 回退"
     : "当前不会伪装成已有数据";
@@ -7259,7 +6941,7 @@ function renderOperations() {
           `
         )
         .join("")
-    : "<p class=\"helper-text\">当前还没有导入批次。先运行授权 CSV 导入任务，这里会出现批次记录。</p>";
+    : "<p class=\"helper-text\">当前还没有导入批次。先运行浏览器抓取批次，这里会出现批次记录。</p>";
 
   const metricsRefreshHistoryMarkup = metricsRefreshHistory.length
     ? `
@@ -8214,13 +7896,6 @@ function renderOperations() {
                   <span class="source-pill">收件箱 ${currentCaptureSubmission.reviewInboxPendingCount ?? reviewInboxSummary.pendingQueueCount ?? 0}</span>
                   <span class="source-pill">当前接力 ${currentCaptureSubmission.postSubmitTaskLabel ?? currentCaptureSubmission.taskLabel ?? "当前任务"}</span>
                   <span class="source-pill">${browserSamplingPostSubmitResolutionLabel(currentCaptureSubmission.postSubmitTaskResolution)}</span>
-                  ${
-                    (currentCaptureSubmission.autoFilledChannels ?? []).length
-                      ? `<span class="source-pill">已预填 ${(currentCaptureSubmission.autoFilledChannels ?? [])
-                          .map((channel) => (channel === "rent" ? "Rent" : "Sale"))
-                          .join(" / ")}</span>`
-                      : ""
-                  }
                 </div>
                 <small>${browserSamplingWorkflowReasonLabel(currentCaptureSubmission.workflowReason)}</small>
               </article>
@@ -8387,96 +8062,19 @@ function renderOperations() {
               <button class="action compact" data-browser-workbench-copy-rent="${selectedSamplingTask.taskId}">复制 Rent 检索词</button>
               <button class="action compact" data-browser-workbench-copy-target="${selectedSamplingTask.taskId}">复制目标检索词</button>
             </div>
-            <div class="browser-capture-grid">
-          <article class="browser-capture-card">
-            <div class="breakdown-top">
-              <strong>Sale 原文</strong>
-              <span class="trace-status resolved">出售</span>
-            </div>
-            <label class="field compact">
-              <div class="field-header">
-                <span>source_listing_id</span>
-                <strong>必填</strong>
+            <article class="browser-capture-card browser-scrape-target-card">
+              <div class="breakdown-top">
+                <strong>浏览器抓取目标</strong>
+                <span class="trace-status ${selectedSamplingTask.taskLifecycleStatus ?? "needs_capture"}">${selectedSamplingTask.taskLifecycleLabel ?? "待抓取"}</span>
               </div>
-              <input type="text" value="${escapeHtml(state.browserCaptureDraft.sale.sourceListingId)}" data-browser-capture-field="sourceListingId" data-browser-capture-channel="sale" data-browser-capture-input="sale-sourceListingId" placeholder="例如 sale-20260414-001" />
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>页面 URL</span>
-                <strong>必填</strong>
+              <p>${selectedSamplingTask.communityName}${selectedSamplingTask.buildingName ? ` · ${selectedSamplingTask.buildingName}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""}</p>
+              <div class="comparison-strip">
+                <span class="source-pill">Sale: ${selectedSamplingTask.saleQuery ?? "待生成"}</span>
+                <span class="source-pill">Rent: ${selectedSamplingTask.rentQuery ?? "待生成"}</span>
+                ${selectedSamplingTask.targetQuery ? `<span class="source-pill">Target: ${selectedSamplingTask.targetQuery}</span>` : ""}
               </div>
-              <input type="text" value="${escapeHtml(state.browserCaptureDraft.sale.url)}" data-browser-capture-field="url" data-browser-capture-channel="sale" data-browser-capture-input="sale-url" placeholder="https://..." />
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>发布时间</span>
-                <strong>必填</strong>
-              </div>
-              <input type="text" value="${escapeHtml(state.browserCaptureDraft.sale.publishedAt)}" data-browser-capture-field="publishedAt" data-browser-capture-channel="sale" data-browser-capture-input="sale-publishedAt" placeholder="2026-04-14 12:30:00" />
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>原文摘录</span>
-                <strong>必填</strong>
-              </div>
-              <textarea data-browser-capture-field="rawText" data-browser-capture-channel="sale" data-browser-capture-input="sale-rawText" placeholder="把公开 sale 页面里包含楼栋、楼层、面积、户型、总价等文字直接贴进来。">${escapeHtml(state.browserCaptureDraft.sale.rawText)}</textarea>
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>备注</span>
-                <strong>可选</strong>
-              </div>
-              <textarea data-browser-capture-field="note" data-browser-capture-channel="sale" data-browser-capture-input="sale-note" placeholder="例如：页面里写的是低楼层，楼栋文本来自标题。">${escapeHtml(state.browserCaptureDraft.sale.note)}</textarea>
-            </label>
-          </article>
-          <article class="browser-capture-card">
-            <div class="breakdown-top">
-              <strong>Rent 原文</strong>
-              <span class="trace-status high">出租</span>
-            </div>
-            <label class="field compact">
-              <div class="field-header">
-                <span>source_listing_id</span>
-                <strong>必填</strong>
-              </div>
-              <input type="text" value="${escapeHtml(state.browserCaptureDraft.rent.sourceListingId)}" data-browser-capture-field="sourceListingId" data-browser-capture-channel="rent" data-browser-capture-input="rent-sourceListingId" placeholder="例如 rent-20260414-001" />
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>页面 URL</span>
-                <strong>必填</strong>
-              </div>
-              <input type="text" value="${escapeHtml(state.browserCaptureDraft.rent.url)}" data-browser-capture-field="url" data-browser-capture-channel="rent" data-browser-capture-input="rent-url" placeholder="https://..." />
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>发布时间</span>
-                <strong>必填</strong>
-              </div>
-              <input type="text" value="${escapeHtml(state.browserCaptureDraft.rent.publishedAt)}" data-browser-capture-field="publishedAt" data-browser-capture-channel="rent" data-browser-capture-input="rent-publishedAt" placeholder="2026-04-14 12:30:00" />
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>原文摘录</span>
-                <strong>必填</strong>
-              </div>
-              <textarea data-browser-capture-field="rawText" data-browser-capture-channel="rent" data-browser-capture-input="rent-rawText" placeholder="把公开 rent 页面里包含楼栋、楼层、面积、户型、月租等文字直接贴进来。">${escapeHtml(state.browserCaptureDraft.rent.rawText)}</textarea>
-            </label>
-            <label class="field compact">
-              <div class="field-header">
-                <span>备注</span>
-                <strong>可选</strong>
-              </div>
-              <textarea data-browser-capture-field="note" data-browser-capture-channel="rent" data-browser-capture-input="rent-note" placeholder="例如：月租来自详情页，朝向在副标题里。">${escapeHtml(state.browserCaptureDraft.rent.note)}</textarea>
-            </label>
-          </article>
-            </div>
-            <div class="queue-item-footer browser-capture-footer">
-              <button class="action compact" data-browser-capture-reset="${selectedSamplingTask.taskId}" data-browser-capture-reset-button="${selectedSamplingTask.taskId}" ${state.busyBrowserSamplingSubmit ? "disabled" : ""}>清空草稿</button>
-              <button class="action compact primary" data-browser-capture-submit="${selectedSamplingTask.taskId}" data-browser-capture-submit-button="${selectedSamplingTask.taskId}" ${state.busyBrowserSamplingSubmit ? "disabled" : ""}>
-                ${state.busyBrowserSamplingSubmit ? "导入中..." : "生成采样批次并刷新"}
-              </button>
-            </div>
+              <small>当前工作台不再提供人工录入表单；新增 listing 只通过浏览器抓取批次进入。</small>
+            </article>
           </div>
           <div class="capture-side-column">
             <article class="import-run-section" data-browser-capture-current-task-runs="true">
@@ -8608,7 +8206,6 @@ function renderOperations() {
                                     <span class="source-pill">${browserCaptureReviewStatusLabel(item.status)}</span>
                                   </div>
                                   <div class="action-row compact">
-                                    <button class="action compact" data-browser-capture-fill-from-attention="${item.queueId}">回填到${item.businessTypeLabel}草稿</button>
                                     <button class="action compact" data-browser-capture-review-resolve="${item.queueId}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>${state.busyBrowserCaptureReviewQueueId === item.queueId ? "处理中..." : "标记已修正"}</button>
                                     <button class="action compact" data-browser-capture-review-waive="${item.queueId}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>豁免并留痕</button>
                                     ${item.rawText ? `<button class="action compact" data-browser-capture-copy-raw="${item.queueId}">复制原文</button>` : ""}
@@ -8646,7 +8243,7 @@ function renderOperations() {
                       : ""
                   }
                 `
-                : `<p class="helper-text">点击上面的最近采样批次后，这里会展开 run 级 review queue，并支持一键回填、标记已修正、或豁免留痕。</p>`
+                : `<p class="helper-text">点击上面的最近采样批次后，这里会展开 run 级 review queue，并支持标记已修正或豁免留痕。</p>`
           }
             </article>
           </div>
@@ -8655,7 +8252,7 @@ function renderOperations() {
     `
     : `<p class="helper-text">${
         (state.browserSamplingPackItems ?? []).length
-          ? "选择一条公开页面采样任务后，这里会出现可直接粘贴公开页原文的执行工作台。"
+          ? "选择一条公开页面抓取任务后，这里会出现抓取目标、历史批次和复核面板。"
           : "当前没有待执行的公开页面采样任务。"
       }</p>`;
 
@@ -8911,7 +8508,7 @@ function renderOperations() {
                 .map((item) => {
                   const topCandidate = item.topCandidate ?? item.candidateSuggestions?.[0] ?? null;
                   const scoreLabel = topCandidate?.score != null ? `${Math.round(Number(topCandidate.score) * 100)}%` : "待确认";
-                  const suggestionName = topCandidate?.name ?? "等待人工补点";
+                  const suggestionName = topCandidate?.name ?? "等待补点";
                   const suggestionText = topCandidate?.address ?? topCandidate?.query ?? item.sourceRefs?.[0] ?? "暂未命中可靠候选。";
                   const suggestionSource = topCandidate?.matchSource ?? topCandidate?.match_source ?? item.previewAnchorSource ?? "candidate";
                   return `
@@ -8936,7 +8533,6 @@ function renderOperations() {
                         <button class="action compact primary" data-anchor-confirm-community-id="${item.communityId}" data-anchor-reference-run-id="${item.referenceRunId ?? ""}">
                           ${state.busyAnchorCommunityId === item.communityId ? "写回中..." : "确认当前候选"}
                         </button>
-                        <button class="action compact" data-anchor-open-editor-community-id="${item.communityId}">手工覆盖坐标</button>
                       </div>
                     </article>
                   `;
@@ -9203,26 +8799,6 @@ function renderOperations() {
       });
     });
 
-  [...anchorWatchlist.querySelectorAll("[data-anchor-open-editor-community-id]"), ...detailCard.querySelectorAll("[data-anchor-open-editor-community-id]")]
-    .forEach((button) => {
-      button.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        const communityId = button.dataset.anchorOpenEditorCommunityId;
-        const community = communityId === state.selectedCommunityId
-          ? state.selectedCommunityDetail ?? getSelectedCommunity()
-          : mapCommunities.find((item) => item.id === communityId) ?? state.opportunityItems.find((item) => item.id === communityId);
-        if (community && community.id !== state.selectedCommunityId) {
-          await selectCommunity(community.id, community.districtId);
-        }
-        if (state.anchorEditorCommunityId === communityId) {
-          closeAnchorManualEditor();
-        } else {
-          openAnchorManualEditor(state.selectedCommunityDetail ?? community);
-        }
-        render();
-      });
-    });
-
   browserSamplingWorkbench.querySelectorAll("[data-browser-workbench-copy-sale]").forEach((button) => {
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
@@ -9266,7 +8842,7 @@ function renderOperations() {
           ) ??
           null;
         if (reviewItem?.taskId && reviewItem?.runId && reviewItem?.queueId) {
-          await navigateToBrowserReviewInboxItem(reviewItem, { resetDraft: false });
+          await navigateToBrowserReviewInboxItem(reviewItem);
           render();
           return;
         }
@@ -9281,7 +8857,6 @@ function renderOperations() {
         return;
       }
       await navigateToBrowserSamplingTask(task, {
-        resetDraft: false,
         revealLatestCaptureRun: button.dataset.browserWorkbenchNextReview ? true : "auto"
       });
       render();
@@ -9297,37 +8872,8 @@ function renderOperations() {
             (entry?.runId === (card.dataset.browserReviewInboxRunId || null) &&
               entry?.queueId === (card.dataset.browserReviewInboxQueueId || null))
         ) ?? null;
-      await navigateToBrowserReviewInboxItem(item, { resetDraft: false });
+      await navigateToBrowserReviewInboxItem(item);
       render();
-    });
-  });
-
-  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-field]").forEach((input) => {
-    const syncDraft = (event) => {
-      const channel = input.dataset.browserCaptureChannel;
-      const field = input.dataset.browserCaptureField;
-      if (!channel || !field) {
-        return;
-      }
-      updateBrowserCaptureDraft(channel, field, event.target.value);
-    };
-    input.addEventListener("input", syncDraft);
-    input.addEventListener("change", syncDraft);
-  });
-
-  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-reset]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      resetBrowserCaptureDraft();
-      render();
-    });
-  });
-
-  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-submit]").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const task = currentBrowserSamplingTask();
-      await submitBrowserSamplingCapture(task);
     });
   });
 
@@ -9335,27 +8881,10 @@ function renderOperations() {
     card.addEventListener("click", async () => {
       const taskId = card.dataset.browserTaskId;
       if (taskId) {
-        selectBrowserSamplingTask(taskId, { resetDraft: false });
+        selectBrowserSamplingTask(taskId);
       }
       await loadSelectedBrowserCaptureRunDetail(card.dataset.browserCaptureRunId);
       await navigateToEvidenceTarget(card.dataset.communityId, card.dataset.buildingId || null, card.dataset.floorNo || null);
-    });
-  });
-
-  browserSamplingWorkbench.querySelectorAll("[data-browser-capture-fill-from-attention]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const queueId = button.dataset.browserCaptureFillFromAttention || "";
-      const item = currentBrowserCaptureReviewQueue().find((entry) => entry.queueId === queueId) ?? null;
-      if (!item) {
-        return;
-      }
-      fillBrowserCaptureDraftFromAttention(item);
-      state.selectedBrowserCaptureReviewQueueId = item.queueId ?? null;
-      state.opsMessage = `已把 ${item.businessTypeLabel} attention 原文回填到草稿。`;
-      state.opsMessageTone = "success";
-      state.opsMessageContext = "sampling";
-      render();
     });
   });
 
@@ -9473,12 +9002,12 @@ function renderOperations() {
       const taskId = card.dataset.browserCoverageTaskId;
       const task = taskId ? (state.browserSamplingPackItems ?? []).find((item) => item.taskId === taskId) : null;
       if (task) {
-        await navigateToBrowserSamplingTask(task, { resetDraft: false });
+        await navigateToBrowserSamplingTask(task);
         render();
         return;
       }
       if (taskId) {
-        selectBrowserSamplingTask(taskId, { resetDraft: false });
+        selectBrowserSamplingTask(taskId);
       }
       render();
       if (card.dataset.communityId) {
@@ -9495,45 +9024,15 @@ function renderOperations() {
       await applyDistrictScope(community?.districtId ?? state.districtFilter);
       const task = taskId ? (state.browserSamplingPackItems ?? []).find((item) => item.taskId === taskId) : null;
       if (task) {
-        await navigateToBrowserSamplingTask(task, { resetDraft: false });
+        await navigateToBrowserSamplingTask(task);
         render();
         return;
       }
       if (taskId) {
-        selectBrowserSamplingTask(taskId, { resetDraft: false });
+        selectBrowserSamplingTask(taskId);
       }
       await navigateToEvidenceTarget(card.dataset.communityId, card.dataset.buildingId || null, card.dataset.floorNo || null);
       render();
-    });
-  });
-
-  detailCard.querySelectorAll("[data-anchor-close-editor-community-id]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      closeAnchorManualEditor();
-      render();
-    });
-  });
-
-  detailCard.querySelectorAll("[data-anchor-draft-field]").forEach((input) => {
-    const handler = input.tagName === "TEXTAREA" || input.type === "text" ? "input" : "change";
-    input.addEventListener(handler, (event) => {
-      const field = input.dataset.anchorDraftField;
-      if (!field) {
-        return;
-      }
-      state.anchorDraft = {
-        ...state.anchorDraft,
-        [field]: event.target.value
-      };
-    });
-  });
-
-  detailCard.querySelectorAll("[data-anchor-save-manual-community-id]").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const community = state.selectedCommunityDetail ?? getSelectedCommunity();
-      await saveManualAnchorOverride(community);
     });
   });
 
@@ -9680,9 +9179,6 @@ function getYieldColor(value) {
 
 
 function sourceLabelById(sourceId) {
-  if (sourceId === "authorized-manual") {
-    return "授权手工样本";
-  }
   return (
     operationsOverview?.sourceHealth?.find((item) => item.sourceId === sourceId || item.id === sourceId)?.name ??
     dataSources.find((item) => item.id === sourceId)?.name ??

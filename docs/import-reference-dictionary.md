@@ -111,5 +111,5 @@ python3 jobs/load_reference_dictionary_to_postgres.py \
 ## 现在这条链解决什么
 
 - 让小区别名、楼栋别名和 `source_ref` 正式进入数据库主档
-- 让授权 listing / 几何导入优先吃数据库 reference catalog，而不是只认 demo 名称
+- 让浏览器抓取 listing / 几何导入优先吃数据库 reference catalog，而不是只认 demo 名称
 - 让“同一楼栋不同写法”的解析结果能真正反哺下一批导入

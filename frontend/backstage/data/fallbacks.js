@@ -352,7 +352,7 @@ const fallbackDistricts = [
 const fallbackPipelineSteps = [
   {
     title: "采集层",
-    description: "本地 CSV 与公开页人工采样样本，保留原始文本、原始坐标、抓取时间与页面快照。",
+    description: "公开页浏览器抓取样本，保留原始文本、原始坐标、抓取时间与页面快照。",
     meta: "raw_listings_sale / raw_listings_rent"
   },
   {
@@ -407,8 +407,8 @@ const fallbackSchemas = [
 
 const fallbackOperationsOverview = {
   summary: {
-    sourceCount: 5,
-    readySourceCount: 4,
+    sourceCount: 3,
+    readySourceCount: 3,
     resolvedQueueCount: 3,
     reviewQueueCount: 2,
     matchingQueueCount: 1,
@@ -430,14 +430,14 @@ const fallbackOperationsOverview = {
       note: "适合做小区字典底座和别名归一。"
     },
     {
-      sourceId: "authorized-batch-import",
-      name: "授权批次导入",
+      sourceId: "public-browser-sampling",
+      name: "浏览器公开页抓取",
       status: "local_ready",
       freshness: "on_demand",
       coveragePct: 58,
       listingCount: 48,
       normalizationPct: 84,
-      note: "适合先跑小批量自有 CSV、地址复核和逐层证据验证。"
+      note: "listing 补样只通过浏览器抓取批次进入。"
     },
     {
       sourceId: "amap-aoi-poi",
@@ -457,7 +457,7 @@ const fallbackOperationsOverview = {
       buildingNo: "5号楼",
       buildingId: "zhangjiang-park-b2",
       floorNo: 17,
-      sourceId: "authorized-batch-import",
+      sourceId: "public-browser-sampling",
       rawAddress: "浦东新区张江路xx弄5号楼17层1702",
       normalizedPath: "浦东新区 / 张江汤臣豪园 / 5号楼 / 2单元 / 17层 / 1702",
       status: "resolved",
@@ -477,7 +477,7 @@ const fallbackOperationsOverview = {
       status: "needs_review",
       confidence: 0.79,
       lastActionAt: "2026-04-11 08:42",
-      reviewHint: "缺少单元号，建议结合 AOI 和人工校正补齐。"
+      reviewHint: "缺少单元号，建议结合 AOI 和下一轮浏览器抓取补齐。"
     },
     {
       queueId: "addr-003",
@@ -485,7 +485,7 @@ const fallbackOperationsOverview = {
       buildingNo: "9幢",
       buildingId: "qibao-yunting-b2",
       floorNo: 12,
-      sourceId: "authorized-batch-import",
+      sourceId: "public-browser-sampling",
       rawAddress: "七宝云庭9幢12楼1201",
       normalizedPath: "闵行区 / 七宝云庭 / 9幢 / 1单元 / 12层 / 1201",
       status: "resolved",
@@ -513,13 +513,13 @@ const fallbackOperationsOverview = {
       buildingNo: "9幢",
       buildingId: "qibao-yunting-b2",
       floorNo: 15,
-      sourceId: "authorized-batch-import",
+      sourceId: "public-browser-sampling",
       rawAddress: "闵行区七宝云庭9幢高楼层样本",
       normalizedPath: "闵行区 / 七宝云庭 / 9幢 / 1单元 / 15层",
       status: "needs_review",
       confidence: 0.81,
       lastActionAt: "2026-04-11 20:38",
-      reviewHint: "来自授权 CSV，高楼层被折算为 15 层，建议人工复核。",
+      reviewHint: "来自浏览器抓取样本，高楼层被折算为 15 层，建议复核。",
       runId: "pudong-demo-2026-04-11-20260411222040",
       batchName: "pudong-demo-2026-04-11"
     }
@@ -528,7 +528,7 @@ const fallbackOperationsOverview = {
   importRuns: [
     {
       runId: "pudong-demo-2026-04-11-20260411222040",
-      providerId: "authorized-batch-import",
+      providerId: "public-browser-sampling",
       batchName: "pudong-demo-2026-04-11",
       createdAt: "2026-04-11T22:20:40+08:00",
       resolvedRate: 0.75,

@@ -235,19 +235,7 @@ def confirm_community_anchor(
         review_action_label = "confirm_candidate"
         review_state = "confirmed"
     elif action == "manual_override":
-        resolved_center_lng = to_float_or_none(center_lng)
-        resolved_center_lat = to_float_or_none(center_lat)
-        if resolved_center_lng is None or resolved_center_lat is None:
-            raise ValueError("手工覆盖必须传有效的 center_lng / center_lat")
-        if not (-180 <= resolved_center_lng <= 180) or not (-90 <= resolved_center_lat <= 90):
-            raise ValueError("手工覆盖坐标超出有效范围")
-        resolved_anchor_source = (anchor_source_label or "manual_override_gcj02").strip() or "manual_override_gcj02"
-        resolved_anchor_quality = 1.0
-        alias_text = str(alias_hint or "").strip()
-        if alias_text and alias_text not in aliases:
-            alias_to_append = alias_text
-        review_action_label = "manual_override"
-        review_state = "manual_override"
+        raise ValueError("手工覆盖入口已移除，请使用候选锚点确认或补充浏览器 / 开放数据批次。")
     else:
         raise ValueError("Unsupported anchor confirmation action")
 

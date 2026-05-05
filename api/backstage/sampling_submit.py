@@ -178,7 +178,7 @@ def submit_browser_sampling_capture(payload: dict[str, Any]) -> dict[str, Any]:
 
     import_command = [
         sys.executable,
-        str(ROOT_DIR / "jobs" / "import_authorized_listings.py"),
+        str(ROOT_DIR / "jobs" / "import_browser_scraped_listings.py"),
         "--provider-id",
         "public-browser-sampling",
         "--batch-name",

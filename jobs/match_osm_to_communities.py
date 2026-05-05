@@ -10,7 +10,7 @@ Reads the latest reference catalog (or one specified via --reference-run)
 to source community centroids.
 
 Output: a NEW geo-asset run dir alongside the input — the original is not
-modified. The new run takes the same shape as manual-geometry-staging so
+modified. The new run takes the same shape as geo-asset staging runs so
 the workbench review pipeline picks it up.
 
 Run:

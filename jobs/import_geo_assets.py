@@ -236,7 +236,7 @@ def build_summary(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Import authorized GeoJSON building footprints into a geo-assets batch.")
+    parser = argparse.ArgumentParser(description="Import open-map or AOI GeoJSON building footprints into a geo-assets batch.")
     parser.add_argument("--provider-id", required=True)
     parser.add_argument("--batch-name", required=True)
     parser.add_argument("--geojson-file", required=True, type=Path)

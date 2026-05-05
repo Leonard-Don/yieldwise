@@ -68,7 +68,7 @@ pip install -r api/requirements.txt
 ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 ```
 
-This is only for local exploration. Real analysis should use Postgres/PostGIS plus your own authorized or open-data imports.
+This is only for local exploration. Real analysis should use Postgres/PostGIS plus open-data imports or public-page browser-scrape batches.
 
 ## Features
 
@@ -84,9 +84,9 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 | Building footprints | OpenStreetMap | ODbL |
 | Community boundaries | AMAP POI | Per AMAP ToS |
 | District boundaries | Shanghai government open data | Open Government Data |
-| Listings (sample) | Synthetic / hand-curated demo set | Self-generated |
+| Listings (sample) | Synthetic / browser-scraped demo set | Self-generated |
 
-Yieldwise ships **zero scrapers** and never auto-fetches anything that requires authorization. If a data source needs scraping, that's your decision in your own environment.
+Yieldwise keeps the listing path to public-page browser scraping only: no manual data-entry UI and no auto-fetching of anything that requires authorization.
 
 ## Project status
 

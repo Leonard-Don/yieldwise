@@ -10,9 +10,6 @@ REFERENCE_CATALOG_ENV = "ATLAS_REFERENCE_CATALOG_FILE"
 
 PROVIDER_ALIASES = {
     "shanghai-open-data-community": "shanghai-open-data",
-    "authorized-import": "authorized-batch-import",
-    "official-export": "authorized-batch-import",
-    "authorized-export": "authorized-batch-import",
 }
 
 PROVIDER_REGISTRY = [
@@ -58,67 +55,29 @@ PROVIDER_REGISTRY = [
     },
     {
         "id": "public-browser-sampling",
-        "name": "公开页面辅助采样",
-        "category": "staging_only",
-        "priority": "medium",
-        "role": "公开页面只读采样、字段补洞与浏览器辅助录入",
-        "coverage": "公开房源页、小区详情页、地图点位和楼栋 / 楼层文本的人工 capture CSV、手工或半自动 staging 样本。",
+        "name": "浏览器公开页抓取",
+        "category": "browser_scrape",
+        "priority": "high",
+        "role": "公开页面只读抓取、字段补洞与浏览器采集批次",
+        "coverage": "公开房源页、小区详情页、地图点位和楼栋 / 楼层文本的浏览器抓取结果。",
         "connectionState": "offline_ready",
-        "supportsLocalAutomation": False,
+        "supportsLocalAutomation": True,
         "requiredEnv": [],
         "scopes": ["sale_rent_batch", "dictionary_batch"],
         "platformUrl": "/docs/internal/import-public-browser-capture.md",
         "docsUrl": "/docs/internal/import-public-browser-capture.md",
         "guideUrl": "/docs/internal/import-public-browser-capture.md",
-        "applicationMode": "browser_staging",
-        "recommendedNextStep": "先把浏览器人工采样文本整理成 capture CSV，再跑 import_public_browser_capture.py 落成标准 sale_rent_batch / dictionary_batch 产物。",
+        "applicationMode": "browser_scrape",
+        "recommendedNextStep": "使用浏览器抓取产物进入 import_public_browser_capture.py，落成标准 sale_rent_batch / dictionary_batch 产物。",
         "contactLabel": "使用边界",
         "contactValue": "只读公开页面 / 不依赖登录态 / 不做高频自动化",
-    },
-    {
-        "id": "manual-geometry-staging",
-        "name": "手工几何 staging",
-        "category": "staging_only",
-        "priority": "medium",
-        "role": "研究阶段楼栋 footprint / anchor 手工勾绘与导入",
-        "coverage": "重点区楼栋 footprint、多边形草图、人工校正后的楼栋 geometry 批次。",
-        "connectionState": "offline_ready",
-        "supportsLocalAutomation": False,
-        "requiredEnv": [],
-        "scopes": ["geometry_batch"],
-        "platformUrl": "/docs/import-geo-assets.md",
-        "docsUrl": "/docs/import-geo-assets.md",
-        "guideUrl": "/docs/import-geo-assets.md",
-        "applicationMode": "manual_sketch",
-        "recommendedNextStep": "当官方 AOI / footprint 还没接通时，先把重点区楼栋手工勾绘成 GeoJSON，统一走 geometry_batch 导入。",
-        "contactLabel": "使用边界",
-        "contactValue": "显式标注为 staging 几何 / 不伪装成官方 AOI",
-    },
-    {
-        "id": "authorized-batch-import",
-        "name": "授权离线批次",
-        "category": "offline_authorized",
-        "priority": "medium",
-        "role": "自有 CSV / 已授权样本的离线 staging 通道",
-        "coverage": "出售 / 出租 CSV、字典 CSV、GeoJSON footprint 批次与联调 conformance harness。",
-        "connectionState": "offline_ready",
-        "supportsLocalAutomation": False,
-        "requiredEnv": [],
-        "scopes": ["sale_rent_batch", "dictionary_batch", "geometry_batch"],
-        "platformUrl": "/docs/import-authorized-data.md",
-        "docsUrl": "/docs/import-authorized-data.md",
-        "guideUrl": "/docs/import-authorized-data.md",
-        "applicationMode": "internal_staging",
-        "recommendedNextStep": "拿到官方导出 CSV / GeoJSON 后先走离线 staging，再写入 PostgreSQL 作为主读数据。",
-        "contactLabel": "内部链路",
-        "contactValue": "jobs/import_* + PostgreSQL",
     },
 ]
 
 ADAPTER_CONTRACTS = {
     "sale_rent_batch": {
         "scope": "sale_rent_batch",
-        "description": "出售 / 出租 listing 批次导入。用于授权 CSV、平台导出文件和后续官方 API 拉平后的离线落地。",
+        "description": "出售 / 出租 listing 批次导入。用于浏览器公开页抓取产物落成标准 staging 批次。",
         "requiredOutputs": [
             "manifest",
             "normalized_sale",
@@ -235,13 +194,9 @@ def provider_readiness_snapshot(
             missing_env = [name for name in required_env if name not in configured_env]
             env_ready = bool(required_env) and not missing_env
         connection_state = readiness.get("connectionState", "planned")
-        note = "等待本地数据文件、公开数据下载或手工批次。"
-        if readiness["id"] == "authorized-batch-import":
-            note = "离线导入通道已可用，用于 staging 和 conformance harness。"
-        elif readiness["id"] == "public-browser-sampling":
-            note = "公开页面辅助采样通道已可用，只做只读补洞与小批量 staging。"
-        elif readiness["id"] == "manual-geometry-staging":
-            note = "手工几何 staging 通道已可用，适合重点区楼栋 footprint 人工勾绘与研究校正。"
+        note = "等待公开数据下载或浏览器抓取批次。"
+        if readiness["id"] == "public-browser-sampling":
+            note = "浏览器公开页抓取通道已可用，只做只读补洞与小批量 staging。"
         elif env_ready:
             connection_state = "local_config_ready"
             note = "本地配置已就绪，可用于本地数据辅助任务。"
@@ -258,9 +213,9 @@ def provider_readiness_snapshot(
 
         staged_count = 0
         if "sale_rent_batch" in readiness.get("scopes", []) or "dictionary_batch" in readiness.get("scopes", []):
-            staged_count += staged_listing_runs if readiness["id"] == "authorized-batch-import" else 0
+            staged_count += staged_listing_runs if readiness["id"] == "public-browser-sampling" else 0
         if "geometry_batch" in readiness.get("scopes", []):
-            staged_count += staged_geometry_runs if readiness["id"] in {"authorized-batch-import", "amap-aoi-poi", "manual-geometry-staging"} else 0
+            staged_count += staged_geometry_runs if readiness["id"] == "amap-aoi-poi" else 0
 
         readiness["connectionState"] = connection_state
         readiness["readinessLabel"] = {
@@ -280,7 +235,7 @@ def provider_readiness_snapshot(
             "active_database"
             if has_real_data
             and readiness["id"]
-            in {"shanghai-open-data", "amap-aoi-poi", "authorized-batch-import", "public-browser-sampling", "manual-geometry-staging"}
+            in {"shanghai-open-data", "amap-aoi-poi", "public-browser-sampling"}
             else "staging"
             if staged_count
             else "planned"

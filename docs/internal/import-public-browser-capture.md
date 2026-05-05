@@ -1,15 +1,15 @@
-# 公开页面人工采样导入
+# 公开页面浏览器抓取导入
 
-这条链专门服务“暂时拿不到正式授权，但仍然要持续补洞”的阶段。
+这条链专门服务公开页面的浏览器抓取补洞，不再提供人工录入入口。
 
 约束：
 
-- 只处理**公开页面**人工采样
+- 只处理**公开页面**浏览器抓取结果
 - 不依赖登录态
 - 不做高频自动化抓取
 - 最终仍然统一落成 `public-browser-sampling` 的标准 staging 批次
 
-## 1. 准备 capture CSV
+## 1. 准备浏览器抓取 capture CSV
 
 模板见：
 
@@ -27,9 +27,9 @@
 
 建议做法：
 
-1. 浏览器打开公开房源页或小区详情页。
-2. 人工复制核心文本到 `raw_text`。
-3. 如果页面上的结构化字段很清楚，可以把 `building_text / floor_text / area_sqm / price_total_wan / monthly_rent` 这些覆盖字段也直接填上。
+1. 浏览器抓取公开房源页或小区详情页的标题、正文和可见结构化字段。
+2. 将抓取结果写入 `raw_text`，并保留原始 `url / published_at`。
+3. 如果抓取器能稳定识别结构化字段，可以写入 `building_text / floor_text / area_sqm / price_total_wan / monthly_rent` 这些覆盖字段。
 
 ## 2. 把 capture CSV 转成标准 sale / rent staging 样本
 
@@ -49,7 +49,7 @@ python3 jobs/import_public_browser_capture.py \
 
 默认还会自动继续调用：
 
-`jobs/import_authorized_listings.py --provider-id public-browser-sampling`
+`jobs/import_browser_scraped_listings.py --provider-id public-browser-sampling`
 
 所以最后也会生成标准 import run。
 
@@ -83,7 +83,7 @@ python3 jobs/materialize_public_snapshot.py \
 1. reference dictionary
 2. community anchor enrichment
 3. public-browser-sampling listing import
-4. manual geometry staging import
+4. amap-aoi-poi geometry enrichment
 5. staged metrics refresh
 
 ## 5. 解析规则
@@ -106,41 +106,24 @@ python3 jobs/materialize_public_snapshot.py \
 
 ## 6. 推荐使用方式
 
-1. 先用浏览器人工采样少量高价值楼栋。
+1. 先用浏览器抓取少量高价值楼栋。
 2. 跑 `import_public_browser_capture.py`。
 3. 先在 Atlas 工作台顶部看 `全局待复核收件箱`，它会优先按当前区展示待复核条目。
 4. 进入目标任务后，在 `review queue 回看面板` 里看当前 batch 的 `pending` 条目。
 5. 对每条缺口选择：
-   - 回填到 `sale / rent` 草稿后重新提交修正
+   - 进入下一轮浏览器抓取批次修正
    - 或者直接 `豁免并留痕`
    - 如果当前 run 有多条同类缺口，也可以先勾选子集，再批量 `标记已修正` 或 `批量豁免并留痕`
 6. 确认当前 run 的 `pendingCount` 清零后，工作台会自动接力到同任务 / 同区 / 全局的下一条待复核；都清空后再并进 staged 日更。
 
-如果你想顺手验证 Atlas 工作台里的“公开页面采样执行台”写路径也没坏，可以直接运行：
+如果你想顺手验证 Atlas 工作台已经移除人工录入控件，可以直接运行：
 
 ```bash
 python3 scripts/browser_capture_smoke.py --url http://127.0.0.1:8013/
 ```
 
-它会自动填当前任务、提交、等待刷新，并检查新的 import / metrics run 是否真的生成。
+它会打开当前任务，检查手填控件、提交按钮和回填入口都不存在。
 默认会复用 `atlas-smoke` 会话并以 headless 模式运行；如果你希望看到真实浏览器窗口，可以显式传 `--headed`。如果你希望复用当前已经打开的 Atlas 页面，可以显式传 `--session default`；如果你想强制新开一个干净会话，可以再加 `--fresh-session`。
-
-如果你想稳定验证某一条 workflow 分支，也可以直接断言提交后的接力动作：
-
-```bash
-python3 scripts/browser_capture_smoke.py \
-  --url http://127.0.0.1:8013/ \
-  --expected-workflow-action review_current_capture
-```
-
-```bash
-python3 scripts/browser_capture_smoke.py \
-  --url http://127.0.0.1:8013/ \
-  --expected-workflow-action advance_next_capture
-```
-
-不传 `--task-id` 时，脚本会先读取 live `browser_sampling_pack`，再自动挑一条最适合该 workflow 的任务；
-如果你就是想复核某个固定任务，也仍然可以额外传入 `--task-id ...` 覆盖自动选择。
 
 如果你想把 review queue 的接力 contract 单独跑成定向 smoke，也可以直接验证三条核心分支：
 
@@ -185,6 +168,4 @@ python3 scripts/full_browser_regression.py --url http://127.0.0.1:8013/
 - review queue 的 `豁免并留痕` 动作是否会写回并触发复核接力条
 - 复核接力条是否明确使用后端 `workflow.item` 指定的下一条 review 目标，而不是退回前端本地收件箱推导
 - `review_current_task` 分支是否会在临时 fixture 场景下稳定命中，并把工作台继续 pin 在当前 task 上
-- 公开页采样提交流程里的 `review_current_capture` / `advance_next_capture` 两条 workflow 分支是否都还能走通
-- 采样接力条是否明确使用后端 `workflow.task` 指定的目标，而不是退回前端本地兜底推导
-- 提交成功后，`当前任务最近采样` / `最近公开页采样批次` 是否都会指向本次新生成的 capture run
+- 公开页抓取工作台是否已经移除人工录入控件

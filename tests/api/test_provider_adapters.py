@@ -13,6 +13,8 @@ def test_readiness_snapshot_uses_local_first_status_fields(monkeypatch) -> None:
     assert by_id["amap-aoi-poi"]["readinessLabel"] == "本地配置已就绪"
     assert by_id["shanghai-open-data"]["connectionState"] == "planned"
     assert by_id["public-browser-sampling"]["connectionState"] == "offline_ready"
+    assert by_id["public-browser-sampling"]["stagedRunCount"] == 2
+    assert set(by_id) == {"shanghai-open-data", "amap-aoi-poi", "public-browser-sampling"}
 
     old_keys = {
         "supports" + "LivePull",

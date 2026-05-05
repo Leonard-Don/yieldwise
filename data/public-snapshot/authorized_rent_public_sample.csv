@@ -1,5 +1,0 @@
-source,source_listing_id,url,community_name,address_text,building_text,unit_text,floor_text,total_floors,area_sqm,bedrooms,living_rooms,bathrooms,orientation,decoration,published_at,monthly_rent
-public-browser-sampling,PUBLIC-RENT-001,https://example.com/public-rent-001,张江汤臣豪园三期,上海市浦东新区张江汤臣豪园三期5号楼2单元,5号楼,2单元,8/11,11,83.5,2,2,1,南北,精装,2026-04-12T20:12:00+08:00,12000
-public-browser-sampling,PUBLIC-RENT-002,https://example.com/public-page-002,东方汇景苑,上海市浦东新区东方路1881弄1号楼1单元,1号楼,1单元,29/39,39,110.0,2,2,1,西,简单装修,2026-04-12T20:20:00+08:00,11500
-public-browser-sampling,PUBLIC-RENT-003,https://example.com/public-page,财富海景花园,上海市浦东新区浦明路258弄1号楼1单元,1号楼,1单元,32/38,38,340.0,4,2,3,东西,精装,2026-04-12T20:28:00+08:00,90000
-public-browser-sampling,PUBLIC-RENT-004,https://example.com/public-page,嘉利明珠城,上海市静安区平型关路377弄1号楼1单元,1号楼,1单元,16/38,38,96.56,2,2,1,南,简单装修,2026-04-12T20:36:00+08:00,9800

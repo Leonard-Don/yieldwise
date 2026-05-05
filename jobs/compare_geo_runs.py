@@ -4,8 +4,8 @@
 The built-in `/api/geo-assets/runs/{id}/compare` only compares runs that
 share the same provider_id + asset_type — it's designed to track diff
 between successive captures of the same source. This script does the
-other comparison: how well do TWO different sources (e.g. manual-
-geometry-staging vs openstreetmap) cover the same buildings?
+other comparison: how well do TWO different sources (e.g. amap-aoi-poi
+vs openstreetmap) cover the same buildings?
 
 For each feature in --primary-run, find the nearest feature in
 --baseline-run within --max-meters; bucket by distance; summarize.
@@ -18,11 +18,11 @@ Output:
 
 Run:
     python3 jobs/compare_geo_runs.py
-        # auto: latest manual-priority-geometry as primary,
+        # auto: latest amap-aoi-poi geometry as primary,
         #       latest osm-matched as baseline
 
     python3 jobs/compare_geo_runs.py \\
-        --primary-run manual-priority-geometry-2026-04-17-priority4-20260417204646 \\
+        --primary-run amap-aoi-poi-geometry-2026-04-17-priority4-20260417204646 \\
         --baseline-run osm-matched-20260429111404 \\
         --max-meters 100
 """
@@ -125,7 +125,7 @@ def find_nearest(cx: float, cy: float, district: str, baseline_index: dict, max_
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--primary-run", help="Run dir name. Default: latest manual-geometry-staging")
+    p.add_argument("--primary-run", help="Run dir name. Default: latest amap-aoi-poi")
     p.add_argument("--baseline-run", help="Run dir name. Default: latest openstreetmap (osm-matched)")
     p.add_argument("--max-meters", type=float, default=100.0)
     p.add_argument("--output-root", type=Path, default=ROOT_DIR / "tmp" / "geo-comparisons")
@@ -137,14 +137,14 @@ def main() -> int:
 
     primary_dir = (
         GEO_RUNS_ROOT / args.primary_run
-        if args.primary_run else latest_run_with_provider("manual-geometry-staging")
+        if args.primary_run else latest_run_with_provider("amap-aoi-poi")
     )
     baseline_dir = (
         GEO_RUNS_ROOT / args.baseline_run
         if args.baseline_run else latest_run_with_provider("openstreetmap")
     )
     if not primary_dir or not primary_dir.exists():
-        raise SystemExit("no primary run found (manual-geometry-staging?)")
+        raise SystemExit("no primary run found (amap-aoi-poi?)")
     if not baseline_dir or not baseline_dir.exists():
         raise SystemExit("no baseline run found (openstreetmap?)")
 

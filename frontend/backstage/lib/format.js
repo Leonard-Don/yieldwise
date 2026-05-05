@@ -2,7 +2,7 @@ function anchorDecisionLabel(value) {
   return {
     pending: "待确认",
     confirmed: "已确认",
-    manual_override: "手工覆盖"
+    manual_override: "历史覆盖"
   }[value] ?? "待确认";
 }
 
@@ -233,7 +233,7 @@ function sourceModeLabel(mode) {
     catalog_apply_or_download: "目录申请 / 下载",
     console_key: "本地 Key",
     internal_staging: "本地 staging",
-    manual_sketch: "手工勾绘 staging"
+    browser_scrape: "浏览器抓取"
   }[mode] ?? mode;
 }
 

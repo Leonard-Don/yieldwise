@@ -1,6 +1,6 @@
 # Contributing
 
-这个仓库当前按“内部研究台”来维护，默认走 `staged` 数据模式，不要求先接正式授权源。
+这个仓库当前按“内部研究台”来维护，默认走 `staged` 数据模式，不保留人工录入数据入口。
 
 ## 推荐工作流
 
@@ -15,7 +15,7 @@ python3 -m compileall api jobs scripts
 node --check app.js
 ```
 
-## 公开页采样边界
+## 浏览器抓取边界
 
 - 只处理公开可见页面。
 - 不依赖登录态。
@@ -36,7 +36,7 @@ python3 jobs/materialize_public_snapshot.py \
 
 ```bash
 ATLAS_REFERENCE_CATALOG_FILE=tmp/reference-runs/shanghai-citywide-reference-2026-04-14/reference_catalog.json \
-python3 jobs/import_authorized_listings.py \
+python3 jobs/import_browser_scraped_listings.py \
   --provider-id public-browser-sampling \
   --batch-name "public-browser-sampling-2026-04-14" \
   --sale-file data/public-snapshot/2026-04-12/public_browser_sampling_sale.csv \
@@ -50,7 +50,7 @@ python3 jobs/refresh_metrics.py \
 
 ## Issue 类型
 
-- `Public Sampling Task`: 继续补公开页人工采样
+- `Public Sampling Task`: 继续补公开页浏览器抓取任务
 - `Bug Report`: 页面、导入链或地图联动问题
 
 当前采样重点见 `docs/internal/public-sampling-backlog.md`。

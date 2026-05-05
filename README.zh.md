@@ -68,7 +68,7 @@ pip install -r api/requirements.txt
 ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 ```
 
-这只适合本地试用。真实分析仍然建议接 Postgres/PostGIS，并导入你自己有授权或公开开放的数据。
+这只适合本地试用。真实分析仍然建议接 Postgres/PostGIS，并使用公开开放数据或浏览器公开页抓取批次。
 
 ## 功能
 
@@ -84,9 +84,9 @@ ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 | 楼栋形状 | OpenStreetMap | ODbL |
 | 小区边界 | 高德 POI | 按高德 ToS |
 | 行政区边界 | 上海政府开放数据 | 开放政府数据 |
-| 挂牌（demo）| 合成 / 手工策展数据 | 自生成 |
+| 挂牌（demo）| 合成 / 浏览器抓取样例 | 自生成 |
 
-Yieldwise 不带任何爬虫、不主动获取任何需要授权的数据。要爬，你在你自己的环境自己决定。
+Yieldwise 只保留公开页面浏览器抓取口径，不提供人工录入数据入口，不主动获取任何需要授权的数据。
 
 ## 项目状态
 

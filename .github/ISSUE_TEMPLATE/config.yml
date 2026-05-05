@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Local Data Import Docs
-    url: https://github.com/Leonard-Don/yieldwise/blob/main/docs/import-authorized-data.md
-    about: 先看本地 CSV 导入、公开页人工采样边界和字段模板。
+  - name: Browser Scrape Import Docs
+    url: https://github.com/Leonard-Don/yieldwise/blob/main/docs/internal/import-public-browser-capture.md
+    about: 先看公开页浏览器抓取边界、capture CSV 和导入链。
