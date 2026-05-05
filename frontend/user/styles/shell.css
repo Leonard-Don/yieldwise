@@ -119,15 +119,6 @@
   background: rgba(0, 214, 143, 0.08);
 }
 
-.atlas-mode-chip[data-stub="true"] {
-  opacity: 0.7;
-}
-
-.atlas-mode-chip[data-stub="true"][aria-pressed="true"] {
-  border-color: var(--warn);
-  background: rgba(255, 176, 32, 0.08);
-}
-
 .atlas-topbar-spacer {
   flex: 1;
 }

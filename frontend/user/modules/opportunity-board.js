@@ -33,11 +33,6 @@ export async function initBoard({ container, store }) {
 
   async function loadFor(modeId, state) {
     const mode = getMode(modeId);
-    if (!mode.enabled) {
-      lastItems = [];
-      render(store.get());
-      return;
-    }
     if (modeId === "city") {
       try {
         const data = await api.mapDistricts();
@@ -68,14 +63,6 @@ export async function initBoard({ container, store }) {
   function render(state) {
     const mode = getMode(state.mode);
     modeLabelEl.textContent = mode.label;
-    if (!mode.enabled) {
-      list.innerHTML = "";
-      empty.hidden = false;
-      empty.textContent = `${mode.label} 模式将于 Phase 3 启用`;
-      countEl.textContent = "--";
-      publishCount(null);
-      return;
-    }
     if (lastItems.length === 0) {
       list.innerHTML = "";
       empty.hidden = false;

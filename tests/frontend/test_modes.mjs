@@ -78,10 +78,6 @@ test("resolveDefaultFilters: city mode is empty regardless of prefs", () => {
   assert.deepEqual(resolveDefaultFilters("city", { budget_max_wan: 1200 }), {});
 });
 
-test("MODES: home mode is now enabled", () => {
-  assert.equal(getMode("home").enabled, true);
-});
-
 test("districtColorFor: null/NaN returns dim", () => {
   assert.equal(districtColorFor(null, 4), "var(--text-dim)");
   assert.equal(districtColorFor(Number.NaN, 4), "var(--text-dim)");

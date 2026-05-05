@@ -11,7 +11,6 @@ export const MODES = [
     ],
     defaultSort: { key: "yield", direction: "desc" },
     defaultFilters: { minYield: 4, maxBudget: 1500 },
-    enabled: true,
   },
   {
     id: "home",
@@ -24,7 +23,6 @@ export const MODES = [
     ],
     defaultSort: { key: "avgPriceWan", direction: "asc" },
     defaultFilters: {},
-    enabled: true,
   },
   {
     id: "city",
@@ -38,7 +36,6 @@ export const MODES = [
     ],
     defaultSort: { key: "yield", direction: "desc" },
     defaultFilters: {},
-    enabled: true,
   },
 ];
 

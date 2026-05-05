@@ -9,11 +9,9 @@ export function initShell({ root, store }) {
   const statusbarMode = statusbar.querySelector('[data-role="statusbar-mode"]');
   const statusbarData = statusbar.querySelector('[data-role="statusbar-data"]');
 
-  // Render chips once. Stub modes (home/city) are still clickable in Phase 2b
-  // — the spec calls for switchable chips with stub board content rather than
-  // disabled chips. Per-mode behavior wires up in Phase 3.
+  // Render chips once; every declared mode is a live workflow.
   chipsContainer.innerHTML = MODES.map(
-    (m) => `<button type="button" class="atlas-mode-chip" data-mode="${m.id}" aria-pressed="false" data-stub="${m.enabled ? "false" : "true"}">⌘${m.hotkey} ${m.label}</button>`,
+    (m) => `<button type="button" class="atlas-mode-chip" data-mode="${m.id}" aria-pressed="false">⌘${m.hotkey} ${m.label}</button>`,
   ).join("");
   chipsContainer.addEventListener("click", (event) => {
     const target = event.target.closest("[data-mode]");
