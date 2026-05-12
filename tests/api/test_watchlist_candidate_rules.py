@@ -206,3 +206,26 @@ def test_candidate_review_digest_handles_sparse_queue_items_deterministically() 
     }
     assert digest["top_target"]["target_id"] == "due"
     assert digest["next_actions"][-1]["top_targets"][0]["target_name"] == "未命名候选"
+
+
+def test_candidate_review_queue_and_digest_preserve_numeric_zero_ids() -> None:
+    queue = build_candidate_review_queue(
+        [
+            {
+                "target_id": 0,
+                "target_type": "building",
+                "target_name": "Zero Candidate",
+                "status": "watching",
+                "priority": 1,
+                "current_snapshot": {"yield": 4.2},
+                "candidate_tasks": [{"group": "target_rule", "label": "收益率达到目标", "priority": "high"}],
+                "candidate_triggers": [{"kind": "target_yield_hit", "label": "收益率达到目标"}],
+                "candidate_action": {"level": "target_rule"},
+            }
+        ]
+    )
+
+    assert queue[0]["target_id"] == "0"
+    digest = build_candidate_review_digest(queue)
+    assert digest["next_actions"][0]["target_ids"] == ["0"]
+    assert digest["next_actions"][0]["top_targets"][0]["target_id"] == "0"

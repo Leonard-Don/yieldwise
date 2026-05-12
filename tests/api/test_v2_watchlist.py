@@ -121,6 +121,247 @@ def test_review_queue_includes_deterministic_reviewer_digest(client) -> None:
     assert body["digest"]["next_actions"][0]["top_targets"][0]["task_labels"]
 
 
+def test_review_decision_reviewed_persists_audit_and_closes_open_actions(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_yield_pct": 0.1,
+            "review_due_at": "2000-01-01",
+        },
+    )
+
+    response = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/review-decision",
+        json={"decision": "reviewed", "note": "真实挂牌和租金已复核"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["review_decision"] == "reviewed"
+    assert body["review_decision_at"]
+    assert body["review_decision_note"] == "真实挂牌和租金已复核"
+    assert body["decision_history"][-1]["decision"] == "reviewed"
+    assert body["decision_history"][-1]["note"] == "真实挂牌和租金已复核"
+    assert body["decision_history"][-1]["decided_at"] == body["review_decision_at"]
+    assert body["last_reviewed_at"] == body["review_decision_at"]
+    assert body["last_seen_snapshot"]["name"]
+    assert body["notes"] == "真实挂牌和租金已复核"
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["summary"] == {
+        "total": 1,
+        "pending_review": 0,
+        "watch": 0,
+        "reviewed": 1,
+        "dismissed": 0,
+    }
+    assert queue["digest"]["open_count"] == 0
+    assert queue["digest"]["next_action_count"] == 0
+    assert queue["digest"]["next_actions"] == []
+    assert queue["items"][0]["status"] == "reviewed"
+    assert queue["items"][0]["review_decision"] == "reviewed"
+    assert "target_rule" not in queue["items"][0]["task_groups"]
+
+
+def test_review_decision_watch_keeps_candidate_visible_as_watch(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_yield_pct": 0.1,
+            "review_due_at": "2000-01-01",
+        },
+    )
+
+    response = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/review-decision",
+        json={"decision": "watch", "note": "暂不推进，保留观察"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["review_decision"] == "watch"
+    assert body["review_decision_at"]
+    assert body["review_decision_note"] == "暂不推进，保留观察"
+    assert body["status"] == "watching"
+    assert body["review_due_at"] is None
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["summary"] == {
+        "total": 1,
+        "pending_review": 0,
+        "watch": 1,
+        "reviewed": 0,
+        "dismissed": 0,
+    }
+    assert queue["digest"]["open_count"] == 1
+    assert queue["digest"]["next_action_count"] == 1
+    assert [action["group"] for action in queue["digest"]["next_actions"]] == ["watch"]
+    assert queue["items"][0]["status"] == "watch"
+    assert queue["items"][0]["review_decision"] == "watch"
+    assert queue["items"][0]["task_groups"] == ["watch"]
+
+
+def test_review_decision_dismissed_moves_to_dismissed_without_open_actions(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_yield_pct": 0.1,
+        },
+    )
+
+    response = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/review-decision",
+        json={"decision": "dismissed"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "rejected"
+    assert body["review_decision"] == "dismissed"
+    assert body["review_decision_at"]
+    assert body["review_decision_note"] is None
+    assert body["decision_history"][-1]["decision"] == "dismissed"
+    assert body["last_reviewed_at"] == body["review_decision_at"]
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["summary"] == {
+        "total": 1,
+        "pending_review": 0,
+        "watch": 0,
+        "reviewed": 0,
+        "dismissed": 1,
+    }
+    assert queue["digest"]["open_count"] == 0
+    assert queue["digest"]["next_action_count"] == 0
+    assert queue["items"][0]["status"] == "dismissed"
+
+
+def test_review_decision_preserves_string_zero_target_id(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "0", "target_type": "building", "review_due_at": "2000-01-01"},
+    )
+
+    response = client.post(
+        "/api/v2/watchlist/0/review-decision",
+        json={"decision": "watch", "note": "0 号占位候选继续观察"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["target_id"] == "0"
+    assert body["review_decision"] == "watch"
+    assert body["decision_history"][-1]["note"] == "0 号占位候选继续观察"
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["items"][0]["target_id"] == "0"
+    assert queue["items"][0]["status"] == "watch"
+    assert queue["digest"]["next_actions"][0]["target_ids"] == ["0"]
+
+
+def test_review_decision_preserves_numeric_zero_target_id_through_storage(client) -> None:
+    response = client.post(
+        "/api/v2/watchlist",
+        json={"target_id": 0, "target_type": "building", "review_due_at": "2000-01-01"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["target_id"] == 0
+
+    decision = client.post(
+        "/api/v2/watchlist/0/review-decision",
+        json={"decision": "watch", "note": "numeric zero"},
+    )
+    assert decision.status_code == 200, decision.text
+    assert decision.json()["target_id"] == 0
+    assert decision.json()["review_decision"] == "watch"
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["items"][0]["target_id"] == "0"
+    assert queue["digest"]["next_actions"][0]["target_ids"] == ["0"]
+
+
+def test_reviewed_decision_reenters_queue_when_due_again(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
+    )
+    reviewed = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/review-decision",
+        json={"decision": "reviewed"},
+    )
+    assert reviewed.status_code == 200, reviewed.text
+
+    patched = client.patch(
+        "/api/v2/watchlist/zhangjiang-park-b1",
+        json={"review_due_at": "2000-01-01"},
+    )
+    assert patched.status_code == 200, patched.text
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["summary"]["pending_review"] == 1
+    assert queue["items"][0]["status"] == "pending_review"
+    assert "due_review" in queue["items"][0]["task_groups"]
+    assert queue["digest"]["open_count"] == 1
+
+
+def test_legacy_action_overrides_prior_review_decision(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
+    )
+    watched = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/review-decision",
+        json={"decision": "watch"},
+    )
+    assert watched.status_code == 200, watched.text
+
+    rejected = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/actions",
+        json={"action": "reject", "notes": "旧动作仍然是权威操作"},
+    )
+    assert rejected.status_code == 200, rejected.text
+    assert rejected.json()["review_decision"] == "dismissed"
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["summary"]["dismissed"] == 1
+    assert queue["items"][0]["status"] == "dismissed"
+    assert queue["digest"]["open_count"] == 0
+
+
+def test_legacy_shortlist_action_supersedes_prior_watch_decision(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={"target_id": "zhangjiang-park-b1", "target_type": "building"},
+    )
+    watched = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/review-decision",
+        json={"decision": "watch"},
+    )
+    assert watched.status_code == 200, watched.text
+
+    shortlisted = client.post(
+        "/api/v2/watchlist/zhangjiang-park-b1/actions",
+        json={"action": "shortlist", "notes": "旧按钮提升为候选"},
+    )
+    assert shortlisted.status_code == 200, shortlisted.text
+    body = shortlisted.json()
+    assert body["status"] == "shortlisted"
+    assert body["review_decision"] is None
+    assert body["review_decision_superseded_at"] == body["updated_at"]
+
+    queue = client.get("/api/v2/watchlist/review-queue").json()
+    assert queue["items"][0]["candidate_status"] == "shortlisted"
+    assert queue["items"][0]["status"] != "watch"
+    assert "watch" not in queue["items"][0]["task_groups"]
+    assert "shortlisted" in queue["items"][0]["task_groups"]
+
+
 def test_post_adds_entry_with_added_at(client) -> None:
     response = client.post(
         "/api/v2/watchlist",

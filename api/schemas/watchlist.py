@@ -8,6 +8,17 @@ from pydantic import BaseModel, ConfigDict, Field
 TargetType = Literal["building", "community", "district"]
 CandidateStatus = Literal["watching", "researching", "shortlisted", "rejected"]
 CandidateAction = Literal["complete_review", "defer_review", "shortlist", "reject"]
+CandidateReviewDecision = Literal["reviewed", "dismissed", "watch"]
+
+
+class WatchlistDecisionRecord(BaseModel):
+    """One auditable candidate review decision."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    decision: CandidateReviewDecision
+    decided_at: str
+    note: str | None = None
 
 
 class WatchlistEntry(BaseModel):
@@ -20,7 +31,7 @@ class WatchlistEntry(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    target_id: str
+    target_id: str | int
     target_type: TargetType
     added_at: str | None = None
     updated_at: str | None = None
@@ -34,6 +45,11 @@ class WatchlistEntry(BaseModel):
     last_reviewed_at: str | None = None
     notes: str | None = None
     last_seen_snapshot: dict[str, Any] | None = None
+    review_decision: CandidateReviewDecision | None = None
+    review_decision_at: str | None = None
+    review_decision_note: str | None = None
+    review_decision_superseded_at: str | None = None
+    decision_history: list[WatchlistDecisionRecord] = Field(default_factory=list)
 
 
 class WatchlistAddPayload(BaseModel):
@@ -41,7 +57,7 @@ class WatchlistAddPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    target_id: str
+    target_id: str | int
     target_type: TargetType
     status: CandidateStatus | None = None
     priority: int | None = Field(default=None, ge=1, le=5)
@@ -78,3 +94,12 @@ class WatchlistActionPayload(BaseModel):
     action: CandidateAction
     days: int | None = Field(default=None, ge=1, le=90)
     notes: str | None = None
+
+
+class WatchlistDecisionPayload(BaseModel):
+    """POST body for /api/v2/watchlist/{target_id}/review-decision."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: CandidateReviewDecision
+    note: str | None = None

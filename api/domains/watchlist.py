@@ -6,7 +6,13 @@ from typing import Any
 from fastapi import APIRouter
 
 from .. import personal_storage
-from ..schemas.watchlist import WatchlistActionPayload, WatchlistAddPayload, WatchlistEntry, WatchlistPatchPayload
+from ..schemas.watchlist import (
+    WatchlistActionPayload,
+    WatchlistAddPayload,
+    WatchlistDecisionPayload,
+    WatchlistEntry,
+    WatchlistPatchPayload,
+)
 from ..service import get_building, get_community, list_districts
 
 router = APIRouter(tags=["watchlist"])
@@ -137,11 +143,12 @@ def add_to_watchlist(payload: WatchlistAddPayload) -> dict[str, Any]:
     # the original list position so the order stays stable.
     replaced = False
     for index, existing in enumerate(items):
-        if existing.get("target_id") == payload.target_id:
-            new_entry = _entry_from_payload(payload, existing=existing, now=now)
-            items[index] = new_entry
-            replaced = True
-            break
+        if not _same_target_id(existing.get("target_id"), payload.target_id):
+            continue
+        new_entry = _entry_from_payload(payload, existing=existing, now=now)
+        items[index] = new_entry
+        replaced = True
+        break
     if not replaced:
         new_entry = _entry_from_payload(payload, existing=None, now=now)
         items.append(new_entry)
@@ -155,7 +162,7 @@ def update_watchlist_entry(target_id: str, payload: WatchlistPatchPayload) -> di
     items = _load_entries()
     update = payload.model_dump(exclude_unset=True)
     for index, existing in enumerate(items):
-        if existing.get("target_id") != target_id:
+        if not _same_target_id(existing.get("target_id"), target_id):
             continue
         next_entry = {
             **existing,
@@ -175,7 +182,7 @@ def apply_watchlist_action(target_id: str, payload: WatchlistActionPayload) -> d
     now = _now()
     today = date.today()
     for index, existing in enumerate(items):
-        if existing.get("target_id") != target_id:
+        if not _same_target_id(existing.get("target_id"), target_id):
             continue
         snapshot = _snapshot_for_entry(existing)
         next_entry = _apply_action(existing, payload, snapshot=snapshot, now=now, today=today)
@@ -186,10 +193,27 @@ def apply_watchlist_action(target_id: str, payload: WatchlistActionPayload) -> d
     return {"updated": False}
 
 
+@router.post("/watchlist/{target_id}/review-decision")
+def apply_watchlist_review_decision(target_id: str, payload: WatchlistDecisionPayload) -> dict[str, Any]:
+    items = _load_entries()
+    now = _now()
+    today = date.today()
+    for index, existing in enumerate(items):
+        if not _same_target_id(existing.get("target_id"), target_id):
+            continue
+        snapshot = _snapshot_for_entry(existing)
+        next_entry = _apply_review_decision(existing, payload, snapshot=snapshot, now=now, today=today)
+        validated = WatchlistEntry.model_validate(next_entry).model_dump()
+        items[index] = validated
+        _save_entries(items)
+        return _enrich_entry(validated)
+    return {"updated": False}
+
+
 @router.delete("/watchlist/{target_id}")
 def remove_from_watchlist(target_id: str) -> dict[str, Any]:
     items = _load_entries()
-    next_items = [it for it in items if it.get("target_id") != target_id]
+    next_items = [it for it in items if not _same_target_id(it.get("target_id"), target_id)]
     if len(next_items) == len(items):
         return {"removed": False}
     _save_entries(next_items)
@@ -242,6 +266,10 @@ def _apply_action(
             "last_reviewed_at": now,
             "last_seen_snapshot": snapshot or entry.get("last_seen_snapshot"),
             "review_due_at": _date_after(payload.days or 14, today=today),
+            "review_decision": "reviewed",
+            "review_decision_at": now,
+            "review_decision_note": notes,
+            "review_decision_superseded_at": None,
             "notes": notes,
         }
     if payload.action == "defer_review":
@@ -250,6 +278,10 @@ def _apply_action(
             "updated_at": now,
             "status": "researching" if entry.get("status") != "shortlisted" else entry.get("status"),
             "review_due_at": _date_after(payload.days or 7, today=today),
+            "review_decision": None,
+            "review_decision_at": None,
+            "review_decision_note": None,
+            "review_decision_superseded_at": now,
             "notes": notes,
         }
     if payload.action == "shortlist":
@@ -258,6 +290,10 @@ def _apply_action(
             "updated_at": now,
             "status": "shortlisted",
             "review_due_at": entry.get("review_due_at") or _date_after(payload.days or 7, today=today),
+            "review_decision": None,
+            "review_decision_at": None,
+            "review_decision_note": None,
+            "review_decision_superseded_at": now,
             "notes": notes,
         }
     if payload.action == "reject":
@@ -268,9 +304,85 @@ def _apply_action(
             "review_due_at": None,
             "last_reviewed_at": now,
             "last_seen_snapshot": snapshot or entry.get("last_seen_snapshot"),
+            "review_decision": "dismissed",
+            "review_decision_at": now,
+            "review_decision_note": notes,
+            "review_decision_superseded_at": None,
             "notes": notes,
         }
     return entry
+
+
+def _apply_review_decision(
+    entry: dict[str, Any],
+    payload: WatchlistDecisionPayload,
+    *,
+    snapshot: dict[str, Any] | None,
+    now: str,
+    today: date,
+) -> dict[str, Any]:
+    decision = payload.decision
+    note = _clean_text(payload.note)
+    record = {
+        "decision": decision,
+        "decided_at": now,
+        "note": note,
+    }
+    next_entry = {
+        **entry,
+        "updated_at": now,
+        "review_decision": decision,
+        "review_decision_at": now,
+        "review_decision_note": note,
+        "review_decision_superseded_at": None,
+        "decision_history": [*_decision_history(entry.get("decision_history")), record],
+    }
+    if note is not None:
+        next_entry["notes"] = note
+
+    if decision == "reviewed":
+        return {
+            **next_entry,
+            "last_reviewed_at": now,
+            "last_seen_snapshot": snapshot or entry.get("last_seen_snapshot"),
+            "review_due_at": _date_after(14, today=today),
+        }
+    if decision == "dismissed":
+        return {
+            **next_entry,
+            "status": "rejected",
+            "review_due_at": None,
+            "last_reviewed_at": now,
+            "last_seen_snapshot": snapshot or entry.get("last_seen_snapshot"),
+        }
+    if decision == "watch":
+        return {
+            **next_entry,
+            "status": "watching",
+            "review_due_at": None,
+        }
+    return next_entry
+
+
+def _decision_history(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        decision = _clean_text(item.get("decision"))
+        decided_at = _clean_text(item.get("decided_at"))
+        if decision not in {"reviewed", "dismissed", "watch"} or not decided_at:
+            continue
+        out.append(
+            {
+                "decision": decision,
+                "decided_at": decided_at,
+                "note": _clean_text(item.get("note")),
+            }
+        )
+    return out
 
 
 def _enrich_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -292,8 +404,8 @@ def _enrich_entry(entry: dict[str, Any]) -> dict[str, Any]:
 
 
 def _snapshot_for_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
-    target_id = str(entry.get("target_id") or "")
-    target_type = str(entry.get("target_type") or "")
+    target_id = _clean_text(entry.get("target_id")) or ""
+    target_type = _clean_text(entry.get("target_type")) or ""
     if not target_id:
         return None
 
@@ -453,6 +565,20 @@ def _candidate_tasks(
     triggers: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
     status = str(entry.get("status") or "watching")
+    decision = _latest_review_decision(entry)
+    if decision == "reviewed" and not _is_due(entry.get("review_due_at")):
+        return []
+    if decision == "watch":
+        return [
+            {
+                "group": "watch",
+                "label": "继续观察",
+                "priority": "low",
+                "next": "保留关注，下一轮看价格、租金和质量变化。",
+            }
+        ]
+    if decision == "dismissed":
+        status = "rejected"
     if status == "rejected":
         return [
             {
@@ -616,6 +742,8 @@ def _review_digest_bucket(group: str) -> dict[str, Any]:
 
 def _review_digest_groups(item: dict[str, Any]) -> list[str]:
     status = str(item.get("status") or "").strip()
+    if status in {"reviewed", "dismissed"}:
+        return []
     groups: list[str] = []
     for group in _clean_strings(item.get("task_groups")):
         if group in REVIEW_DIGEST_GROUP_META and group not in {"needs_review"}:
@@ -661,11 +789,14 @@ def _candidate_review_queue_item(item: dict[str, Any]) -> dict[str, Any]:
         else None
     )
     return {
-        "target_id": item.get("target_id"),
+        "target_id": _clean_text(item.get("target_id")),
         "target_name": item.get("target_name") or snapshot.get("name") or item.get("target_id"),
         "target_type": item.get("target_type"),
         "status": _candidate_review_status(item, tasks),
         "candidate_status": item.get("status") or "watching",
+        "review_decision": _latest_review_decision(item),
+        "review_decision_at": item.get("review_decision_at"),
+        "review_decision_note": item.get("review_decision_note"),
         "priority": int(_maybe_float(item.get("priority")) or 3),
         "review_date": item.get("review_due_at"),
         "reviewed_at": item.get("last_reviewed_at"),
@@ -691,6 +822,13 @@ def _candidate_review_queue_item(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _candidate_review_status(item: dict[str, Any], tasks: list[dict[str, Any]]) -> str:
+    decision = _latest_review_decision(item)
+    if decision == "dismissed":
+        return "dismissed"
+    if decision == "reviewed" and not _is_due(item.get("review_due_at")):
+        return "reviewed"
+    if decision == "watch":
+        return "watch"
     candidate_status = str(item.get("status") or "watching")
     action = item.get("candidate_action") if isinstance(item.get("candidate_action"), dict) else {}
     action_level = str(action.get("level") or "")
@@ -736,8 +874,8 @@ def _candidate_review_queue_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
         int(_maybe_float(item.get("priority")) or 3),
         -_candidate_sort_timestamp(item),
         -float(_maybe_float(item.get("material_delta")) or 0.0),
-        str(item.get("target_type") or ""),
-        str(item.get("target_id") or ""),
+        _clean_text(item.get("target_type")) or "",
+        _clean_text(item.get("target_id")) or "",
     )
 
 
@@ -848,6 +986,31 @@ def _clean_strings(value: Any) -> list[str]:
         if text:
             out.append(text)
     return out
+
+
+def _same_target_id(left: Any, right: Any) -> bool:
+    left_text = _clean_text(left)
+    right_text = _clean_text(right)
+    return left_text is not None and right_text is not None and left_text == right_text
+
+
+def _latest_review_decision(entry: dict[str, Any]) -> str | None:
+    decision = _clean_text(entry.get("review_decision"))
+    if decision in {"reviewed", "dismissed", "watch"}:
+        return decision
+    history = _decision_history(entry.get("decision_history"))
+    if not history:
+        return None
+    latest = max(history, key=lambda item: _candidate_sort_timestamp({"updated_at": item.get("decided_at")}))
+    latest_decision = _clean_text(latest.get("decision"))
+    if latest_decision not in {"reviewed", "dismissed", "watch"}:
+        return None
+    superseded_at = _clean_text(entry.get("review_decision_superseded_at"))
+    if superseded_at and _candidate_sort_timestamp({"updated_at": superseded_at}) >= _candidate_sort_timestamp(
+        {"updated_at": latest.get("decided_at")}
+    ):
+        return None
+    return latest_decision
 
 
 def _normalize_yield_pct(value: Any) -> float | None:
