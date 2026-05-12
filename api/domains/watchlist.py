@@ -18,6 +18,24 @@ CANDIDATE_STATUS_LABELS = {
     "shortlisted": "候选",
     "rejected": "搁置",
 }
+REVIEW_QUEUE_STATUS_RANK = {
+    "pending_review": 0,
+    "watch": 1,
+    "reviewed": 2,
+    "dismissed": 3,
+}
+REVIEW_QUEUE_PENDING_GROUPS = {
+    "due_review",
+    "target_rule",
+    "changed",
+    "evidence_missing",
+    "shortlisted",
+}
+TASK_PRIORITY_RANK = {
+    "high": 0,
+    "medium": 1,
+    "low": 2,
+}
 
 
 def _load_entries() -> list[dict[str, Any]]:
@@ -51,6 +69,15 @@ def list_watchlist() -> dict[str, Any]:
     return {
         "items": items,
         "summary": _research_summary(items),
+    }
+
+
+@router.get("/watchlist/review-queue")
+def list_watchlist_review_queue() -> dict[str, Any]:
+    queue = build_candidate_review_queue([_enrich_entry(item) for item in _load_entries()])
+    return {
+        "items": queue,
+        "summary": _review_queue_summary(queue),
     }
 
 
@@ -475,6 +502,145 @@ def _candidate_action(
     if not snapshot:
         return {"level": "blocked", "label": "缺当前快照", "next": "先刷新数据或移出候选。"}
     return {"level": "ready", "label": "可比较", "next": snapshot.get("decisionNextAction") or "加入对比并生成备忘录。"}
+
+
+def build_candidate_review_queue(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Derive a deterministic decision queue from enriched watchlist candidates."""
+
+    queue = [_candidate_review_queue_item(item) for item in items]
+    queue.sort(key=_candidate_review_queue_sort_key)
+    return queue
+
+
+def _candidate_review_queue_item(item: dict[str, Any]) -> dict[str, Any]:
+    snapshot = item.get("current_snapshot") if isinstance(item.get("current_snapshot"), dict) else {}
+    triggers = item.get("candidate_triggers") if isinstance(item.get("candidate_triggers"), list) else []
+    tasks = item.get("candidate_tasks") if isinstance(item.get("candidate_tasks"), list) else []
+    current_yield = _normalize_yield_pct(snapshot.get("yield"))
+    target_yield = _maybe_float(item.get("target_yield_pct"))
+    yield_delta = (
+        round(current_yield - target_yield, 2)
+        if current_yield is not None and target_yield is not None
+        else None
+    )
+    return {
+        "target_id": item.get("target_id"),
+        "target_name": item.get("target_name") or snapshot.get("name") or item.get("target_id"),
+        "target_type": item.get("target_type"),
+        "status": _candidate_review_status(item, tasks),
+        "candidate_status": item.get("status") or "watching",
+        "priority": int(_maybe_float(item.get("priority")) or 3),
+        "review_date": item.get("review_due_at"),
+        "reviewed_at": item.get("last_reviewed_at"),
+        "current_yield_pct": current_yield,
+        "target_yield_pct": target_yield,
+        "yield_delta_pct": yield_delta,
+        "trigger_labels": [str(trigger.get("label")) for trigger in triggers if trigger.get("label")],
+        "trigger_reasons": [
+            str(trigger.get("kind") or trigger.get("reason"))
+            for trigger in triggers
+            if trigger.get("kind") or trigger.get("reason")
+        ],
+        "task_labels": [str(task.get("label")) for task in tasks if task.get("label")],
+        "task_groups": [str(task.get("group")) for task in tasks if task.get("group")],
+        "task_priorities": [str(task.get("priority")) for task in tasks if task.get("priority")],
+        "action_level": (item.get("candidate_action") or {}).get("level")
+        if isinstance(item.get("candidate_action"), dict)
+        else None,
+        "material_delta": _candidate_material_delta(item, current_yield, target_yield),
+        "added_at": item.get("added_at"),
+        "updated_at": item.get("updated_at"),
+    }
+
+
+def _candidate_review_status(item: dict[str, Any], tasks: list[dict[str, Any]]) -> str:
+    candidate_status = str(item.get("status") or "watching")
+    action = item.get("candidate_action") if isinstance(item.get("candidate_action"), dict) else {}
+    action_level = str(action.get("level") or "")
+    task_groups = {str(task.get("group") or "") for task in tasks}
+    if candidate_status == "rejected" or action_level == "rejected" or "rejected" in task_groups:
+        return "dismissed"
+    if task_groups & REVIEW_QUEUE_PENDING_GROUPS:
+        return "pending_review"
+    if item.get("last_reviewed_at"):
+        return "reviewed"
+    return "watch"
+
+
+def _candidate_material_delta(
+    item: dict[str, Any],
+    current_yield: float | None,
+    target_yield: float | None,
+) -> float:
+    values: list[float] = []
+    if current_yield is not None and target_yield is not None:
+        values.append(abs(current_yield - target_yield))
+    delta = item.get("snapshot_delta")
+    if isinstance(delta, dict):
+        for value in delta.values():
+            number = _maybe_float(value)
+            if number is not None:
+                values.append(abs(number))
+    triggers = item.get("candidate_triggers")
+    if isinstance(triggers, list):
+        for trigger in triggers:
+            if not isinstance(trigger, dict):
+                continue
+            number = _maybe_float(trigger.get("delta"))
+            if number is not None:
+                values.append(abs(number))
+    return round(max(values), 4) if values else 0.0
+
+
+def _candidate_review_queue_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        REVIEW_QUEUE_STATUS_RANK.get(str(item.get("status") or ""), 9),
+        _candidate_task_priority_rank(item),
+        int(_maybe_float(item.get("priority")) or 3),
+        -_candidate_sort_timestamp(item),
+        -float(_maybe_float(item.get("material_delta")) or 0.0),
+        str(item.get("target_type") or ""),
+        str(item.get("target_id") or ""),
+    )
+
+
+def _candidate_task_priority_rank(item: dict[str, Any]) -> int:
+    ranks = [
+        TASK_PRIORITY_RANK.get(str(priority).lower(), 9)
+        for priority in item.get("task_priorities", [])
+        if priority
+    ]
+    if ranks:
+        return min(ranks)
+    return 2 if item.get("status") == "watch" else 9
+
+
+def _candidate_sort_timestamp(item: dict[str, Any]) -> float:
+    value = item.get("updated_at") or item.get("added_at") or item.get("review_date") or ""
+    if not value:
+        return 0.0
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        try:
+            return datetime.fromisoformat(f"{str(value)[:10]}T00:00:00").timestamp()
+        except ValueError:
+            return 0.0
+
+
+def _review_queue_summary(queue: list[dict[str, Any]]) -> dict[str, int]:
+    summary = {
+        "total": len(queue),
+        "pending_review": 0,
+        "watch": 0,
+        "reviewed": 0,
+        "dismissed": 0,
+    }
+    for item in queue:
+        status = str(item.get("status") or "")
+        if status in summary:
+            summary[status] += 1
+    return summary
 
 
 def _research_summary(items: list[dict[str, Any]]) -> dict[str, int]:

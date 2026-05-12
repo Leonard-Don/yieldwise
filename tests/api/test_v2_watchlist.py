@@ -35,6 +35,54 @@ def test_get_returns_empty_items_when_no_file(client) -> None:
     }
 
 
+def test_review_queue_returns_deterministic_candidate_tasks(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_yield_pct": 0.1,
+            "review_due_at": "2000-01-01",
+        },
+    )
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "pudong",
+            "target_type": "district",
+            "status": "rejected",
+            "target_yield_pct": 0.1,
+        },
+    )
+
+    response = client.get("/api/v2/watchlist/review-queue")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"] == {
+        "total": 2,
+        "pending_review": 1,
+        "watch": 0,
+        "reviewed": 0,
+        "dismissed": 1,
+    }
+
+    first = body["items"][0]
+    assert first["target_id"] == "zhangjiang-park-b1"
+    assert first["target_name"]
+    assert first["target_type"] == "building"
+    assert first["status"] == "pending_review"
+    assert first["candidate_status"] == "watching"
+    assert first["priority"] == 3
+    assert first["current_yield_pct"] > 1
+    assert first["target_yield_pct"] == 0.1
+    assert first["yield_delta_pct"] == round(first["current_yield_pct"] - 0.1, 2)
+    assert "收益率达到目标" in first["trigger_labels"]
+    assert first["review_date"] == "2000-01-01"
+
+    assert body["items"][1]["target_id"] == "pudong"
+    assert body["items"][1]["status"] == "dismissed"
+
+
 def test_post_adds_entry_with_added_at(client) -> None:
     response = client.post(
         "/api/v2/watchlist",
