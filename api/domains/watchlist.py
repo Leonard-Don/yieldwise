@@ -357,7 +357,7 @@ def _candidate_triggers(
                 "delta": round(rent - target_rent, 2),
             }
         )
-    yield_pct = _maybe_float(snapshot.get("yield"))
+    yield_pct = _normalize_yield_pct(snapshot.get("yield"))
     target_yield = _maybe_float(entry.get("target_yield_pct"))
     if yield_pct is not None and target_yield is not None and yield_pct >= target_yield:
         out.append(
@@ -514,6 +514,13 @@ def _maybe_float(value: Any) -> float | None:
     if number != number:
         return None
     return number
+
+
+def _normalize_yield_pct(value: Any) -> float | None:
+    number = _maybe_float(value)
+    if number is None:
+        return None
+    return number * 100.0 if number < 1 else number
 
 
 def _is_due(value: Any) -> bool:
