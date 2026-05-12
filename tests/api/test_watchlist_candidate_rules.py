@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from api.domains.watchlist import _candidate_triggers, build_candidate_review_queue
+from api.domains.watchlist import _candidate_triggers, build_candidate_review_digest, build_candidate_review_queue
 
 
 def test_candidate_yield_rule_normalizes_fraction_snapshot_to_percent() -> None:
@@ -121,3 +121,88 @@ def test_candidate_review_queue_derives_fields_and_sorts_deterministically() -> 
     assert queue[2]["status"] == "watch"
     assert queue[3]["status"] == "reviewed"
     assert queue[4]["status"] == "dismissed"
+
+
+def test_candidate_review_digest_handles_sparse_queue_items_deterministically() -> None:
+    digest = build_candidate_review_digest(
+        [
+            {
+                "target_id": "watch",
+                "target_name": "Watch",
+                "target_type": "community",
+                "status": "watch",
+                "priority": "",
+                "task_groups": None,
+            },
+            {
+                "target_id": "due",
+                "target_name": "Due",
+                "target_type": "building",
+                "status": "pending_review",
+                "priority": 1,
+                "review_date": "2026-05-12",
+                "task_groups": ["due_review", "due_review", "", None],
+                "task_labels": ["到期复核", None, ""],
+                "task_priorities": ["high", ""],
+                "trigger_labels": [None, "收益率达到目标"],
+                "material_delta": 2.34567,
+            },
+            {
+                "target_id": "evidence",
+                "target_name": "Evidence",
+                "target_type": "building",
+                "status": "pending_review",
+                "priority": 2,
+                "task_groups": ["evidence_missing"],
+                "task_labels": ["证据不足"],
+                "task_priorities": ["medium"],
+            },
+            {
+                "target_name": "",
+                "target_type": "",
+                "status": "",
+                "priority": None,
+                "task_groups": [],
+            },
+            {
+                "target_id": "dismissed",
+                "status": "dismissed",
+                "task_groups": ["rejected"],
+            },
+        ]
+    )
+
+    assert digest["counts"] == {
+        "total": 5,
+        "pending_review": 2,
+        "watch": 1,
+        "reviewed": 0,
+        "dismissed": 1,
+    }
+    assert digest["open_count"] == 3
+    assert digest["next_action_count"] == 4
+    assert [action["group"] for action in digest["next_actions"]] == [
+        "due_review",
+        "evidence_missing",
+        "watch",
+        "needs_review",
+    ]
+    due_action = digest["next_actions"][0]
+    assert due_action["count"] == 1
+    assert due_action["target_ids"] == ["due"]
+    assert due_action["top_targets"][0] == {
+        "target_id": "due",
+        "target_name": "Due",
+        "target_type": "building",
+        "status": "pending_review",
+        "candidate_status": None,
+        "priority": 1,
+        "review_date": "2026-05-12",
+        "action_level": None,
+        "task_labels": ["到期复核"],
+        "trigger_labels": ["收益率达到目标"],
+        "yield_delta_pct": None,
+        "material_delta": 2.3457,
+    }
+    assert digest["top_target"]["target_id"] == "due"
+    assert digest["next_actions"][-1]["top_targets"][0]["target_name"] == "未命名候选"

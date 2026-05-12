@@ -36,6 +36,52 @@ TASK_PRIORITY_RANK = {
     "medium": 1,
     "low": 2,
 }
+REVIEW_DIGEST_GROUP_META = {
+    "due_review": {
+        "label": "到期复核",
+        "priority": "high",
+        "next": "先重新检查价格、租金、楼层样本和备注。",
+    },
+    "target_rule": {
+        "label": "目标触发",
+        "priority": "high",
+        "next": "先核对真实房源后决定是否进入候选或放弃。",
+    },
+    "evidence_missing": {
+        "label": "证据缺口",
+        "priority": "medium",
+        "next": "先补齐公开样本、楼层配对或刷新快照。",
+    },
+    "changed": {
+        "label": "变化复核",
+        "priority": "medium",
+        "next": "先展开变化提醒并更新本地备忘录。",
+    },
+    "shortlisted": {
+        "label": "候选推进",
+        "priority": "medium",
+        "next": "先补齐反对理由和下一步动作，准备投决备忘录。",
+    },
+    "watch": {
+        "label": "继续观察",
+        "priority": "low",
+        "next": "保留关注，下一轮看价格、租金和质量变化。",
+    },
+    "needs_review": {
+        "label": "人工复核",
+        "priority": "high",
+        "next": "先检查候选状态和任务字段是否完整。",
+    },
+}
+REVIEW_DIGEST_GROUP_RANK = {
+    "due_review": 0,
+    "target_rule": 1,
+    "evidence_missing": 2,
+    "changed": 3,
+    "shortlisted": 4,
+    "watch": 5,
+    "needs_review": 6,
+}
 
 
 def _load_entries() -> list[dict[str, Any]]:
@@ -78,6 +124,7 @@ def list_watchlist_review_queue() -> dict[str, Any]:
     return {
         "items": queue,
         "summary": _review_queue_summary(queue),
+        "digest": build_candidate_review_digest(queue),
     }
 
 
@@ -512,6 +559,96 @@ def build_candidate_review_queue(items: list[dict[str, Any]]) -> list[dict[str, 
     return queue
 
 
+def build_candidate_review_digest(queue: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize the review queue into deterministic reviewer next-action buckets."""
+
+    buckets: dict[str, dict[str, Any]] = {}
+    action_item_indexes: set[int] = set()
+    for index, item in enumerate(queue):
+        if not isinstance(item, dict):
+            continue
+        groups = _review_digest_groups(item)
+        if not groups:
+            continue
+        action_item_indexes.add(index)
+        target = _review_digest_target(item)
+        target_id = _clean_text(item.get("target_id"))
+        for group in groups:
+            bucket = buckets.setdefault(group, _review_digest_bucket(group))
+            bucket["count"] += 1
+            if target_id:
+                bucket["target_ids"].append(target_id)
+            if len(bucket["top_targets"]) < 3:
+                bucket["top_targets"].append(target)
+
+    next_actions = sorted(
+        buckets.values(),
+        key=lambda bucket: (
+            REVIEW_DIGEST_GROUP_RANK.get(str(bucket.get("group") or ""), 99),
+            TASK_PRIORITY_RANK.get(str(bucket.get("priority") or "").lower(), 9),
+            -int(bucket.get("count") or 0),
+            str(bucket.get("group") or ""),
+        ),
+    )
+    top_target = next_actions[0]["top_targets"][0] if next_actions and next_actions[0]["top_targets"] else None
+    counts = _review_queue_summary(queue)
+    return {
+        "counts": counts,
+        "open_count": counts["pending_review"] + counts["watch"],
+        "next_action_count": len(action_item_indexes),
+        "top_target": top_target,
+        "next_actions": next_actions,
+    }
+
+
+def _review_digest_bucket(group: str) -> dict[str, Any]:
+    meta = REVIEW_DIGEST_GROUP_META.get(group) or REVIEW_DIGEST_GROUP_META["needs_review"]
+    return {
+        "group": group,
+        "label": meta["label"],
+        "priority": meta["priority"],
+        "next": meta["next"],
+        "count": 0,
+        "target_ids": [],
+        "top_targets": [],
+    }
+
+
+def _review_digest_groups(item: dict[str, Any]) -> list[str]:
+    status = str(item.get("status") or "").strip()
+    groups: list[str] = []
+    for group in _clean_strings(item.get("task_groups")):
+        if group in REVIEW_DIGEST_GROUP_META and group not in {"needs_review"}:
+            groups.append(group)
+    if not groups:
+        if status == "pending_review" or not status:
+            groups.append("needs_review")
+        elif status == "watch":
+            groups.append("watch")
+    return list(dict.fromkeys(groups))
+
+
+def _review_digest_target(item: dict[str, Any]) -> dict[str, Any]:
+    priority = _maybe_float(item.get("priority"))
+    material_delta = _maybe_float(item.get("material_delta"))
+    return {
+        "target_id": _clean_text(item.get("target_id")),
+        "target_name": _clean_text(item.get("target_name"))
+        or _clean_text(item.get("target_id"))
+        or "未命名候选",
+        "target_type": _clean_text(item.get("target_type")) or "unknown",
+        "status": _clean_text(item.get("status")) or "needs_review",
+        "candidate_status": _clean_text(item.get("candidate_status")),
+        "priority": int(priority) if priority is not None else 3,
+        "review_date": _clean_text(item.get("review_date")),
+        "action_level": _clean_text(item.get("action_level")),
+        "task_labels": _clean_strings(item.get("task_labels"))[:3],
+        "trigger_labels": _clean_strings(item.get("trigger_labels"))[:3],
+        "yield_delta_pct": _round_optional(item.get("yield_delta_pct"), digits=2),
+        "material_delta": _round_optional(material_delta, digits=4) or 0.0,
+    }
+
+
 def _candidate_review_queue_item(item: dict[str, Any]) -> dict[str, Any]:
     snapshot = item.get("current_snapshot") if isinstance(item.get("current_snapshot"), dict) else {}
     triggers = item.get("candidate_triggers") if isinstance(item.get("candidate_triggers"), list) else []
@@ -680,6 +817,37 @@ def _maybe_float(value: Any) -> float | None:
     if number != number:
         return None
     return number
+
+
+def _round_optional(value: Any, *, digits: int) -> float | None:
+    number = _maybe_float(value)
+    if number is None:
+        return None
+    return round(number, digits)
+
+
+def _clean_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _clean_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        values = [value]
+    elif isinstance(value, set):
+        values = sorted(value, key=lambda item: str(item))
+    elif isinstance(value, (list, tuple)):
+        values = list(value)
+    else:
+        return []
+    out: list[str] = []
+    for item in values:
+        text = _clean_text(item)
+        if text:
+            out.append(text)
+    return out
 
 
 def _normalize_yield_pct(value: Any) -> float | None:

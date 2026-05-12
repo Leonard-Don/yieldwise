@@ -83,6 +83,44 @@ def test_review_queue_returns_deterministic_candidate_tasks(client) -> None:
     assert body["items"][1]["status"] == "dismissed"
 
 
+def test_review_queue_includes_deterministic_reviewer_digest(client) -> None:
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "zhangjiang-park-b1",
+            "target_type": "building",
+            "target_yield_pct": 0.1,
+            "review_due_at": "2000-01-01",
+        },
+    )
+    client.post(
+        "/api/v2/watchlist",
+        json={
+            "target_id": "pudong",
+            "target_type": "district",
+            "status": "rejected",
+            "target_yield_pct": 0.1,
+        },
+    )
+
+    response = client.get("/api/v2/watchlist/review-queue")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"] == body["digest"]["counts"]
+    assert body["digest"]["open_count"] == 1
+    assert body["digest"]["next_action_count"] == 1
+    assert body["digest"]["top_target"]["target_id"] == "zhangjiang-park-b1"
+    assert [action["group"] for action in body["digest"]["next_actions"]] == [
+        "due_review",
+        "target_rule",
+        "evidence_missing",
+    ]
+    assert body["digest"]["next_actions"][0]["count"] == 1
+    assert body["digest"]["next_actions"][0]["target_ids"] == ["zhangjiang-park-b1"]
+    assert body["digest"]["next_actions"][0]["top_targets"][0]["task_labels"]
+
+
 def test_post_adds_entry_with_added_at(client) -> None:
     response = client.post(
         "/api/v2/watchlist",
