@@ -9,6 +9,7 @@ export async function initBoard({ container, store }) {
   const modeLabelEl = container.querySelector('[data-role="board-mode-label"]');
 
   let lastItems = [];
+  let lastError = null;
   let lastMode = store.get().mode;
   let lastFilterKey = filterKeyFor(store.get(), lastMode);
 
@@ -37,9 +38,11 @@ export async function initBoard({ container, store }) {
       try {
         const data = await api.mapDistricts();
         lastItems = sortItems(data.districts || [], mode.defaultSort);
+        lastError = null;
       } catch (err) {
         console.error("[atlas:board] districts load failed", err);
         lastItems = [];
+        lastError = err;
       }
       render(store.get());
       return;
@@ -53,9 +56,11 @@ export async function initBoard({ container, store }) {
     try {
       const data = await api.opportunities(params);
       lastItems = sortItems(data.items || [], mode.defaultSort);
+      lastError = null;
     } catch (err) {
       console.error("[atlas:board] opportunities load failed", err);
       lastItems = [];
+      lastError = err;
     }
     render(store.get());
   }
@@ -66,7 +71,9 @@ export async function initBoard({ container, store }) {
     if (lastItems.length === 0) {
       list.innerHTML = "";
       empty.hidden = false;
-      empty.textContent = "暂无机会";
+      empty.textContent = lastError
+        ? "榜单暂时加载失败，可刷新页面或稍后重试；也可以先放宽筛选条件检查是否有样本。"
+        : emptyMessageFor(state.mode);
       countEl.textContent = "0";
       publishCount(0);
       return;
@@ -129,11 +136,11 @@ function formatCell(item, col) {
   if (col.key === "districtName") {
     return `<span class="name">${escapeText(raw ?? "—")}</span>`;
   }
-  return `<span class="secondary">${formatValue(raw, col.format)}</span>`;
+  return `<span class="secondary"><span class="metric-label">${escapeText(col.label)}</span><span class="metric-value">${escapeText(formatValue(raw, col.format, item))}</span></span>`;
 }
 
 function renderCompareButton(item, compared) {
-  return `<button type="button" class="atlas-compare-toggle" data-comparison-add data-id="${escapeAttr(item.id)}" aria-pressed="${compared ? "true" : "false"}" title="${compared ? "已加入对比" : "加入对比"}">${compared ? "已选" : "对比"}</button>`;
+  return `<button type="button" class="atlas-compare-toggle" data-comparison-add data-id="${escapeAttr(item.id)}" aria-pressed="${compared ? "true" : "false"}" title="${compared ? "已加入对比" : "加入对比"}">${compared ? "已加入" : "加入对比"}</button>`;
 }
 
 function renderQualityBadge(quality) {
@@ -161,7 +168,7 @@ function renderDecisionBadge(brief) {
   return `<span class="atlas-decision-mini" data-decision-stance="${escapeAttr(stance)}" title="${escapeAttr(title)}">${escapeText(label)}</span>`;
 }
 
-function formatValue(value, format) {
+function formatValue(value, format, item = {}) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   if (format === "pct") return `${Number(value).toFixed(2)}%`;
   if (format === "years") {
@@ -170,7 +177,22 @@ function formatValue(value, format) {
   }
   if (format === "wan") return Number(value).toLocaleString("en-US");
   if (format === "int") return String(Math.round(Number(value)));
+  if (format === "sample") {
+    const label = item.quality?.label || item.sampleLabel || null;
+    const numeric = Number(value);
+    if (label && Number.isFinite(numeric)) return `${label} · ${Math.round(numeric)}`;
+    if (label) return label;
+    return Number.isFinite(numeric) ? `${Math.round(numeric)} 套` : "—";
+  }
   return String(value);
+}
+
+function emptyMessageFor(modeId) {
+  return {
+    yield: "当前筛选下暂无结果，可放宽租售比、总价或样本量条件。",
+    home: "当前偏好下暂无匹配房源，可放宽预算、区域或面积条件。",
+    city: "当前没有可汇总的行政区样本，可先导入演示/暂存样本或降低样本量门槛。",
+  }[modeId] || "当前筛选下暂无结果，可放宽条件后再试。";
 }
 
 function sortItems(items, sortSpec) {

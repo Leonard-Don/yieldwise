@@ -17,8 +17,8 @@
     <div class="app-shell" id="appShell">
       <header class="topbar">
         <div class="topbar-copy">
-          <p class="eyebrow">Spatial Arbitrage Workbench</p>
-          <h1>Yieldwise Workbench · 租知</h1>
+          <p class="eyebrow">空间收益研究台</p>
+          <h1>Yieldwise 研究后台 · 租知</h1>
           <p class="helper-text topbar-lead">把全市挂图、重点楼栋、楼层证据和公开页补样工作流收进同一张研究台，先判断哪里值得看，再决定下一步补什么。</p>
           <div class="topbar-ribbon">
             <span class="topbar-tag">全市小区挂图</span>
@@ -36,7 +36,7 @@
             <strong>GCJ-02 → WGS-84</strong>
           </div>
           <div>
-            <span class="meta-label">模式</span>
+            <span class="meta-label">研究口径</span>
             <strong>租售比 + 机会评分</strong>
           </div>
           <div class="topbar-mode-card">
@@ -58,7 +58,7 @@
 
       <section id="overviewBand" class="panel metric-strip overview-band">
         <div class="panel-heading">
-          <p class="eyebrow">Pulse</p>
+          <p class="eyebrow">全局脉冲</p>
           <h2>全局观测</h2>
           <p class="helper-text">这块只回答一个问题：当前这个筛选窗口里，盘面大概长什么样，是否值得继续下钻。</p>
         </div>
@@ -69,7 +69,7 @@
         <aside class="sidebar">
           <section class="panel filter-panel">
             <div class="panel-heading">
-              <p class="eyebrow">Control</p>
+              <p class="eyebrow">筛选控制</p>
               <h2>筛选条件</h2>
               <p class="helper-text">先定研究范围，再收紧收益与样本门槛，最后决定是看小区、楼栋还是楼层。</p>
             </div>
@@ -186,7 +186,7 @@
           <section class="panel map-panel">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Map Surface</p>
+                <p class="eyebrow">地图工作面</p>
                 <h2>上海租售比地图</h2>
                 <p class="helper-text map-lead">全市小区真实挂图，重点区楼栋与楼层证据在同一张底图里联动研究。</p>
               </div>
@@ -212,7 +212,7 @@
           <section class="panel matrix-panel">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Building x Floor</p>
+                <p class="eyebrow">楼栋 × 楼层</p>
                 <h2 id="matrixTitle">楼栋 × 楼层回报率表</h2>
               </div>
               <p class="helper-text">点击地图上的小区点或机会榜条目切楼栋，右侧会继续下钻到逐层机会带。</p>
@@ -225,7 +225,7 @@
           <section class="panel detail-panel inspector-panel" data-inspector-panel="detail">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Inspector</p>
+                <p class="eyebrow">对象检查</p>
                 <h2>选中对象</h2>
               </div>
               <button
@@ -263,7 +263,7 @@
           <section class="panel ranking-panel inspector-panel" data-inspector-panel="opportunity">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Opportunity</p>
+                <p class="eyebrow">机会榜</p>
                 <h2>套利机会榜</h2>
               </div>
               <div class="panel-heading-actions">
@@ -285,7 +285,7 @@
           <section class="panel ranking-panel inspector-panel" data-inspector-panel="persistence">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Persistence</p>
+                <p class="eyebrow">持续跟踪</p>
                 <h2>持续套利楼层榜</h2>
               </div>
               <div class="panel-heading-actions">
@@ -311,7 +311,7 @@
           <section class="panel ranking-panel inspector-panel" data-inspector-panel="geo">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Geo Ops</p>
+                <p class="eyebrow">几何补采</p>
                 <h2>几何补采优先级榜</h2>
               </div>
               <div class="panel-heading-actions">
@@ -337,7 +337,7 @@
           <section class="panel ranking-panel inspector-panel" data-inspector-panel="sampling">
             <div class="panel-heading split">
               <div>
-                <p class="eyebrow">Sampling</p>
+                <p class="eyebrow">公开页采样</p>
                 <h2>公开页面采样任务包</h2>
               </div>
               <div class="panel-heading-actions">
@@ -372,7 +372,7 @@
               策略
             </button>
             <button type="button" class="segment ops-tab-button" data-research-backstage-tab="operations" role="tab" aria-selected="false">
-              Ops
+              运维
             </button>
             <button type="button" class="segment ops-tab-button" data-research-backstage-tab="pipeline" role="tab" aria-selected="false">
               流水线
@@ -385,7 +385,7 @@
 
         <section class="panel strategy-panel" data-research-panel="strategy">
           <div class="panel-heading">
-            <p class="eyebrow">Stack</p>
+            <p class="eyebrow">数据栈</p>
             <h2>地图与数据策略</h2>
             <p class="helper-text research-helper">先看底层地图栈、坐标策略和数据接入优先级，再决定今天的研究动作落在哪条链路上。</p>
           </div>
@@ -401,7 +401,7 @@
 
           <section class="panel operations-panel" data-research-panel="operations" hidden>
             <div class="panel-heading">
-              <p class="eyebrow">Ops</p>
+              <p class="eyebrow">运维</p>
               <h2>数据接入与地址标准化</h2>
               <p class="helper-text research-helper">这里是研究后场：先看系统状态，再决定是补主档、补样本、补几何，还是直接处理采样 attention。</p>
           </div>
@@ -413,16 +413,16 @@
             <div class="research-section-label">批次与快照</div>
             <div class="ops-tab-strip" id="operationsHistoryTabs" role="tablist" aria-label="批次与快照类型">
               <button type="button" class="segment ops-tab-button is-active" data-ops-history-tab="reference" role="tab" aria-selected="true">
-                Reference
+                主档批次
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-history-tab="import" role="tab" aria-selected="false">
-                Import
+                样本导入
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-history-tab="metrics" role="tab" aria-selected="false">
-                Metrics
+                指标快照
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-history-tab="geo" role="tab" aria-selected="false">
-                Geo
+                几何批次
               </button>
             </div>
             <div class="ops-tab-panel" data-ops-history-panel="reference">
@@ -442,13 +442,13 @@
             <div class="research-section-label">运行细节</div>
             <div class="ops-tab-strip ops-tab-strip--subsection" id="operationsDetailTabs" role="tablist" aria-label="运行细节类型">
               <button type="button" class="segment ops-tab-button is-active" data-ops-detail-tab="geo" role="tab" aria-selected="true">
-                Geo Detail
+                几何详情
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-detail-tab="import" role="tab" aria-selected="false">
-                Import Detail
+                导入详情
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-detail-tab="sources" role="tab" aria-selected="false">
-                Sources
+                数据源
               </button>
             </div>
             <div class="ops-tab-panel ops-tab-panel--detail" data-ops-detail-panel="geo">
@@ -465,19 +465,19 @@
             <div class="research-section-label">采样与质量</div>
             <div class="ops-tab-strip ops-tab-strip--subsection" id="operationsQualityTabs" role="tablist" aria-label="采样与质量类型">
               <button type="button" class="segment ops-tab-button is-active" data-ops-quality-tab="workbench" role="tab" aria-selected="true">
-                Workbench
+                采样工作台
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-quality-tab="coverage" role="tab" aria-selected="false">
-                Coverage
+                覆盖看板
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-quality-tab="queue" role="tab" aria-selected="false">
-                Review Queue
+                复核队列
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-quality-tab="refresh" role="tab" aria-selected="false">
-                Refresh QA
+                刷新质检
               </button>
               <button type="button" class="segment ops-tab-button" data-ops-quality-tab="anchor" role="tab" aria-selected="false">
-                Anchor Watch
+                锚点关注
               </button>
             </div>
             <div class="ops-tab-panel ops-tab-panel--quality" data-ops-quality-panel="workbench">
@@ -500,7 +500,7 @@
 
         <section class="panel pipeline-panel" data-research-panel="pipeline" hidden>
           <div class="panel-heading">
-            <p class="eyebrow">Architecture</p>
+            <p class="eyebrow">链路结构</p>
             <h2>采集与清洗链路</h2>
             <p class="helper-text research-helper">把“公开页采样 → 标准化 → 去重 → 空间挂载 → 指标快照”这条链路压成一条可读的研究流水线。</p>
           </div>
@@ -509,7 +509,7 @@
 
         <section class="panel schema-panel" data-research-panel="schema" hidden>
           <div class="panel-heading">
-            <p class="eyebrow">Storage</p>
+            <p class="eyebrow">存储设计</p>
             <h2>核心表设计</h2>
             <p class="helper-text research-helper">下面是持久层骨架，主要用来判断现在的研究信号最终该沉到哪张表里。</p>
           </div>

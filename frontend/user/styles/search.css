@@ -134,7 +134,7 @@
 
 .atlas-search-row .kind {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -143,6 +143,6 @@
 .atlas-search-status {
   padding: 8px 16px 12px;
   border-top: 1px solid var(--line);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.06em;
 }

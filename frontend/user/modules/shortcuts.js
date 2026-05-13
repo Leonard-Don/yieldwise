@@ -26,11 +26,37 @@ export function initShortcuts({ root, store }) {
     overlay.dataset.open = open ? "true" : "false";
     backdrop.dataset.open = open ? "true" : "false";
     overlay.setAttribute("aria-hidden", open ? "false" : "true");
+    if (open) {
+      overlay.focus();
+      closeBtn.focus();
+    }
   }
 
   function handleKeyDown(event) {
-    // Esc always closes the help overlay if it's open. Other Esc semantics
-    // (drawer / onboarding) are owned by their own modules.
+    if (event.defaultPrevented) return;
+    if (event.key === "Escape") {
+      const state = store.get();
+      if (state.searchOpen) {
+        event.preventDefault();
+        store.set({ searchOpen: false });
+        return;
+      }
+      if (state.onboardingOpen) {
+        event.preventDefault();
+        store.set({ onboardingOpen: false });
+        return;
+      }
+      if (state.helpOpen) {
+        event.preventDefault();
+        store.set({ helpOpen: false });
+        return;
+      }
+      if (state.selection) {
+        event.preventDefault();
+        store.set({ selection: null });
+        return;
+      }
+    }
     if (event.key === "Escape" && store.get().helpOpen) {
       event.preventDefault();
       store.set({ helpOpen: false });

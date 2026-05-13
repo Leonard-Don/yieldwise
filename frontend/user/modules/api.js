@@ -6,7 +6,7 @@ async function getJSON(url, { signal } = {}) {
   }
   const response = await fetch(url, { signal });
   if (!response.ok) {
-    throw new Error(`API ${url} → ${response.status}`);
+    throw new Error(`数据读取失败（${response.status}）`);
   }
   const body = await response.json();
   cache.set(url, body);
@@ -31,7 +31,7 @@ function buildQuery(params) {
 
 async function getJSONFresh(url) {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`API ${url} → ${response.status}`);
+  if (!response.ok) throw new Error(`数据读取失败（${response.status}）`);
   return response.json();
 }
 
@@ -43,7 +43,7 @@ async function patchJSON(url, payload) {
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`API ${url} → ${response.status} ${text}`);
+    throw new Error(`保存失败（${response.status}）${text ? `：${text}` : ""}`);
   }
   return response.json();
 }
@@ -52,7 +52,7 @@ async function deleteJSON(url) {
   const response = await fetch(url, { method: "DELETE" });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`API ${url} → ${response.status} ${text}`);
+    throw new Error(`删除失败（${response.status}）${text ? `：${text}` : ""}`);
   }
   return response.json();
 }
@@ -65,7 +65,7 @@ async function postJSON(url, payload) {
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`API ${url} → ${response.status} ${text}`);
+    throw new Error(`提交失败（${response.status}）${text ? `：${text}` : ""}`);
   }
   return response.json();
 }

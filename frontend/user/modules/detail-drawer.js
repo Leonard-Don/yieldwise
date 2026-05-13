@@ -44,6 +44,8 @@ export function initDrawer({ root, store }) {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && drawer.dataset.open === "true") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       close();
     }
   });
@@ -101,6 +103,7 @@ export function initDrawer({ root, store }) {
     drawer.dataset.open = "true";
     backdrop.dataset.open = "true";
     drawer.setAttribute("aria-hidden", "false");
+    drawer.focus();
   }
 
   function renderClosed() {
@@ -119,7 +122,7 @@ export function initDrawer({ root, store }) {
   }
 
   function renderError(message) {
-    bodyEl.innerHTML = `<div class="atlas-drawer-status" data-state="error">${escapeText(message)}</div>`;
+    bodyEl.innerHTML = `<div class="atlas-drawer-status" data-state="error">${escapeText(message)}。可重新选择榜单条目，或放宽筛选条件后再试。</div>`;
   }
 
   function renderDetail({ sel, detail, mode }) {
@@ -361,7 +364,7 @@ export function initDrawer({ root, store }) {
 async function getJSON(url) {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`API ${url} → ${response.status}`);
+    throw new Error(`数据读取失败（${response.status}）`);
   }
   return response.json();
 }

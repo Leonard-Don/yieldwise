@@ -76,7 +76,7 @@ export function normalizeDecisionBrief(detail) {
 
 export function decisionLabelFor(stance) {
   return {
-    shortlist: "纳入候选",
+    shortlist: "已入候选",
     watch: "继续观察",
     sample_first: "先补样",
   }[stance] || "继续观察";

@@ -23,6 +23,8 @@ export function initOnboarding({ root, store }) {
   backdrop.addEventListener("click", close);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && modal.dataset.open === "true") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       close();
     }
   });
@@ -49,9 +51,10 @@ export function initOnboarding({ root, store }) {
     modal.dataset.open = "true";
     backdrop.dataset.open = "true";
     modal.setAttribute("aria-hidden", "false");
-    statusEl.textContent = "填写后保存到 data/personal/user_prefs.json";
+    statusEl.textContent = "偏好仅保存在本机，可随时修改。";
     statusEl.removeAttribute("data-state");
     refreshSubmitState();
+    modal.focus();
     inputs.budget_max_wan.focus();
   }
 

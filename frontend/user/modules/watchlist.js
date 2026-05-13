@@ -15,10 +15,10 @@ export function initWatchlist({ root, store }) {
   function render(state) {
     const items = state.watchlist;
     if (!Array.isArray(items)) {
-      countEl.textContent = "★ —";
+      countEl.textContent = "候选/关注 —";
       countEl.removeAttribute("data-active");
     } else {
-      countEl.textContent = `★ ${watchlistCount(items)}`;
+      countEl.textContent = `候选/关注 ${watchlistCount(items)}`;
       countEl.dataset.active = items.length > 0 ? "true" : "false";
     }
     syncStarButton(state);
@@ -37,6 +37,9 @@ export function initWatchlist({ root, store }) {
       "aria-pressed",
       isStarred(state.watchlist, sel.id) ? "true" : "false",
     );
+    const label = isStarred(state.watchlist, sel.id) ? "已入候选" : "加入候选";
+    starButton.textContent = label;
+    starButton.title = label;
   }
 
   async function toggleStar() {

@@ -57,7 +57,7 @@ export function initCandidateDesk({ root, store }) {
       const candidate = candidateToComparisonItem(item);
       if (candidate) {
         root.dispatchEvent(new CustomEvent("atlas:add-comparison", { detail: { candidate } }));
-        setStatus("已加入对比", "ok");
+        setStatus("已加入候选对比", "ok");
       }
       return;
     }
@@ -100,6 +100,9 @@ export function initCandidateDesk({ root, store }) {
     const open = Boolean(state.candidateDeskOpen) && items.length > 0;
     const visibleItems = items.filter((item) => candidateMatchesTaskGroup(item, activeQueueGroup));
     desk.dataset.open = open ? "true" : "false";
+    desk.hidden = !open;
+    desk.setAttribute("aria-hidden", open ? "false" : "true");
+    desk.toggleAttribute("inert", !open);
     toggleButton.dataset.open = open ? "true" : "false";
     toggleButton.setAttribute("aria-expanded", open ? "true" : "false");
     exportButton.disabled = items.length === 0;
@@ -248,10 +251,10 @@ function renderCandidateItem(item, alerts) {
       <div class="atlas-candidate-row-actions">
         <button type="button" data-candidate-action="complete_review" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">复核完成</button>
         <button type="button" data-candidate-action="defer_review" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">延后</button>
-        <button type="button" data-candidate-action="shortlist" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">候选</button>
+        <button type="button" data-candidate-action="shortlist" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">${item.status === "shortlisted" ? "已入候选" : "加入候选"}</button>
         <button type="button" data-candidate-action="reject" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">放弃</button>
         <button type="button" data-candidate-memo data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">下一步 memo</button>
-        <button type="button" data-candidate-compare data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">对比</button>
+        <button type="button" data-candidate-compare data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">加入对比</button>
       </div>
     </div>
   </li>`;
@@ -327,7 +330,7 @@ function actionStatusText(action) {
   return {
     complete_review: "复核已完成，已排入下一轮",
     defer_review: "已延后复核",
-    shortlist: "已加入 shortlist",
+    shortlist: "已入候选",
     reject: "已标记放弃",
   }[action] || "候选已更新";
 }

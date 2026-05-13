@@ -86,6 +86,9 @@ export function initComparison({ root, store, storage }) {
       "aria-pressed",
       isCompared(items, candidate.target_id, candidate.target_type) ? "true" : "false",
     );
+    drawerButton.textContent = isCompared(items, candidate.target_id, candidate.target_type)
+      ? "已加入"
+      : "加入对比";
   }
 
   async function exportMemo() {

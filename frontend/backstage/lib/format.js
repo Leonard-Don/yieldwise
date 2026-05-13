@@ -71,9 +71,9 @@ function metricsRefreshStatusLabel(status) {
 
 function metricsRefreshModeLabel(mode) {
   return {
-    staged: "仅 staged",
-    "staged+postgres": "staged + PostgreSQL",
-    "postgres-only": "仅 PostgreSQL"
+    staged: "仅离线快照",
+    "staged+postgres": "离线快照 + 本地数据库",
+    "postgres-only": "仅本地数据库"
   }[String(mode ?? "").trim().toLowerCase()] ?? "模式待补";
 }
 
@@ -81,7 +81,7 @@ function metricsRefreshTriggerLabel(source) {
   return {
     "atlas-ui": "工作台手动",
     "browser-sampling": "公开页采样",
-    bootstrap: "本地 Bootstrap"
+    bootstrap: "本地引导"
   }[String(source ?? "").trim().toLowerCase()] ?? "系统触发";
 }
 
@@ -232,7 +232,7 @@ function sourceModeLabel(mode) {
   return {
     catalog_apply_or_download: "目录申请 / 下载",
     console_key: "本地 Key",
-    internal_staging: "本地 staging",
+    internal_staging: "本地离线样本",
     browser_scrape: "浏览器抓取"
   }[mode] ?? mode;
 }

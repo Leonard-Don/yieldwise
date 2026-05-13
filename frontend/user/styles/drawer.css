@@ -67,7 +67,7 @@
   background: var(--bg-2);
   color: var(--text-dim);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   width: 22px;
   height: 22px;
   border-radius: var(--radius-sm);
@@ -571,7 +571,7 @@
 
 .atlas-drawer-empty {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
   padding: 24px 0;
   text-align: center;
 }
@@ -588,9 +588,11 @@
   background: var(--bg-2);
   color: var(--text-dim);
   font: inherit;
-  font-size: 14px;
-  width: 28px;
+  font-size: 12px;
+  width: auto;
+  min-width: 66px;
   height: 22px;
+  padding: 0 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;

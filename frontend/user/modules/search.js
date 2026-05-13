@@ -27,6 +27,12 @@ export function initSearch({ root, store }) {
     debouncedSearch(inputEl.value);
   });
   inputEl.addEventListener("keydown", handleInputKey);
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !lastOpen) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    close();
+  });
   resultsEl.addEventListener("click", (event) => {
     const row = event.target.closest("[data-row-index]");
     if (!row) return;
@@ -50,6 +56,7 @@ export function initSearch({ root, store }) {
       activeIndex = 0;
       renderResults();
       statusEl.textContent = "输入后按 ↑↓ 选择，Enter 打开";
+      overlay.focus();
       // Focus on next tick so the modal is visible first.
       setTimeout(() => inputEl.focus(), 30);
     }
@@ -76,7 +83,7 @@ export function initSearch({ root, store }) {
       renderResults();
       statusEl.textContent = results.length
         ? `${results.length} 条结果 · Enter 打开 · Esc 关闭`
-        : "未找到匹配项";
+        : "未找到匹配项，可减少关键词或直接按区域筛选。";
     } catch (err) {
       if (myToken !== queryToken) return;
       console.error("[atlas:search] query failed", err);

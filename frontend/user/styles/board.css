@@ -3,7 +3,7 @@
   justify-content: space-between;
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -17,7 +17,7 @@
 
 .atlas-board-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, max-content);
+  grid-template-columns: minmax(0, 1fr) repeat(5, minmax(74px, max-content));
   gap: 10px;
   align-items: baseline;
   padding: 8px 14px;
@@ -64,7 +64,7 @@
   padding: 2px 5px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.2;
   color: var(--text-dim);
   background: var(--bg-2);
@@ -75,7 +75,7 @@
   padding: 2px 5px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.2;
   color: var(--text-dim);
   background: var(--bg-2);
@@ -103,7 +103,7 @@
   background: var(--bg-2);
   color: var(--text-dim);
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
   padding: 2px 6px;
   cursor: pointer;
   transition: color 120ms ease-out, border-color 120ms ease-out,
@@ -134,15 +134,28 @@
 }
 
 .atlas-board-row .secondary {
+  display: grid;
+  gap: 1px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.atlas-board-row .secondary .metric-label {
+  color: var(--text-xs);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.atlas-board-row .secondary .metric-value {
+  color: var(--text-0);
 }
 
 .atlas-board-empty {
-  padding: 32px 14px;
+  padding: 32px 18px;
   text-align: center;
   color: var(--text-xs);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  line-height: 1.65;
 }

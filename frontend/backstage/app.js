@@ -8,7 +8,7 @@ const amapState = {
   infoWindow: null,
   scriptPromise: null,
   hasInitialFit: false,
-  modeNote: "未检测到 AMAP_API_KEY，当前只保留真地图容器。",
+  modeNote: "地图底图服务暂未配置，当前只保留真地图容器。",
   transitionTimer: null,
   transitionToken: 0
 };
@@ -230,7 +230,7 @@ async function loadBootstrapData() {
       headers: { Accept: "application/json" }
     });
     if (!response.ok) {
-      throw new Error(`Bootstrap failed with ${response.status}`);
+      throw new Error(`本地引导失败：${response.status}`);
     }
     const payload = await response.json();
     districts = hydrateDistrictsPayload(payload.districts ?? (canUseDemoFallback() ? fallbackDistricts : []));
@@ -517,7 +517,7 @@ async function loadGeoAssets() {
 
 async function initializeMapExperience() {
   if (!runtimeConfig.hasAmapKey || !runtimeConfig.amapApiKey) {
-    setMapMode("fallback", "未检测到 AMAP_API_KEY，当前仅保留真地图容器。配置 key 后即可启用高德底图。");
+    setMapMode("fallback", "地图底图服务暂未配置，当前仅保留真地图容器。配置本机地图服务后即可启用高德底图。");
     return;
   }
 
@@ -2783,8 +2783,8 @@ function updateMapNote() {
     mapNote.innerHTML = `
       <strong>说明</strong>
       <p>${amapState.modeNote ?? "当前地图用于展示上海租售比机会分布。"}</p>
-      <p>当前还没有数据库主读数据，页面先保留真地图容器与 staged 说明。</p>
-      <p>${runtimeConfig.hasPostgresDsn ? "本地库已配置，下一步补首轮 bootstrap。" : "下一步先配置 DSN 或导入 staged 批次。"}</p>
+      <p>当前还没有数据库主读数据，页面先保留真地图容器与离线样本说明。</p>
+      <p>${runtimeConfig.hasPostgresDsn ? "本地库已配置，下一步完成首轮本地引导。" : "下一步先配置数据库连接串，或导入离线样本批次。"}</p>
     `;
     return;
   }
@@ -4210,10 +4210,10 @@ async function persistImportRun(runId, { applySchema = false } = {}) {
     if (!response.ok) {
       throw new Error(payload.detail || `Persist failed with ${response.status}`);
     }
-    state.opsMessage = `批次 ${state.selectedImportRunDetail?.batchName ?? runId} 已写入 PostgreSQL。`;
+    state.opsMessage = `批次 ${state.selectedImportRunDetail?.batchName ?? runId} 已写入本地数据库。`;
     state.opsMessageTone = "success";
   } catch (error) {
-    state.opsMessage = error.message || "写入 PostgreSQL 失败。";
+    state.opsMessage = error.message || "写入本地数据库失败。";
     state.opsMessageTone = "error";
   } finally {
     state.busyPersistRunId = null;
@@ -4245,10 +4245,10 @@ async function persistReferenceRun(runId, { applySchema = false } = {}) {
     if (!response.ok) {
       throw new Error(payload.detail || `Reference persist failed with ${response.status}`);
     }
-    state.opsMessage = `主档批次 ${runId} 已写入 PostgreSQL。`;
+    state.opsMessage = `主档批次 ${runId} 已写入本地数据库。`;
     state.opsMessageTone = "success";
   } catch (error) {
-    state.opsMessage = error.message || "主档批次写入 PostgreSQL 失败。";
+    state.opsMessage = error.message || "主档批次写入本地数据库失败。";
     state.opsMessageTone = "error";
   } finally {
     state.busyReferencePersistRunId = null;
@@ -4286,7 +4286,7 @@ async function bootstrapLocalDatabaseRequest({
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.detail || `Database bootstrap failed with ${response.status}`);
+      throw new Error(payload.detail || `本地数据库引导失败：${response.status}`);
     }
     const stepSummary = (payload.steps ?? [])
       .map((item) => `${item.step}:${item.status}`)
@@ -4335,7 +4335,7 @@ async function refreshMetricsSnapshotRequest({
       refreshSummary.communityMetricCount || refreshSummary.buildingFloorMetricCount
         ? `（小区 ${refreshSummary.communityMetricCount ?? 0} / 楼栋分桶 ${refreshSummary.buildingFloorMetricCount ?? 0}）`
         : "";
-    const postgresMessage = payload.postgres ? "，并同步写入 PostgreSQL" : "";
+    const postgresMessage = payload.postgres ? "，并同步写入本地数据库" : "";
     state.opsMessage = metricsRun?.batchName
       ? `已刷新指标快照 ${metricsRun.batchName}${summaryMessage}${postgresMessage}。`
       : `指标快照已刷新${summaryMessage}${postgresMessage}。`;
@@ -4373,7 +4373,7 @@ async function generateRefreshCenterReport() {
     state.refreshCenterReport = payload;
     state.opsMessage = payload.reportPath
       ? `刷新报告已生成：${payload.reportPath}`
-      : "刷新中心 dry-run 报告已生成。";
+      : "刷新中心预检查报告已生成。";
     state.opsMessageTone = "success";
   } catch (error) {
     state.opsMessage = error.message || "刷新中心报告生成失败。";
@@ -4453,11 +4453,11 @@ async function updateRefreshAnomalyStatus(anomalyId, status) {
     if (!response.ok) {
       throw new Error(payload.detail || `Refresh anomaly update failed with ${response.status}`);
     }
-    state.opsMessage = `Refresh QA 已标记为${refreshAnomalyStatusLabel(status)}。`;
+    state.opsMessage = `刷新质检已标记为${refreshAnomalyStatusLabel(status)}。`;
     state.opsMessageTone = "success";
     await Promise.all([loadRefreshCenterReport(), loadRefreshAnomalyQueue()]);
   } catch (error) {
-    state.opsMessage = error.message || "Refresh QA 状态更新失败。";
+    state.opsMessage = error.message || "刷新质检状态更新失败。";
     state.opsMessageTone = "error";
   } finally {
     state.busyRefreshAnomalyId = null;
@@ -4686,10 +4686,10 @@ async function persistGeoAssetRun(runId, { applySchema = false } = {}) {
     if (!response.ok) {
       throw new Error(payload.detail || `Geo persist failed with ${response.status}`);
     }
-    state.opsMessage = `几何批次 ${state.selectedGeoAssetRunDetail?.batchName ?? runId} 已写入 PostgreSQL。`;
+    state.opsMessage = `几何批次 ${state.selectedGeoAssetRunDetail?.batchName ?? runId} 已写入本地数据库。`;
     state.opsMessageTone = "success";
   } catch (error) {
-    state.opsMessage = error.message || "几何批次写入 PostgreSQL 失败。";
+    state.opsMessage = error.message || "几何批次写入本地数据库失败。";
     state.opsMessageTone = "error";
   } finally {
     state.busyGeoPersistRunId = null;
@@ -4830,6 +4830,12 @@ async function updateGeoWorkOrder(runId, workOrderId, { status } = {}) {
 
 function renderSummary() {
   const communities = getFilteredCommunities();
+  const visibleMapCount =
+    state.granularity === "community"
+      ? getVisibleMapCommunities().length
+      : state.granularity === "building"
+      ? getVisibleBuildingItems().length
+      : getVisibleFloorWatchlistItems().length;
   const fallbackSummary = {
     communityCount: communities.length,
     avgYield: communities.reduce((sum, item) => sum + item.yield, 0) / (communities.length || 1),
@@ -4850,7 +4856,14 @@ function renderSummary() {
         });
 
   const metrics = [
-    { key: "community_count", label: "筛选后小区", value: summary.communityCount, suffix: "个", note: "当前筛选结果" },
+    { key: "community_count", label: "筛选结果", value: summary.communityCount, suffix: "个", note: "右侧列表与统计口径" },
+    {
+      key: "map_visible_count",
+      label: "地图点",
+      value: visibleMapCount,
+      suffix: "个",
+      note: `${visibleMapCount}/${summary.communityCount} 已挂到当前地图粒度`
+    },
     { key: "avg_yield", label: "平均年化回报", value: Number(summary.avgYield).toFixed(2), suffix: "%", note: "中位样本口径" },
     { key: "avg_budget", label: "平均挂牌总价", value: Number(summary.avgBudget).toFixed(0), suffix: "万", note: "出售样本均值" },
     { key: "avg_monthly_rent", label: "平均月租", value: Number(summary.avgMonthlyRent).toFixed(0), suffix: "元", note: "出租样本均值" },
@@ -4892,7 +4905,7 @@ function renderDetail() {
       <p>${
         currentDataMode() === "empty"
           ? runtimeConfig.hasPostgresDsn
-            ? "数据库 DSN 已配置，但还没完成首轮 bootstrap。先落 reference、import、geo，再刷新 metrics。"
+            ? "数据库连接串已配置，但还没完成首轮本地引导。先落主档、样本、几何，再刷新指标。"
             : "当前还没有数据库主读数据。请先写入浏览器抓取 / 官方开放批次，页面才会切到真实的全市楼栋研究模式。"
           : "当前筛选条件下没有可展示的小区，请适当放宽预算、回报率或样本量。"
       }</p>
@@ -5441,8 +5454,8 @@ function renderRanking() {
     : `<p class="helper-text">${
         currentDataMode() === "empty"
           ? runtimeConfig.hasPostgresDsn
-            ? "数据库已连接，但还没完成首轮 bootstrap。先写入 reference / import / geo，再刷新 metrics。"
-            : "当前还没有落库的小区 / 楼栋数据。请先写入浏览器抓取批次并同步 PostgreSQL，或显式开启 demo mock。"
+            ? "数据库已连接，但还没完成首轮本地引导。先写入主档、样本和几何，再刷新指标。"
+            : "当前还没有落库的小区 / 楼栋数据。请先写入浏览器抓取批次并同步本地数据库，或显式开启演示样本。"
           : "当前筛选窗口下没有命中的小区机会。"
       }</p>`;
 
@@ -5678,7 +5691,7 @@ function renderRanking() {
                         browserCapturePendingAttentionCount(item)
                           ? `<span class="source-pill">待复核 ${browserCapturePendingAttentionCount(item)}</span>`
                           : item.latestCaptureAttentionCount
-                            ? `<span class="source-pill">raw attention ${item.latestCaptureAttentionCount}</span>`
+                            ? `<span class="source-pill">原文待处理 ${item.latestCaptureAttentionCount}</span>`
                           : `<span class="source-pill">已并入 ${item.latestCaptureImportRunId ?? "最新批次"}</span>`
                       }
                     </div>
@@ -5701,7 +5714,7 @@ function renderRanking() {
         .join("")
     : `<p class="helper-text">${
         currentDataMode() === "empty"
-          ? "当前还没有 staged 研究样本，采样任务包会在 reference / import / metrics 就绪后出现。"
+          ? "当前还没有离线研究样本，采样任务包会在主档、样本导入和指标快照就绪后出现。"
           : "当前筛选窗口下没有需要优先补的公开页面采样任务。"
       }</p>`;
 
@@ -5962,7 +5975,7 @@ function renderOperations() {
   }
   const referenceRuns = operationsOverview?.referenceRuns ?? [];
   const postgresReady = runtimeConfig.hasPostgresDsn;
-  const postgresLabel = runtimeConfig.postgresDsnMasked ?? "未配置 POSTGRES_DSN";
+  const postgresLabel = runtimeConfig.postgresDsnMasked ? `连接串 ${runtimeConfig.postgresDsnMasked}` : "未配置数据库连接串";
   const displayQueueItems = selectedRunId
     ? queueItems.filter((item) => !item.runId || item.runId === selectedRunId)
     : queueItems;
@@ -5977,10 +5990,10 @@ function renderOperations() {
       : summary.activeDataMode === "staged"
       ? "离线快照"
       : summary.activeDataMode === "mock"
-      ? "Demo Mock"
+      ? "演示样本"
       : "待接入";
   const dataModeHint = summary.hasRealData
-    ? "地图与详情优先读 PostgreSQL"
+    ? "地图与详情优先读本地数据库"
     : summary.activeDataMode === "staged"
     ? "当前优先展示最新浏览器抓取 / 公开样本批次"
     : summary.mockEnabled
@@ -5994,20 +6007,20 @@ function renderOperations() {
     ? "待引导"
     : "未连接";
   const databaseStatusHint = !postgresReady
-    ? "先配置 POSTGRES_DSN。"
+    ? "先配置数据库连接串。"
     : summary.databaseSeeded
     ? `当前主读 ${summary.databaseCommunityCount ?? 0} 个小区 / ${summary.databaseBuildingCount ?? 0} 栋楼。`
     : summary.databaseConnected
-    ? "数据库已连通，但还没完成首轮 reference / import / geo / metrics 落库。"
+    ? "数据库已连通，但还没完成首轮主档、样本、几何和指标落库。"
     : "DSN 已配置，但当前数据库还不可读。";
   const canWriteMetricsToDatabase = postgresReady && summary.databaseConnected && summary.databaseSeeded;
   const stagedMetricsLabel = summary.latestStagedMetricsRunAt ? formatTimestamp(summary.latestStagedMetricsRunAt) : "未生成";
   const databaseMetricsLabel = summary.latestDatabaseMetricsRefreshAt ? formatTimestamp(summary.latestDatabaseMetricsRefreshAt) : "未写库";
   const metricsStatusHint = canWriteMetricsToDatabase
-    ? "数据库已就绪，可选择只更新 staged 或连带同步 PostgreSQL。"
+    ? "数据库已就绪，可选择只更新离线快照或连带同步本地数据库。"
     : postgresReady && summary.databaseConnected
-    ? "数据库已连通，但建议先完成本地 Bootstrap 再同步 metrics 表。"
-    : "当前只刷新 staged metrics run，统一离线研究口径。";
+    ? "数据库已连通，但建议先完成本地引导再同步指标表。"
+    : "当前只刷新离线指标快照，统一离线研究口径。";
   const anchoredCommunityCount = Number(summary.anchoredCommunityCount ?? 0);
   const cityCommunityCount = Number(summary.cityCommunityCount ?? 0);
   const anchoredCommunityPct = cityCommunityCount
@@ -6032,16 +6045,16 @@ function renderOperations() {
   const latestAnchorLabel = summary.latestAnchorReviewAt ? formatTimestamp(summary.latestAnchorReviewAt) : "暂无";
   const latestMetricsLabel = summary.latestMetricsRefreshAt ? formatTimestamp(summary.latestMetricsRefreshAt) : "待刷新";
   const overviewStatusHint = `${dataModeHint}。`;
-  const bootstrapActionHint = postgresReady ? "先把本地库引导成可主读，再切数据库口径。" : "先配置 POSTGRES_DSN，再打开数据库主读。";
+  const bootstrapActionHint = postgresReady ? "先把本地库引导成可主读，再切数据库口径。" : "先配置数据库连接串，再打开数据库主读。";
   const metricsActionHint = canWriteMetricsToDatabase
-    ? "可只刷 staged，也可同步 PostgreSQL。"
+    ? "可只刷离线快照，也可同步本地数据库。"
     : postgresReady && summary.databaseConnected
-    ? "先做 Bootstrap，再同步 metrics 表。"
-    : "当前只刷新 staged。";
+    ? "先做本地引导，再同步指标表。"
+    : "当前只刷新离线快照。";
   const stagedMetricsSummary =
     summary.activeDataMode === "database"
       ? `${summary.databaseSaleListingCount ?? 0} sale / ${summary.databaseRentListingCount ?? 0} rent`
-      : `${metricsRunCount} 个 staged metrics run`;
+      : `${metricsRunCount} 个离线指标快照`;
   const sourceHint = sourcePendingCount ? `待补本地配置 ${sourcePendingCount} 个。` : "链路已就绪。";
   const coverageHint = pendingAnchorCount ? `待补锚点 ${pendingAnchorCount} 个。` : cityCommunityCount ? "已全部挂图。" : "等待首批锚点。";
   const samplingHint = `${browserCaptureRunCount} 次公开页采样${prioritySamplingCount ? ` · 重点区 ${prioritySamplingCount}` : ""}`;
@@ -6079,7 +6092,7 @@ function renderOperations() {
     ? `阻断 ${refreshBlockerCount} 项，先处理主档或必需批次。`
     : refreshWarningCount
     ? `还有 ${refreshWarningCount} 项需要复核后再写库。`
-    : "dry-run 已通过，可执行 staged 刷新。";
+    : "预检查已通过，可执行离线刷新。";
   const visibleAnomalyFilters = refreshAnomalyFilters
     .filter((item) => Number(item.count ?? 0) > 0 || item.status !== "ok")
     .slice(0, 4);
@@ -6119,7 +6132,7 @@ function renderOperations() {
       <div class="breakdown-top">
         <div class="refresh-center-title">
           <span class="ops-overview-kicker">刷新中心</span>
-          <strong>${refreshCenterStatusLabel(refreshCenterStatus)} · Dry-run</strong>
+          <strong>${refreshCenterStatusLabel(refreshCenterStatus)} · 预检查</strong>
           <p>${refreshPrimaryHint}</p>
         </div>
         <span class="trace-status ${refreshCenterStatusTone(refreshCenterStatus)}">${refreshCenterStatusLabel(refreshCenterStatus)}</span>
@@ -6136,7 +6149,7 @@ function renderOperations() {
         <section class="refresh-center-column">
           <div class="refresh-center-section-head">
             <strong>一键导入计划</strong>
-            <span>${refreshCenterReadiness.canWriteMetricsToPostgres ? "可写库" : "staged 优先"}</span>
+            <span>${refreshCenterReadiness.canWriteMetricsToPostgres ? "可写库" : "离线优先"}</span>
           </div>
           <div class="refresh-center-list">
             ${
@@ -6176,7 +6189,7 @@ function renderOperations() {
         </section>
         <section class="refresh-center-column">
           <div class="refresh-center-section-head">
-            <strong>Dry-run 检查</strong>
+            <strong>预检查</strong>
             <span>${refreshBlockerCount ? `${refreshBlockerCount} 阻断` : refreshWarningCount ? `${refreshWarningCount} 关注` : "通过"}</span>
           </div>
           <div class="refresh-center-list">
@@ -6193,7 +6206,7 @@ function renderOperations() {
                       `
                     )
                     .join("")
-                : "<p class=\"helper-text\">等待 dry-run 报告。</p>"
+                : "<p class=\"helper-text\">等待预检查报告。</p>"
             }
           </div>
         </section>
@@ -6281,8 +6294,8 @@ function renderOperations() {
         </button>
         ${
           shouldShowRefreshRetry
-            ? `<button class="action compact" data-refresh-center-retry-job-id="${latestRefreshJob.jobId}" ${state.busyRefreshCenterExecute ? "disabled" : ""}>重试失败 Job</button>`
-            : `<button class="action compact" data-refresh-center-quality-tab="refresh">处理 Refresh QA</button>`
+            ? `<button class="action compact" data-refresh-center-retry-job-id="${latestRefreshJob.jobId}" ${state.busyRefreshCenterExecute ? "disabled" : ""}>重试失败任务</button>`
+            : `<button class="action compact" data-refresh-center-quality-tab="refresh">处理刷新质检</button>`
         }
         <button class="action compact" data-refresh-center-detail-tab="geo">查看几何 QA</button>
         <span class="source-pill refresh-center-report-path">${refreshReportLabel}</span>
@@ -6316,10 +6329,10 @@ function renderOperations() {
       <div class="ops-overview-action-grid">
         <section class="ops-overview-action-block">
           <span class="ops-overview-kicker">引导</span>
-          <strong>${postgresReady ? "reference → import → geo → metrics" : "等待 DSN"}</strong>
+          <strong>${postgresReady ? "主档 → 样本 → 几何 → 指标" : "等待连接串"}</strong>
           <p>${bootstrapActionHint}</p>
           <button class="action compact primary" data-database-bootstrap ${postgresReady ? "" : "disabled"}>
-            ${state.busyBootstrapDatabase ? "引导中..." : "本地 Bootstrap"}
+            ${state.busyBootstrapDatabase ? "引导中..." : "本地引导"}
           </button>
         </section>
         <section class="ops-overview-action-block">
@@ -6327,17 +6340,17 @@ function renderOperations() {
           <strong>${latestMetricsLabel}</strong>
           <p>${metricsActionHint}</p>
           <div class="comparison-strip">
-            <span class="source-pill">staged ${stagedMetricsLabel}</span>
-            <span class="source-pill">${postgresReady ? `db ${databaseMetricsLabel}` : "db 未配置"}</span>
+            <span class="source-pill">离线快照 ${stagedMetricsLabel}</span>
+            <span class="source-pill">${postgresReady ? `本地库 ${databaseMetricsLabel}` : "本地库未配置"}</span>
           </div>
           <div class="metric-action-buttons ops-overview-button-row">
             <button
               class="action compact primary"
               data-refresh-metrics
               ${state.busyMetricsRefresh ? "disabled" : ""}
-              title="生成一批新的 staged metrics run，统一当前研究口径。"
+              title="生成一批新的离线指标快照，统一当前研究口径。"
             >
-              ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "staged" ? "刷新中..." : "刷新 staged"}
+              ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "staged" ? "刷新中..." : "刷新离线快照"}
             </button>
             ${
               postgresReady
@@ -6348,11 +6361,11 @@ function renderOperations() {
                     ${state.busyMetricsRefresh || !canWriteMetricsToDatabase ? "disabled" : ""}
                     title="${
                       canWriteMetricsToDatabase
-                        ? "基于同一轮快照同时写入 PostgreSQL metrics 表。"
-                        : "先完成本地 Bootstrap，让数据库具备可写的基础表与首轮数据。"
+                        ? "基于同一轮快照同时写入本地数据库指标表。"
+                        : "先完成本地引导，让数据库具备可写的基础表与首轮数据。"
                     }"
                   >
-                    ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "postgres" ? "写库中..." : "同步 PostgreSQL"}
+                    ${state.busyMetricsRefresh && state.busyMetricsRefreshMode === "postgres" ? "写库中..." : "同步本地数据库"}
                   </button>
                 `
                 : ""
@@ -6388,7 +6401,7 @@ function renderOperations() {
                     </div>
                     <div class="queue-item-footer">
                       <button class="action compact ${postgresReady ? "primary" : ""}" data-reference-persist-run-id="${run.runId}" ${postgresReady ? "" : "disabled"}>
-                        ${state.busyReferencePersistRunId === run.runId ? "写入中..." : "写入 PostgreSQL"}
+                        ${state.busyReferencePersistRunId === run.runId ? "写入中..." : "写入本地数据库"}
                       </button>
                     </div>
                   </article>
@@ -6497,7 +6510,7 @@ function renderOperations() {
           </div>
         </article>
       `
-    : "<p class=\"helper-text\">当前还没有 staged metrics run。可以先运行 `python3 jobs/refresh_metrics.py --batch-name staged-metrics-YYYY-MM-DD` 生成统一指标口径。</p>";
+    : "<p class=\"helper-text\">当前还没有离线指标快照。可以先在刷新中心生成一轮统一指标口径，开发细节见脚本说明。</p>";
 
   metricsRunList.innerHTML = `${metricsRefreshHistoryMarkup}${metricsRunsMarkup}`;
 
@@ -6550,9 +6563,9 @@ function renderOperations() {
               class="action compact ${postgresReady ? "primary" : ""}"
               data-geo-persist-run-id="${selectedGeoRunDetail.runId}"
               ${postgresReady ? "" : "disabled"}
-              title="${postgresReady ? "把该几何批次写入 PostgreSQL geo_assets 表。" : "先配置 POSTGRES_DSN 才能写入 PostgreSQL。"}"
+              title="${postgresReady ? "把该几何批次写入本地数据库几何表。" : "先配置数据库连接串才能写入本地数据库。"}"
             >
-              ${state.busyGeoPersistRunId === selectedGeoRunDetail.runId ? "写入中..." : "写入 PostgreSQL"}
+              ${state.busyGeoPersistRunId === selectedGeoRunDetail.runId ? "写入中..." : "写入本地数据库"}
             </button>
           </div>
         </div>
@@ -7037,7 +7050,7 @@ function renderOperations() {
               data-persist-run-id="${selectedRunDetail.runId}"
               ${postgresReady ? "" : "disabled"}
             >
-              ${state.busyPersistRunId === selectedRunDetail.runId ? "写入中..." : "写入 PostgreSQL"}
+              ${state.busyPersistRunId === selectedRunDetail.runId ? "写入中..." : "写入本地数据库"}
             </button>
           </div>
         </div>
@@ -7236,13 +7249,13 @@ function renderOperations() {
           <p>${item.note}</p>
           <div class="source-meta">
             <span class="source-pill">${item.category}</span>
-            <span class="source-pill">priority ${item.priority}</span>
-            <span class="source-pill">staging ${item.stagedRunCount ?? 0}</span>
+            <span class="source-pill">优先级 ${item.priority}</span>
+            <span class="source-pill">离线批次 ${item.stagedRunCount ?? 0}</span>
             ${item.applicationMode ? `<span class="source-pill">${sourceModeLabel(item.applicationMode)}</span>` : ""}
           </div>
           ${item.recommendedNextStep ? `<p class="source-hint">${item.recommendedNextStep}</p>` : ""}
           ${item.contactValue ? `<small>${item.contactLabel ?? "联系"} · ${item.contactValue}</small>` : ""}
-          <small>${item.supportsLocalAutomation ? "本地辅助任务可用" : "本阶段只保留离线 / staging 接入"}</small>
+          <small>${item.supportsLocalAutomation ? "本地辅助任务可用" : "本阶段只保留离线样本接入"}</small>
           ${renderSourceActions(item, { compact: true })}
         </article>
       `
@@ -7367,8 +7380,8 @@ function renderOperations() {
                 <p>
                   已写入 ${currentCaptureSubmission.taskLabel ?? "当前任务"} ·
                   ${currentCaptureSubmission.importRunId ?? currentCaptureSubmission.captureRunId ?? "已提交"}
-                  ${currentCaptureSubmission.metricsRunId ? ` · metrics ${currentCaptureSubmission.metricsRunId}` : ""}
-                  ${currentCaptureSubmission.attentionCount ? ` · raw attention ${currentCaptureSubmission.attentionCount}` : " · raw attention 0"}
+                  ${currentCaptureSubmission.metricsRunId ? ` · 指标 ${currentCaptureSubmission.metricsRunId}` : ""}
+                  ${currentCaptureSubmission.attentionCount ? ` · 原文待处理 ${currentCaptureSubmission.attentionCount}` : " · 原文待处理 0"}
                 </p>
                 <div class="comparison-strip">
                   <span class="source-pill">${browserSamplingProgressLabel(currentCaptureSubmission.taskProgress)}</span>
@@ -7447,7 +7460,7 @@ function renderOperations() {
             browserCapturePendingAttentionCount(selectedSamplingTask)
               ? `<span class="source-pill">待复核 ${browserCapturePendingAttentionCount(selectedSamplingTask)}</span>`
               : selectedSamplingTask.latestCaptureAttentionCount
-                ? `<span class="source-pill">raw attention ${selectedSamplingTask.latestCaptureAttentionCount}</span>`
+                ? `<span class="source-pill">原文待处理 ${selectedSamplingTask.latestCaptureAttentionCount}</span>`
               : ""
           }
         </div>
@@ -7579,8 +7592,8 @@ function renderOperations() {
                             browserCapturePendingAttentionCount(run)
                               ? `待复核 ${browserCapturePendingAttentionCount(run)} 条 · 已修正 ${browserCaptureResolvedCount(run)} · 已豁免 ${browserCaptureWaivedCount(run)}`
                               : run.attentionCount
-                                ? `raw attention ${run.attentionCount} 条已闭环`
-                              : `已并入 ${run.importRunId ?? "最新 import run"} · metrics ${run.metricsRunId ?? "待刷新"}`
+                                ? `原文待处理 ${run.attentionCount} 条已闭环`
+                              : `已并入 ${run.importRunId ?? "最新导入批次"} · 指标 ${run.metricsRunId ?? "待刷新"}`
                           }</small>
                         </article>
                       `
@@ -7611,8 +7624,8 @@ function renderOperations() {
                             browserCapturePendingAttentionCount(run)
                               ? `待复核 ${browserCapturePendingAttentionCount(run)} 条`
                               : run.attentionCount
-                                ? `raw attention ${run.attentionCount} 条已闭环`
-                              : `导入 ${run.importRunId ?? "latest"} · metrics ${run.metricsRunId ?? "latest"}`
+                                ? `原文待处理 ${run.attentionCount} 条已闭环`
+                              : `导入 ${run.importRunId ?? "最新"} · 指标 ${run.metricsRunId ?? "最新"}`
                           }</small>
                         </article>
                       `
@@ -7631,7 +7644,7 @@ function renderOperations() {
               data-browser-review-current-pending-count="${browserCapturePendingAttentionCount(selectedCaptureRunDetail)}"
             >
           <div class="breakdown-top">
-            <strong>review queue 回看面板</strong>
+            <strong>复核队列回看面板</strong>
             <span class="badge">${
               state.busyBrowserCaptureRunId
                 ? "加载中"
@@ -7646,7 +7659,7 @@ function renderOperations() {
               : selectedCaptureRunDetail?.runId
                 ? `
                   <p>${selectedCaptureRunDetail.communityName}${selectedCaptureRunDetail.buildingName ? ` · ${selectedCaptureRunDetail.buildingName}` : ""}${selectedCaptureRunDetail.floorNo != null ? ` · ${selectedCaptureRunDetail.floorNo}层` : ""} · ${formatTimestamp(selectedCaptureRunDetail.createdAt)}</p>
-                  <small>原文 ${selectedCaptureRunDetail.captureCount ?? 0} 条 · raw attention ${selectedCaptureRunDetail.attentionCount ?? 0} 条 · 待处理 ${browserCapturePendingAttentionCount(selectedCaptureRunDetail)} 条 · 已修正 ${browserCaptureResolvedCount(selectedCaptureRunDetail)} 条 · 已豁免 ${browserCaptureWaivedCount(selectedCaptureRunDetail)} 条${browserCaptureSupersededCount(selectedCaptureRunDetail) ? ` · 已接力 ${browserCaptureSupersededCount(selectedCaptureRunDetail)} 条` : ""}${selectedCaptureRunDetail.importRunId ? ` · import ${selectedCaptureRunDetail.importRunId}` : ""}${selectedCaptureRunDetail.metricsRunId ? ` · metrics ${selectedCaptureRunDetail.metricsRunId}` : ""}</small>
+                  <small>原文 ${selectedCaptureRunDetail.captureCount ?? 0} 条 · 原文待处理 ${selectedCaptureRunDetail.attentionCount ?? 0} 条 · 待处理 ${browserCapturePendingAttentionCount(selectedCaptureRunDetail)} 条 · 已修正 ${browserCaptureResolvedCount(selectedCaptureRunDetail)} 条 · 已豁免 ${browserCaptureWaivedCount(selectedCaptureRunDetail)} 条${browserCaptureSupersededCount(selectedCaptureRunDetail) ? ` · 已接力 ${browserCaptureSupersededCount(selectedCaptureRunDetail)} 条` : ""}${selectedCaptureRunDetail.importRunId ? ` · 导入 ${selectedCaptureRunDetail.importRunId}` : ""}${selectedCaptureRunDetail.metricsRunId ? ` · 指标 ${selectedCaptureRunDetail.metricsRunId}` : ""}</small>
                   <div
                     class="action-row compact browser-task-actions browser-review-batch-toolbar"
                     data-browser-review-batch-selected-count="${selectedReviewQueueIds.length}"
@@ -7695,7 +7708,7 @@ function renderOperations() {
                               `
                             )
                             .join("")
-                        : "<p class=\"helper-text\">当前批次没有待处理 review queue，可继续接力到下一条待复核任务。</p>"
+                        : "<p class=\"helper-text\">当前批次没有待处理复核队列，可继续接力到下一条待复核任务。</p>"
                     }
                   </div>
                   ${
@@ -7724,7 +7737,7 @@ function renderOperations() {
                       : ""
                   }
                 `
-                : `<p class="helper-text">点击上面的最近采样批次后，这里会展开 run 级 review queue，并支持标记已修正或豁免留痕。</p>`
+                : `<p class="helper-text">点击上面的最近采样批次后，这里会展开批次级复核队列，并支持标记已修正或豁免留痕。</p>`
           }
             </article>
           </div>
@@ -7863,7 +7876,7 @@ function renderOperations() {
     : `<p class="helper-text">${
         (state.browserSamplingPackItems ?? []).length
           ? "当前筛选窗口里没有可汇总的公开页采样任务。"
-          : "公开页面采样任务会在 staged 样本和任务包就绪后出现在这里。"
+          : "公开页面采样任务会在离线样本和任务包就绪后出现在这里。"
       }</p>`;
 
   const refreshAnomalySummary = state.refreshAnomalySummary ?? {};
@@ -7906,7 +7919,7 @@ function renderOperations() {
   refreshAnomalyQueue.innerHTML = `
     <article class="import-run-section refresh-anomaly-panel" data-refresh-anomaly-count="${refreshAnomalySummary.totalCount ?? 0}">
       <div class="breakdown-top">
-        <strong>Refresh QA 处理队列</strong>
+        <strong>刷新质检处理队列</strong>
         <span class="badge">${openRefreshAnomalyCount}</span>
       </div>
       ${
@@ -7935,7 +7948,7 @@ function renderOperations() {
                     ${canNavigate ? `data-community-id="${item.communityId ?? ""}" data-building-id="${item.buildingId ?? ""}" data-floor-no="${item.floorNo ?? ""}"` : ""}
                   >
                     <div class="breakdown-top">
-                      <strong>${escapeHtml(item.label ?? item.typeLabel ?? "Refresh QA")}</strong>
+                      <strong>${escapeHtml(item.label ?? item.typeLabel ?? "刷新质检")}</strong>
                       <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshAnomalyStatusLabel(item.status)}</span>
                     </div>
                     <p>${escapeHtml(item.typeLabel ?? item.type ?? "异常")} · ${escapeHtml(item.detail ?? "等待处理")}</p>
@@ -7943,8 +7956,8 @@ function renderOperations() {
                     <div class="comparison-strip">
                       ${item.run?.batchName ? `<span class="source-pill">${escapeHtml(item.run.batchName)}</span>` : ""}
                       ${item.pairCount != null ? `<span class="source-pill">样本对 ${item.pairCount}</span>` : ""}
-                      ${item.yieldPct != null ? `<span class="source-pill">yield ${Number(item.yieldPct).toFixed(2)}%</span>` : ""}
-                      ${item.bestPairConfidence != null ? `<span class="source-pill">conf ${Number(item.bestPairConfidence).toFixed(2)}</span>` : ""}
+                      ${item.yieldPct != null ? `<span class="source-pill">租售比 ${Number(item.yieldPct).toFixed(2)}%</span>` : ""}
+                      ${item.bestPairConfidence != null ? `<span class="source-pill">置信度 ${Number(item.bestPairConfidence).toFixed(2)}</span>` : ""}
                     </div>
                     ${
                       item.review?.reviewedAt
@@ -7965,7 +7978,7 @@ function renderOperations() {
                   </article>
                 `;
               }).join("")
-            : "<p class=\"helper-text\">当前没有 Refresh QA 候选。执行 dry-run 后会把 review queue、低置信配对、单样本楼层和收益异常放到这里。</p>"
+            : "<p class=\"helper-text\">当前没有刷新质检候选。执行预检查后，会把复核队列、低置信配对、单样本楼层和收益异常放到这里。</p>"
         }
       </div>
     </article>

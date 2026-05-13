@@ -46,16 +46,27 @@ export function initShell({ root, store }) {
 
   function renderFromState(state) {
     const activeMode = state.mode;
+    const modeLabel = getMode(activeMode).label;
     chipsContainer
       .querySelectorAll("[data-mode]")
       .forEach((btn) => {
         btn.setAttribute("aria-pressed", btn.dataset.mode === activeMode ? "true" : "false");
       });
-    statusbarMode.textContent = `mode: ${activeMode}`;
+    statusbarMode.textContent = `模式：${modeLabel}`;
     if (state.runtime) {
       const tag = state.runtime.activeDataMode || "—";
-      runtimeTag.textContent = `data ${tag}`;
-      statusbarData.textContent = `data: ${tag}`;
+      const dataLabel = dataModeLabel(tag);
+      runtimeTag.textContent = `数据：${dataLabel}`;
+      statusbarData.textContent = `数据：${dataLabel}`;
     }
   }
+}
+
+function dataModeLabel(mode) {
+  return {
+    database: "本机数据库",
+    staged: "暂存样本",
+    mock: "演示样本",
+    empty: "待导入",
+  }[mode] || "演示/暂存样本";
 }

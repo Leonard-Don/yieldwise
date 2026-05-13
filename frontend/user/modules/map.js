@@ -9,7 +9,7 @@ export async function initMap({ container, store }) {
   store.set({ runtime });
 
   if (!runtime.hasAmapKey || !runtime.amapApiKey) {
-    showError(container, "AMap key 未配置 — 设置 AMAP_API_KEY 后重启");
+    showError(container, "地图底图暂未启用。可先使用右侧榜单筛选，配置本机地图服务后会自动显示。");
     return null;
   }
 
@@ -21,7 +21,7 @@ export async function initMap({ container, store }) {
     });
   } catch (err) {
     console.error("[atlas:map] AMap load failed", err);
-    showError(container, `AMap 加载失败：${err.message}`);
+    showError(container, "地图加载失败，可先使用右侧榜单筛选，稍后刷新重试。");
     return null;
   }
 

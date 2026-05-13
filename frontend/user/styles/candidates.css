@@ -1,13 +1,31 @@
 .atlas-candidate-desk {
-  display: none;
-  border-top: 1px solid var(--line);
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: 52px;
+  z-index: 8;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  max-height: min(42vh, 420px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   background: var(--bg-1);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(14px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  overflow: hidden;
+}
+
+.atlas-candidate-desk[hidden] {
+  display: none !important;
 }
 
 .atlas-candidate-desk[data-open="true"] {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, auto) auto;
-  max-height: 34vh;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .atlas-candidate-head {
@@ -28,7 +46,7 @@
 .atlas-candidate-head [data-role="candidate-summary"] {
   display: block;
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .atlas-candidate-actions {
@@ -53,7 +71,7 @@
 .atlas-candidate-actions button {
   min-height: 24px;
   padding: 4px 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .atlas-candidate-actions button:hover,
@@ -88,7 +106,7 @@
   background: var(--bg-2);
   color: var(--text-dim);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -154,7 +172,7 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
@@ -177,7 +195,7 @@
   display: grid;
   gap: 3px;
   min-width: 78px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-xs);
 }
 
@@ -191,7 +209,7 @@
   background: var(--bg-2);
   color: var(--text-0);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .atlas-candidate-notes {
@@ -210,7 +228,7 @@
 .atlas-candidate-notes button {
   height: 24px;
   padding: 0 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .atlas-candidate-action,

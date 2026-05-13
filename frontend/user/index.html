@@ -34,7 +34,7 @@
         <h1>Yieldwise · 租知</h1>
         <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
         <div class="atlas-topbar-spacer"></div>
-        <button type="button" class="atlas-star-tag mono" data-component="candidate-desk-toggle" data-active="false" title="候选研究台">★ —</button>
+        <button type="button" class="atlas-star-tag mono" data-component="candidate-desk-toggle" data-active="false" title="候选研究台">候选/关注 —</button>
         <button type="button" class="atlas-prefs-button" data-component="prefs-button">偏好</button>
         <button type="button" class="atlas-help-chip" data-component="help-chip" title="键盘快捷键 (?)">?</button>
         <span class="atlas-runtime-tag mono dim" data-component="runtime-tag"></span>
@@ -54,17 +54,17 @@
             <span class="dim" data-role="board-mode-label">--</span>
           </div>
           <ol class="atlas-board-list" data-role="board-list"></ol>
-          <div class="atlas-board-empty" data-role="board-empty" hidden>暂无机会</div>
+          <div class="atlas-board-empty" data-role="board-empty" hidden>当前筛选下暂无结果，可放宽租售比、总价或样本量条件。</div>
         </aside>
         <div class="atlas-drawer-backdrop" data-component="drawer-backdrop" data-open="false"></div>
-        <aside class="atlas-drawer" data-component="drawer" data-open="false" aria-hidden="true">
+        <aside class="atlas-drawer" data-component="drawer" data-open="false" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="atlas-drawer-title" tabindex="-1">
           <header class="atlas-drawer-header">
             <div>
-              <h2 class="atlas-drawer-title" data-role="drawer-title">—</h2>
+              <h2 id="atlas-drawer-title" class="atlas-drawer-title" data-role="drawer-title">—</h2>
               <span class="atlas-drawer-subtitle mono" data-role="drawer-subtitle">—</span>
             </div>
             <div class="atlas-drawer-actions">
-              <button type="button" class="atlas-drawer-compare" data-component="drawer-compare" aria-pressed="false" hidden>对比</button>
+              <button type="button" class="atlas-drawer-compare" data-component="drawer-compare" aria-pressed="false" hidden>加入对比</button>
               <button type="button" class="atlas-drawer-star" data-component="drawer-star" aria-pressed="false" hidden>★</button>
               <button type="button" class="atlas-drawer-close" data-role="drawer-close" aria-label="关闭">×</button>
             </div>
@@ -85,7 +85,7 @@
           </section>
         </aside>
         <div class="atlas-onboarding-backdrop" data-component="onboarding-backdrop" data-open="false"></div>
-        <section class="atlas-onboarding" data-component="onboarding" data-open="false" aria-hidden="true" aria-labelledby="atlas-onboarding-title">
+        <section class="atlas-onboarding" data-component="onboarding" data-open="false" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="atlas-onboarding-title" tabindex="-1">
           <header class="atlas-onboarding-header">
             <h2 id="atlas-onboarding-title" class="atlas-onboarding-title">自住找房 · 偏好设定</h2>
             <button type="button" class="atlas-onboarding-close" data-role="onboarding-close" aria-label="关闭">×</button>
@@ -110,13 +110,13 @@
               </div>
             </fieldset>
             <footer class="atlas-onboarding-actions">
-              <span class="atlas-onboarding-status mono dim" data-role="onboarding-status">填写后保存到 data/personal/user_prefs.json</span>
+              <span class="atlas-onboarding-status mono dim" data-role="onboarding-status">偏好仅保存在本机，可随时修改。</span>
               <button type="submit" class="atlas-onboarding-submit" data-role="onboarding-submit" disabled>保存</button>
             </footer>
           </form>
         </section>
         <div class="atlas-help-backdrop" data-component="help-backdrop" data-open="false"></div>
-        <section class="atlas-help" data-component="help-overlay" data-open="false" aria-hidden="true" aria-labelledby="atlas-help-title">
+        <section class="atlas-help" data-component="help-overlay" data-open="false" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="atlas-help-title" tabindex="-1">
           <header class="atlas-help-header">
             <h2 id="atlas-help-title" class="atlas-help-title">键盘快捷键</h2>
             <button type="button" class="atlas-help-close" data-role="help-close" aria-label="关闭">×</button>
@@ -133,7 +133,7 @@
           </dl>
         </section>
         <div class="atlas-search-backdrop" data-component="search-backdrop" data-open="false"></div>
-        <section class="atlas-search" data-component="search-overlay" data-open="false" aria-hidden="true" aria-labelledby="atlas-search-title">
+        <section class="atlas-search" data-component="search-overlay" data-open="false" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="atlas-search-title" tabindex="-1">
           <header class="atlas-search-header">
             <h2 id="atlas-search-title" class="atlas-search-title">搜索</h2>
             <button type="button" class="atlas-search-close" data-role="search-close" aria-label="关闭">×</button>
@@ -162,7 +162,7 @@
       </section>
       <section class="atlas-comparison-tray" data-component="comparison-tray" data-open="false" aria-label="候选对比">
         <div class="atlas-comparison-summary">
-          <strong>对比 <span data-role="comparison-count">0</span>/5</strong>
+          <strong>候选对比 <span data-role="comparison-count">0</span>/5</strong>
           <span class="mono dim" data-role="comparison-status" data-state="idle">—</span>
         </div>
         <ol class="atlas-comparison-list" data-role="comparison-list"></ol>
@@ -172,9 +172,9 @@
         </div>
       </section>
       <footer class="atlas-statusbar mono" data-component="statusbar">
-        <span data-role="statusbar-mode">mode: --</span>
-        <span data-role="statusbar-data">data: --</span>
-        <span data-role="statusbar-build">v0.3 beta</span>
+        <span data-role="statusbar-mode">模式：--</span>
+        <span data-role="statusbar-data">数据：--</span>
+        <span data-role="statusbar-build">偏好仅保存在本机</span>
       </footer>
     </div>
     <script type="module" src="/modules/main.js"></script>
