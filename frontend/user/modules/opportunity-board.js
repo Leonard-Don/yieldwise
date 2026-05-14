@@ -199,7 +199,9 @@ function emptyMessageFor(modeId) {
 }
 
 function isMissingSortValue(value) {
-  return value === null || value === undefined || Number.isNaN(value);
+  if (value === null || value === undefined) return true;
+  if (typeof value === "number") return !Number.isFinite(value);
+  return false;
 }
 
 export function sortItems(items, sortSpec) {

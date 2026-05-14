@@ -76,6 +76,44 @@ test("sortItems: NaN values sort to the end like null (no silent reordering)", (
   );
 });
 
+test("sortItems: Infinity/-Infinity sort to the end like NaN (bogus upstream math)", () => {
+  // Infinity escapes Number.isNaN (and Number() coercion) when an upstream
+  // metric divides by zero (e.g. rent/price=0 → yield=Infinity). The board's
+  // missing-value sink already catches null/undefined/NaN; ±Infinity belongs
+  // in the same bucket — otherwise it floats to the top of a desc sort and
+  // displaces legitimate rows, while formatValue renders the cell as "—".
+  const items = [
+    { id: "pos_inf", yield: Number.POSITIVE_INFINITY },
+    { id: "neg_inf", yield: Number.NEGATIVE_INFINITY },
+    { id: "low", yield: 1 },
+    { id: "high", yield: 9 },
+  ];
+  const desc = sortItems(items, { key: "yield", direction: "desc" });
+  assert.deepEqual(
+    desc.slice(0, 2).map((i) => i.id),
+    ["high", "low"],
+    "desc: finite numbers come first, ±Infinity at the end",
+  );
+  const descTail = desc.slice(2).map((i) => i.id).sort();
+  assert.deepEqual(
+    descTail,
+    ["neg_inf", "pos_inf"],
+    "desc: both ±Infinity belong in the missing-marker bucket at the end",
+  );
+  const asc = sortItems(items, { key: "yield", direction: "asc" });
+  assert.deepEqual(
+    asc.slice(0, 2).map((i) => i.id),
+    ["low", "high"],
+    "asc: finite numbers come first, ±Infinity still at the end",
+  );
+  const ascTail = asc.slice(2).map((i) => i.id).sort();
+  assert.deepEqual(
+    ascTail,
+    ["neg_inf", "pos_inf"],
+    "asc: ±Infinity stays in the missing-marker bucket regardless of direction",
+  );
+});
+
 test("sortItems: mixed null/NaN/numbers — all missing markers cluster at the end", () => {
   const items = [
     { id: "a", score: 50 },
