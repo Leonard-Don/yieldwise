@@ -40,6 +40,29 @@ test("normalizeYieldPct: < 1 treated as fraction → ×100", () => {
   assert.equal(normalizeYieldPct(null), null);
 });
 
+test("normalizeYieldPct: non-finite (Infinity / -Infinity) → null", () => {
+  // Contract: function returns a percent number or null. A non-finite value
+  // (Infinity from corrupt upstream payload, or e.g. a division-by-zero leak)
+  // is not a valid percent and would render as "Infinity%" via formatPct, or
+  // pollute districtYieldDistribution's min/max/quantiles if pushed into the
+  // sorted point array.
+  assert.equal(normalizeYieldPct(Number.POSITIVE_INFINITY), null);
+  assert.equal(normalizeYieldPct(Number.NEGATIVE_INFINITY), null);
+});
+
+test("districtYieldDistribution: non-finite yields are dropped (do not pollute min/max)", () => {
+  const dist = districtYieldDistribution({
+    communities: [
+      { id: "a", name: "A", yield: 4.0 },
+      { id: "b", name: "B", yield: Number.POSITIVE_INFINITY },
+      { id: "c", name: "C", yield: 5.0 },
+    ],
+  });
+  assert.deepEqual(dist.points.map((p) => p.id), ["a", "c"]);
+  assert.equal(dist.min, 4.0);
+  assert.equal(dist.max, 5.0);
+});
+
 test("normalizeQuality: keeps compact visible fields for drawer rendering", () => {
   const quality = normalizeQuality({
     quality: {

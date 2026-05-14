@@ -1,7 +1,7 @@
 export function normalizeYieldPct(raw) {
   if (raw === null || raw === undefined) return null;
   const value = Number(raw);
-  if (Number.isNaN(value)) return null;
+  if (!Number.isFinite(value)) return null;
   // Backend exposes yield either as a percentage (4.16) or a fraction (0.04).
   return value < 1 ? value * 100 : value;
 }
