@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from .env import ROOT_DIR
 
 SALE_BUG_WAN = 323.0
 SALE_BUG_UNIT = 36292.13
@@ -22,6 +24,15 @@ GATE_LABELS = {
     "warn": "需关注",
     "blocker": "阻断",
 }
+
+FRESHNESS_LABELS = {
+    "fresh": "新鲜",
+    "stale": "陈旧",
+    "missing": "缺失",
+    "invalid": "异常",
+}
+
+DEFAULT_FRESH_WINDOW_DAYS = 14.0
 
 
 def attach_quality_to_communities(communities: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -335,6 +346,159 @@ def dirty_listing_summary_for_import_runs(
         "saleIssueCount": sale_issue_count,
         "totalIssueCount": rent_issue_count + sale_issue_count,
         "affectedRuns": affected_runs[:10],
+    }
+
+
+def source_freshness_row(
+    source: str,
+    path: Path | str | None,
+    *,
+    label: str | None = None,
+    generated_at: str | None = None,
+    now: datetime | None = None,
+    fresh_within_days: float = DEFAULT_FRESH_WINDOW_DAYS,
+) -> dict[str, Any]:
+    """Build a freshness audit row for a single manifest / artifact path.
+
+    safePath is always project-relative (or a basename) — absolute filesystem
+    paths under /Users/, /home/, etc. are never returned verbatim.
+    """
+    path_obj = Path(path) if path else None
+    safe_path = _safe_project_relative_path(path_obj)
+    now = now or datetime.now(tz=timezone.utc)
+    display_label = label or source
+
+    if path_obj is None or not path_obj.exists():
+        return _freshness_row(
+            source=source,
+            label=display_label,
+            safe_path=safe_path,
+            exists=False,
+            status="missing",
+            modified_at=None,
+            generated_at=generated_at,
+            age_days=None,
+            reason="数据源缺失或路径不可达",
+        )
+
+    try:
+        mtime_ts = path_obj.stat().st_mtime
+    except OSError:
+        return _freshness_row(
+            source=source,
+            label=display_label,
+            safe_path=safe_path,
+            exists=True,
+            status="invalid",
+            modified_at=None,
+            generated_at=generated_at,
+            age_days=None,
+            reason="无法读取 mtime",
+        )
+
+    modified = datetime.fromtimestamp(mtime_ts, tz=timezone.utc)
+    age_days = (now - modified).total_seconds() / 86400.0
+
+    if age_days < 0:
+        status = "invalid"
+        reason = f"mtime 异常：领先当前 {abs(age_days):.1f} 天"
+    elif age_days > fresh_within_days:
+        status = "stale"
+        reason = f"数据已陈旧 {age_days:.1f} 天（窗口 {fresh_within_days:.0f} 天）"
+    else:
+        status = "fresh"
+        reason = f"数据新鲜，距今 {age_days:.1f} 天"
+
+    return _freshness_row(
+        source=source,
+        label=display_label,
+        safe_path=safe_path,
+        exists=True,
+        status=status,
+        modified_at=modified.isoformat(),
+        generated_at=generated_at,
+        age_days=round(age_days, 3),
+        reason=reason,
+    )
+
+
+def audit_source_freshness(
+    specs: list[dict[str, Any]],
+    *,
+    now: datetime | None = None,
+    fresh_within_days: float = DEFAULT_FRESH_WINDOW_DAYS,
+) -> dict[str, Any]:
+    """Audit a list of source / manifest specs and return rows + gate-style summary."""
+    rows: list[dict[str, Any]] = []
+    counts = {"fresh": 0, "stale": 0, "missing": 0, "invalid": 0}
+    for spec in specs:
+        source = str(spec.get("source") or spec.get("id") or spec.get("runId") or "")
+        label = spec.get("label") or spec.get("batchName")
+        path = spec.get("path") or spec.get("manifestPath") or spec.get("outputDir")
+        generated_at = spec.get("generatedAt") or spec.get("generated_at") or spec.get("createdAt")
+        row = source_freshness_row(
+            source,
+            path,
+            label=label,
+            generated_at=generated_at,
+            now=now,
+            fresh_within_days=fresh_within_days,
+        )
+        rows.append(row)
+        counts[row["status"]] += 1
+
+    if counts["missing"] or counts["invalid"]:
+        gate_status = "blocker"
+    elif counts["stale"]:
+        gate_status = "warn"
+    else:
+        gate_status = "ok"
+
+    return {
+        "rows": rows,
+        "statusCounts": counts,
+        "totalCount": len(rows),
+        "freshWithinDays": fresh_within_days,
+        "status": gate_status,
+        "label": GATE_LABELS[gate_status],
+    }
+
+
+def _safe_project_relative_path(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    if not path.is_absolute():
+        return path.as_posix()
+    try:
+        return path.resolve().relative_to(ROOT_DIR.resolve()).as_posix()
+    except (OSError, ValueError):
+        return path.name
+
+
+def _freshness_row(
+    *,
+    source: str,
+    label: str,
+    safe_path: str | None,
+    exists: bool,
+    status: str,
+    modified_at: str | None,
+    generated_at: str | None,
+    age_days: float | None,
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "source": source,
+        "label": label,
+        "safePath": safe_path,
+        "exists": exists,
+        "ok": status == "fresh",
+        "status": status,
+        "freshness": FRESHNESS_LABELS[status],
+        "modifiedAt": modified_at,
+        "generatedAt": generated_at,
+        "ageDays": age_days,
+        "reason": reason,
     }
 
 
