@@ -195,15 +195,19 @@ function emptyMessageFor(modeId) {
   }[modeId] || "当前筛选下暂无结果，可放宽条件后再试。";
 }
 
-function sortItems(items, sortSpec) {
+function isMissingSortValue(value) {
+  return value === null || value === undefined || Number.isNaN(value);
+}
+
+export function sortItems(items, sortSpec) {
   if (!sortSpec) return items;
   const dir = sortSpec.direction === "asc" ? 1 : -1;
   return [...items].sort((a, b) => {
     const av = a[sortSpec.key];
     const bv = b[sortSpec.key];
     if (av === bv) return 0;
-    if (av === null || av === undefined) return 1;
-    if (bv === null || bv === undefined) return -1;
+    if (isMissingSortValue(av)) return 1;
+    if (isMissingSortValue(bv)) return -1;
     return av > bv ? dir : -dir;
   });
 }
