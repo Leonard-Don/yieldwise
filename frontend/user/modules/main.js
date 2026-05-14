@@ -12,7 +12,7 @@ import { initAnnotations } from "./annotations.js";
 import { initAlerts } from "./alerts.js";
 import { initShortcuts } from "./shortcuts.js";
 import { initSearch } from "./search.js";
-import { initComparison } from "./comparison.js";
+import { initComparison } from "./comparison.js?v=20260514-a11y";
 import { initCandidateDesk } from "./candidate-desk.js";
 import { normalizeComparisonItems } from "./comparison-helpers.js";
 import { isPrefsEmpty } from "./user-prefs-helpers.js";

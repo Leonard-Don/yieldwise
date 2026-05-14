@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/styles/alerts.css" />
     <link rel="stylesheet" href="/styles/shortcuts.css" />
     <link rel="stylesheet" href="/styles/search.css" />
-    <link rel="stylesheet" href="/styles/comparison.css" />
+    <link rel="stylesheet" href="/styles/comparison.css?v=20260514-a11y" />
     <link rel="stylesheet" href="/styles/candidates.css" />
   </head>
   <body data-user-shell="atlas">
@@ -160,7 +160,7 @@
         <div class="atlas-candidate-empty" data-role="candidate-empty">暂无候选</div>
         <footer class="atlas-candidate-status mono dim" data-role="candidate-status">—</footer>
       </section>
-      <section class="atlas-comparison-tray" data-component="comparison-tray" data-open="false" aria-label="候选对比">
+      <section class="atlas-comparison-tray" data-component="comparison-tray" data-open="false" aria-label="候选对比" aria-hidden="true" hidden inert>
         <div class="atlas-comparison-summary">
           <strong>候选对比 <span data-role="comparison-count">0</span>/5</strong>
           <span class="mono dim" data-role="comparison-status" data-state="idle">—</span>
@@ -177,6 +177,6 @@
         <span data-role="statusbar-build">偏好仅保存在本机</span>
       </footer>
     </div>
-    <script type="module" src="/modules/main.js"></script>
+    <script type="module" src="/modules/main.js?v=20260514-a11y"></script>
   </body>
 </html>

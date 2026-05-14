@@ -17,6 +17,7 @@ export function initComparison({ root, store, storage }) {
   const exportButton = tray.querySelector('[data-role="comparison-export"]');
   const clearButton = tray.querySelector('[data-role="comparison-clear"]');
   const drawerButton = root.querySelector('[data-component="drawer-compare"]');
+  let wasOpen = false;
 
   root.addEventListener("atlas:add-comparison", (event) => {
     const candidate = event.detail?.candidate;
@@ -63,12 +64,21 @@ export function initComparison({ root, store, storage }) {
   function render(state) {
     const items = normalizeComparisonItems(state.comparisonItems);
     const count = comparisonCount(items);
-    tray.dataset.open = count > 0 ? "true" : "false";
+    const open = count > 0;
+    const focusWasInsideTray = !open && wasOpen && tray.contains(document.activeElement);
+    tray.dataset.open = open ? "true" : "false";
+    tray.hidden = !open;
+    tray.setAttribute("aria-hidden", open ? "false" : "true");
+    tray.toggleAttribute("inert", !open);
     countEl.textContent = String(count);
     exportButton.disabled = count === 0;
     clearButton.disabled = count === 0;
     listEl.innerHTML = items.map(renderComparisonItem).join("");
     syncDrawerButton(state, items);
+    if (focusWasInsideTray) {
+      focusAfterTrayClose();
+    }
+    wasOpen = open;
   }
 
   function syncDrawerButton(state, items) {
@@ -125,6 +135,15 @@ export function initComparison({ root, store, storage }) {
   function setStatus(text, state) {
     statusEl.textContent = text;
     statusEl.dataset.state = state;
+  }
+
+  function focusAfterTrayClose() {
+    const nextTarget = root.querySelector('[data-comparison-add]:not([aria-pressed="true"])')
+      || root.querySelector('[data-component="candidate-desk-toggle"]')
+      || root.querySelector('[data-component="mode-chips"] button');
+    if (typeof nextTarget?.focus === "function") {
+      nextTarget.focus();
+    }
   }
 }
 
