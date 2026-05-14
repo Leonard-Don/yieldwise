@@ -168,22 +168,25 @@ function renderDecisionBadge(brief) {
   return `<span class="atlas-decision-mini" data-decision-stance="${escapeAttr(stance)}" title="${escapeAttr(title)}">${escapeText(label)}</span>`;
 }
 
-function formatValue(value, format, item = {}) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  if (format === "pct") return `${Number(value).toFixed(2)}%`;
-  if (format === "years") {
-    const n = Number(value);
-    return n > 0 ? `${n.toFixed(1)} 年` : "—";
-  }
-  if (format === "wan") return Number(value).toLocaleString("en-US");
-  if (format === "int") return String(Math.round(Number(value)));
+export function formatValue(value, format, item = {}) {
   if (format === "sample") {
     const label = item.quality?.label || item.sampleLabel || null;
-    const numeric = Number(value);
+    const missing = value === null || value === undefined || value === "" || Number.isNaN(value);
+    const numeric = missing ? Number.NaN : Number(value);
     if (label && Number.isFinite(numeric)) return `${label} · ${Math.round(numeric)}`;
     if (label) return label;
     return Number.isFinite(numeric) ? `${Math.round(numeric)} 套` : "—";
   }
+
+  if (value === null || value === undefined || value === "" || Number.isNaN(value)) return "—";
+  const numeric = Number(value);
+  if (["pct", "years", "wan", "int"].includes(format) && !Number.isFinite(numeric)) return "—";
+  if (format === "pct") return `${numeric.toFixed(2)}%`;
+  if (format === "years") {
+    return numeric > 0 ? `${numeric.toFixed(1)} 年` : "—";
+  }
+  if (format === "wan") return numeric.toLocaleString("en-US");
+  if (format === "int") return String(Math.round(numeric));
   return String(value);
 }
 
