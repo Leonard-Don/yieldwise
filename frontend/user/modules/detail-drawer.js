@@ -159,9 +159,9 @@ export function initDrawer({ root, store }) {
     }
     const kpis = pickKpisFor(mode, detail);
     const bars = bucketBars({
-      low: detail.low ?? 0,
-      mid: detail.mid ?? 0,
-      high: detail.high ?? 0,
+      low: detail.low,
+      mid: detail.mid,
+      high: detail.high,
     });
     return [
       renderKpiRow(kpis),

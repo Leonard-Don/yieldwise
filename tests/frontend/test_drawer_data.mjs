@@ -132,6 +132,44 @@ test("bucketBars: handles all-zero/empty without dividing by zero", () => {
   assert.equal(bars[2].pct, 0);
 });
 
+test("bucketBars: null / non-finite floor inputs drop to null (real 0 is preserved)", () => {
+  // Floor bucket values come from the pipeline. Missing buckets land as null,
+  // and a divide-by-zero leak or corrupt payload can produce ±Infinity / NaN.
+  // None of these are real measurements: bucketBars must surface them as null
+  // so formatBucketValue renders "—" — never a fake "0" (which would imply a
+  // real zero-yield bucket and put a zero-height bar next to real buckets) and
+  // never the literal string "Infinity" (which leaks through `Number(v) || 0`
+  // because Infinity is truthy). A real numeric 0 stays 0.
+  const bars = bucketBars({
+    low: null,
+    mid: Number.POSITIVE_INFINITY,
+    high: 0,
+  });
+  assert.equal(bars[0].value, null);
+  assert.equal(bars[1].value, null);
+  assert.equal(bars[2].value, 0);
+  // Missing buckets contribute 0 to the bar-height scale and don't anchor max.
+  assert.equal(bars[0].pct, 0);
+  assert.equal(bars[1].pct, 0);
+  assert.equal(bars[2].pct, 0);
+});
+
+test("bucketBars: NaN / -Infinity drop to null while finite siblings still scale", () => {
+  // Sibling test: when one bucket is non-finite but others are real, the real
+  // ones must still scale against each other (max is taken over finite values).
+  const bars = bucketBars({
+    low: Number.NaN,
+    mid: 2,
+    high: 4,
+  });
+  assert.equal(bars[0].value, null);
+  assert.equal(bars[1].value, 2);
+  assert.equal(bars[2].value, 4);
+  assert.equal(bars[0].pct, 0);
+  assert.equal(bars[1].pct, 50);
+  assert.equal(bars[2].pct, 100);
+});
+
 test("pickKpisFor: yield mode focuses on yield/payback/score/sample", () => {
   const detail = {
     yieldAvg: 0.04,

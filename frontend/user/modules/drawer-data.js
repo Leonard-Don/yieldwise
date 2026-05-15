@@ -93,17 +93,24 @@ export function qualityLabelFor(status) {
   }[status] || "待复核";
 }
 
-export function bucketBars({ low = 0, mid = 0, high = 0 } = {}) {
+export function bucketBars({ low, mid, high } = {}) {
   const values = [
-    { key: "low", label: "低层", value: Number(low) || 0 },
-    { key: "mid", label: "中层", value: Number(mid) || 0 },
-    { key: "high", label: "高层", value: Number(high) || 0 },
+    { key: "low", label: "低层", value: coerceFiniteOrNull(low) },
+    { key: "mid", label: "中层", value: coerceFiniteOrNull(mid) },
+    { key: "high", label: "高层", value: coerceFiniteOrNull(high) },
   ];
-  const max = Math.max(...values.map((v) => v.value));
+  const finiteValues = values.map((v) => v.value).filter((v) => v !== null);
+  const max = finiteValues.length ? Math.max(...finiteValues) : 0;
   return values.map((v) => ({
     ...v,
-    pct: max > 0 ? Math.round((v.value / max) * 100) : 0,
+    pct: v.value !== null && max > 0 ? Math.round((v.value / max) * 100) : 0,
   }));
+}
+
+function coerceFiniteOrNull(raw) {
+  if (raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function pickKpisFor(modeId, detail) {
