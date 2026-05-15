@@ -7,8 +7,10 @@ export function normalizeYieldPct(raw) {
 }
 
 export function formatPct(value) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return `${Number(value).toFixed(2)}%`;
+  if (value === null || value === undefined) return "—";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "—";
+  return `${num.toFixed(2)}%`;
 }
 
 export function formatYears(value) {

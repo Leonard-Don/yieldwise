@@ -24,6 +24,18 @@ test("formatPct: 4.16 → '4.16%'", () => {
   assert.equal(formatPct(4.16), "4.16%");
 });
 
+test("formatPct: Infinity / -Infinity → — (defensive against bad upstream math)", () => {
+  // Mirrors normalizeYieldPct (commit 55acb08, which already drops ±Infinity)
+  // and formatValue in opportunity-board (commit 5756f49). formatPct is reached
+  // via topCommunitiesFromDistrict, formatPct(detail.yieldPct), and floor/pair
+  // yieldPct in detail-drawer.js — none of which run values through
+  // normalizeYieldPct first. Without this guard, an Infinity from a derived
+  // metric (e.g. divide-by-zero leak in the pipeline) renders as the literal
+  // string "Infinity%" / "-Infinity%" in the district drawer's community list.
+  assert.equal(formatPct(Number.POSITIVE_INFINITY), "—");
+  assert.equal(formatPct(Number.NEGATIVE_INFINITY), "—");
+});
+
 test("formatWan: 306.85 → '306.85 万'", () => {
   assert.equal(formatWan(306.85), "306.85 万");
   assert.equal(formatWan(null), "—");
