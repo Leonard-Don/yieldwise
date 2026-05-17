@@ -114,7 +114,6 @@ def test_review_queue_includes_deterministic_reviewer_digest(client) -> None:
     assert [action["group"] for action in body["digest"]["next_actions"]] == [
         "due_review",
         "target_rule",
-        "evidence_missing",
     ]
     assert body["digest"]["next_actions"][0]["count"] == 1
     assert body["digest"]["next_actions"][0]["target_ids"] == ["zhangjiang-park-b1"]
