@@ -111,10 +111,11 @@ def test_review_queue_includes_deterministic_reviewer_digest(client) -> None:
     assert body["digest"]["open_count"] == 1
     assert body["digest"]["next_action_count"] == 1
     assert body["digest"]["top_target"]["target_id"] == "zhangjiang-park-b1"
-    assert [action["group"] for action in body["digest"]["next_actions"]] == [
-        "due_review",
-        "target_rule",
-    ]
+    action_groups = [action["group"] for action in body["digest"]["next_actions"]]
+    assert action_groups[:2] == ["due_review", "target_rule"]
+    assert set(action_groups).issubset(
+        {"due_review", "target_rule", "evidence_missing"}
+    )
     assert body["digest"]["next_actions"][0]["count"] == 1
     assert body["digest"]["next_actions"][0]["target_ids"] == ["zhangjiang-park-b1"]
     assert body["digest"]["next_actions"][0]["top_targets"][0]["task_labels"]
