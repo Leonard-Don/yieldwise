@@ -26,6 +26,43 @@
   z-index: 3;
 }
 
+.atlas-map-pin {
+  --pin-color: var(--warn);
+  appearance: none;
+  border: 0;
+  padding: 0;
+  width: 24px;
+  height: 30px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #071016;
+  font-family: var(--font-ui, system-ui), sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+  cursor: pointer;
+}
+
+.atlas-map-pin::before {
+  content: "";
+  position: absolute;
+  inset: 0 1px 6px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50% 50% 50% 0;
+  background: var(--pin-color);
+  transform: rotate(-45deg);
+  box-shadow: 0 0 0 1px rgba(5, 8, 13, 0.5);
+}
+
+.atlas-map-pin > span {
+  position: relative;
+  z-index: 1;
+  transform: translateY(-3px);
+}
+
 /* OSM footprint popup (zoom ≥ 15 click target). InfoWindow content. */
 .atlas-osm-pop {
   font-family: var(--font-body, system-ui), sans-serif;

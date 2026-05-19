@@ -1,11 +1,11 @@
 import { createStore } from "./state.js";
-import { initShell } from "./shell.js";
-import { initMap } from "./map.js";
-import { initBoard } from "./opportunity-board.js";
+import { initShell } from "./shell.js?v=20260519-map-pins-key";
+import { initMap } from "./map.js?v=20260519-map-pins-key";
+import { initBoard } from "./opportunity-board.js?v=20260519-map-pins-key";
 import { initDrawer } from "./detail-drawer.js";
-import { initFilterBar } from "./filter-bar.js";
+import { initFilterBar } from "./filter-bar.js?v=20260519-map-pins-key";
 import { createStorage } from "./storage.js";
-import { MODES, normalizeInitialFiltersFor } from "./modes.js";
+import { MODES, normalizeInitialFiltersFor } from "./modes.js?v=20260519-map-pins-key";
 import { initOnboarding } from "./home-onboarding.js";
 import { initWatchlist } from "./watchlist.js";
 import { initAnnotations } from "./annotations.js";

@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { candidateFromItem, isCompared } from "./comparison-helpers.js";
-import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js";
+import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js?v=20260519-map-pins-key";
 
 export async function initBoard({ container, store }) {
   const list = container.querySelector('[data-role="board-list"]');

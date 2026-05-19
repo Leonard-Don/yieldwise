@@ -1,4 +1,4 @@
-import { MODES, getMode } from "./modes.js";
+import { MODES, getMode } from "./modes.js?v=20260519-map-pins-key";
 
 const VALID_MODES = new Set(MODES.map((m) => m.id));
 

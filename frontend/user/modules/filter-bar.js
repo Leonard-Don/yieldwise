@@ -1,4 +1,4 @@
-import { describeFilter, getMode, prunedFilters } from "./modes.js";
+import { describeFilter, getMode, prunedFilters } from "./modes.js?v=20260519-map-pins-key";
 
 const FILTER_API_DEFAULTS = {
   minYield: 0,
