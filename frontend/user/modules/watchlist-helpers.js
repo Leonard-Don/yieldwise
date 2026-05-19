@@ -114,7 +114,7 @@ export function candidateTaskGroupLabel(group) {
     target_rule: "目标触发",
     changed: "价格/样本变化",
     evidence_missing: "证据缺口",
-    shortlisted: "Shortlist",
+    shortlisted: "已入候选",
     ready: "可比较",
     rejected: "已放弃",
   }[group] || "全部";

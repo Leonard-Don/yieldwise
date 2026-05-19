@@ -117,7 +117,7 @@ export function initDrawer({ root, store }) {
 
   function renderLoading(sel) {
     titleEl.textContent = sel.props?.name || sel.props?.communityName || sel.id;
-    subtitleEl.textContent = (sel.type || "").toUpperCase();
+    subtitleEl.textContent = selectionTypeLabel(sel.type);
     bodyEl.innerHTML = `<div class="atlas-skeleton-section"><div class="atlas-skeleton-label"></div><div class="atlas-skeleton-grid-3"><div class="atlas-skeleton-card"></div><div class="atlas-skeleton-card"></div><div class="atlas-skeleton-card"></div></div></div><div class="atlas-skeleton-section"><div class="atlas-skeleton-label"></div><div class="atlas-skeleton-block"></div></div><div class="atlas-skeleton-section"><div class="atlas-skeleton-label"></div><div class="atlas-skeleton-grid-2"><div class="atlas-skeleton-card"></div><div class="atlas-skeleton-card"></div></div></div>`;
   }
 
@@ -196,7 +196,7 @@ export function initDrawer({ root, store }) {
           `<span class="atlas-yield-spread-dot" style="left: ${pct(p.value).toFixed(2)}%" title="${escapeText(p.name)} · ${escapeText(formatPct(p.value))}"></span>`,
       )
       .join("");
-    const summary = `<div class="atlas-yield-spread-summary"><span>min ${escapeText(formatPct(min))}</span><span>中位 ${escapeText(formatPct(median))}</span><span>max ${escapeText(formatPct(max))}</span></div>`;
+    const summary = `<div class="atlas-yield-spread-summary"><span>最低 ${escapeText(formatPct(min))}</span><span>中位 ${escapeText(formatPct(median))}</span><span>最高 ${escapeText(formatPct(max))}</span></div>`;
     const box =
       span > 0
         ? `<span class="atlas-yield-spread-box" style="left: ${pct(q1).toFixed(2)}%; right: ${(100 - pct(q3)).toFixed(2)}%"></span>`
@@ -205,7 +205,7 @@ export function initDrawer({ root, store }) {
       span > 0
         ? `<span class="atlas-yield-spread-median" style="left: ${pct(median).toFixed(2)}%"></span>`
         : "";
-    return `<div class="atlas-yield-spread"><h3 class="atlas-section-title">区内 yield 分布（${points.length} 个小区）</h3><div class="atlas-yield-spread-track">${box}${medianMarker}${dots}</div>${summary}</div>`;
+    return `<div class="atlas-yield-spread"><h3 class="atlas-section-title">区内租售比分布（${points.length} 个小区）</h3><div class="atlas-yield-spread-track">${box}${medianMarker}${dots}</div>${summary}</div>`;
   }
 
   function renderCommunityList(rows) {
@@ -383,6 +383,14 @@ function escapeText(value) {
     ">": "&gt;",
     '"': "&quot;",
   }[c]));
+}
+
+function selectionTypeLabel(type) {
+  return {
+    building: "楼栋",
+    community: "小区",
+    district: "区",
+  }[type] || "";
 }
 
 function renderFloorEvidenceDetail(detail) {

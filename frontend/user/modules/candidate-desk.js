@@ -253,7 +253,7 @@ function renderCandidateItem(item, alerts) {
         <button type="button" data-candidate-action="defer_review" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">延后</button>
         <button type="button" data-candidate-action="shortlist" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">${item.status === "shortlisted" ? "已入候选" : "加入候选"}</button>
         <button type="button" data-candidate-action="reject" data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">放弃</button>
-        <button type="button" data-candidate-memo data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">下一步 memo</button>
+        <button type="button" data-candidate-memo data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">下一步备忘录</button>
         <button type="button" data-candidate-compare data-target-id="${escapeAttr(item.target_id)}" data-target-type="${escapeAttr(item.target_type)}">加入对比</button>
       </div>
     </div>
