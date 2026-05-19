@@ -640,7 +640,7 @@ def _candidate_tasks(
         tasks.append(
             {
                 "group": "shortlisted",
-                "label": "已 shortlist",
+                "label": "已入候选",
                 "priority": "medium",
                 "next": "补齐反对理由和下一步动作，准备投决备忘录。",
             }

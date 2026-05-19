@@ -169,7 +169,7 @@ function attachOsmFootprintLayer({ map, AMap }) {
     const matchLine = community
       ? `<div class="atlas-osm-pop-row"><span>归属小区</span><strong>${escape(community)}</strong></div>` +
         (distance != null
-          ? `<div class="atlas-osm-pop-row"><span>centroid 距离</span><strong>${Number(distance).toFixed(1)} m</strong></div>`
+          ? `<div class="atlas-osm-pop-row"><span>中心点距离</span><strong>${Number(distance).toFixed(1)} m</strong></div>`
           : "")
       : `<div class="atlas-osm-pop-row atlas-osm-pop-unmatched"><span>归属小区</span><strong>未匹配（200m 内无目录小区）</strong></div>`;
     const buildingLine = buildingName

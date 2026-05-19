@@ -117,6 +117,7 @@ export function candidateTaskGroupLabel(group) {
     shortlisted: "已入候选",
     ready: "可比较",
     rejected: "已放弃",
+    watch: "继续观察",
   }[group] || "全部";
 }
 
