@@ -6,6 +6,7 @@ import {
   getMode,
   yieldColorFor,
   defaultFiltersFor,
+  normalizeInitialFiltersFor,
   resolveDefaultFilters,
   districtColorFor,
 } from "../../frontend/user/modules/modes.js";
@@ -41,8 +42,8 @@ test("yieldColorFor: null/NaN returns dim", () => {
   assert.equal(yieldColorFor(Number.NaN), "var(--text-dim)");
 });
 
-test("defaultFiltersFor: yield mode returns minYield 4 + maxBudget 1500", () => {
-  assert.deepEqual(defaultFiltersFor("yield"), { minYield: 4, maxBudget: 1500 });
+test("defaultFiltersFor: yield mode starts without restrictive filters", () => {
+  assert.deepEqual(defaultFiltersFor("yield"), {});
 });
 
 test("defaultFiltersFor: home and city modes default to empty filters", () => {
@@ -50,8 +51,20 @@ test("defaultFiltersFor: home and city modes default to empty filters", () => {
   assert.deepEqual(defaultFiltersFor("city"), {});
 });
 
-test("resolveDefaultFilters: yield mode static defaults", () => {
-  assert.deepEqual(resolveDefaultFilters("yield", null), { minYield: 4, maxBudget: 1500 });
+test("normalizeInitialFiltersFor: migrates the legacy strict yield defaults", () => {
+  assert.deepEqual(normalizeInitialFiltersFor("yield", { minYield: 4, maxBudget: 1500 }), {});
+  assert.deepEqual(normalizeInitialFiltersFor("yield", { minYield: "4", maxBudget: "1500" }), {});
+});
+
+test("normalizeInitialFiltersFor: preserves user-customized filters", () => {
+  assert.deepEqual(normalizeInitialFiltersFor("yield", { minYield: 3.5, maxBudget: 1500 }), {
+    minYield: 3.5,
+    maxBudget: 1500,
+  });
+});
+
+test("resolveDefaultFilters: yield mode starts without restrictive filters", () => {
+  assert.deepEqual(resolveDefaultFilters("yield", null), {});
 });
 
 test("resolveDefaultFilters: home with empty prefs returns empty", () => {

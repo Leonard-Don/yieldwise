@@ -5,7 +5,7 @@ import { initBoard } from "./opportunity-board.js";
 import { initDrawer } from "./detail-drawer.js";
 import { initFilterBar } from "./filter-bar.js";
 import { createStorage } from "./storage.js";
-import { MODES, defaultFiltersFor } from "./modes.js";
+import { MODES, normalizeInitialFiltersFor } from "./modes.js";
 import { initOnboarding } from "./home-onboarding.js";
 import { initWatchlist } from "./watchlist.js";
 import { initAnnotations } from "./annotations.js";
@@ -35,7 +35,10 @@ async function bootstrap(root) {
   const persistedComparison = normalizeComparisonItems(comparisonStorage.read());
   const initialFilters = {};
   for (const mode of MODES) {
-    initialFilters[mode.id] = persistedFilters[mode.id] || defaultFiltersFor(mode.id);
+    initialFilters[mode.id] = normalizeInitialFiltersFor(mode.id, persistedFilters[mode.id]);
+  }
+  if (JSON.stringify(initialFilters) !== JSON.stringify(persistedFilters)) {
+    filtersStorage.write(initialFilters);
   }
 
   const store = createStore({

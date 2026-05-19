@@ -11,7 +11,7 @@ export const MODES = [
       { key: "sample", label: "样本", format: "sample" },
     ],
     defaultSort: { key: "yield", direction: "desc" },
-    defaultFilters: { minYield: 4, maxBudget: 1500 },
+    defaultFilters: {},
   },
   {
     id: "home",
@@ -77,6 +77,35 @@ export function districtColorFor(value, mean) {
 
 export function defaultFiltersFor(modeId) {
   return { ...(getMode(modeId).defaultFilters || {}) };
+}
+
+const LEGACY_DEFAULT_FILTERS = {
+  yield: [{ minYield: 4, maxBudget: 1500 }],
+};
+
+export function normalizeInitialFiltersFor(modeId, persistedFilters) {
+  if (!persistedFilters || typeof persistedFilters !== "object" || Array.isArray(persistedFilters)) {
+    return defaultFiltersFor(modeId);
+  }
+  const filters = { ...persistedFilters };
+  const legacyDefaults = LEGACY_DEFAULT_FILTERS[modeId] || [];
+  if (legacyDefaults.some((legacy) => filtersEqual(filters, legacy))) {
+    return defaultFiltersFor(modeId);
+  }
+  return filters;
+}
+
+function filtersEqual(left, right) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return rightKeys.every((key) => {
+    if (!Object.prototype.hasOwnProperty.call(left, key)) return false;
+    const leftValue = left[key];
+    const rightValue = right[key];
+    if (typeof rightValue === "number") return Number(leftValue) === rightValue;
+    return leftValue === rightValue;
+  });
 }
 
 const FILTER_KEY_MAP = {
