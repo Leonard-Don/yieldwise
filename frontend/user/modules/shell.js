@@ -1,6 +1,4 @@
-import { MODES, getMode } from "./modes.js?v=20260519-map-pins-key";
-
-const VALID_MODES = new Set(MODES.map((m) => m.id));
+import { PRIMARY_MODE_ID, getMode, normalizeModeId } from "./modes.js?v=20260519-single-yield";
 
 export function initShell({ root, store }) {
   const chipsContainer = root.querySelector('[data-component="mode-chips"]');
@@ -9,15 +7,7 @@ export function initShell({ root, store }) {
   const statusbarMode = statusbar.querySelector('[data-role="statusbar-mode"]');
   const statusbarData = statusbar.querySelector('[data-role="statusbar-data"]');
 
-  // Render chips once; every declared mode is a live workflow.
-  chipsContainer.innerHTML = MODES.map(
-    (m) => `<button type="button" class="atlas-mode-chip" data-mode="${m.id}" aria-pressed="false">⌘${m.hotkey} ${m.label}</button>`,
-  ).join("");
-  chipsContainer.addEventListener("click", (event) => {
-    const target = event.target.closest("[data-mode]");
-    if (!target) return;
-    setMode(target.dataset.mode);
-  });
+  chipsContainer.innerHTML = `<span class="atlas-mode-current">${getMode(PRIMARY_MODE_ID).label}</span>`;
 
   const prefsButton = root.querySelector('[data-component="prefs-button"]');
   if (prefsButton) {
@@ -26,33 +16,24 @@ export function initShell({ root, store }) {
     });
   }
 
-  // Initial mode from URL ?mode=... falling back to store.
+  // Legacy ?mode=home/city links now land on the single rent-sale-ratio view.
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("mode");
-  if (requested && VALID_MODES.has(requested)) {
-    store.set({ mode: requested });
+  const normalizedMode = normalizeModeId(requested || store.get().mode);
+  if (store.get().mode !== normalizedMode) {
+    store.set({ mode: normalizedMode });
+  }
+  if (requested) {
+    params.delete("mode");
+    replaceSearch(params);
   }
 
   store.subscribe(renderFromState);
   renderFromState(store.get());
 
-  function setMode(modeId) {
-    if (!VALID_MODES.has(modeId)) return;
-    store.set({ mode: modeId });
-    const next = new URLSearchParams(window.location.search);
-    next.set("mode", modeId);
-    window.history.replaceState({}, "", `${window.location.pathname}?${next.toString()}`);
-  }
-
   function renderFromState(state) {
-    const activeMode = state.mode;
-    const modeLabel = getMode(activeMode).label;
-    chipsContainer
-      .querySelectorAll("[data-mode]")
-      .forEach((btn) => {
-        btn.setAttribute("aria-pressed", btn.dataset.mode === activeMode ? "true" : "false");
-      });
-    statusbarMode.textContent = `模式：${modeLabel}`;
+    const modeLabel = getMode(state.mode).label;
+    statusbarMode.textContent = `指标：${modeLabel}`;
     if (state.runtime) {
       const tag = state.runtime.activeDataMode || "—";
       const dataLabel = dataModeLabel(tag);
@@ -60,6 +41,12 @@ export function initShell({ root, store }) {
       statusbarData.textContent = `数据：${dataLabel}`;
     }
   }
+}
+
+function replaceSearch(params) {
+  const query = params.toString();
+  const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+  window.history.replaceState({}, "", nextUrl);
 }
 
 function dataModeLabel(mode) {

@@ -7,7 +7,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles/tokens.css" />
     <link rel="stylesheet" href="/styles/shell.css" />
-    <link rel="stylesheet" href="/styles/map.css?v=20260519-map-pins-key" />
+    <link rel="stylesheet" href="/styles/map.css?v=20260519-single-yield" />
     <link rel="stylesheet" href="/styles/board.css" />
     <link rel="stylesheet" href="/styles/drawer.css" />
     <link rel="stylesheet" href="/styles/onboarding.css" />
@@ -32,7 +32,7 @@
       </section>
       <header class="atlas-topbar">
         <h1>Yieldwise · 租知</h1>
-        <nav class="atlas-modes" data-component="mode-chips" aria-label="模式切换"></nav>
+        <nav class="atlas-modes" data-component="mode-chips" aria-label="当前指标"></nav>
         <div class="atlas-topbar-spacer"></div>
         <button type="button" class="atlas-star-tag mono" data-component="candidate-desk-toggle" data-active="false" title="候选研究台">候选/关注 —</button>
         <button type="button" class="atlas-prefs-button" data-component="prefs-button">偏好</button>
@@ -87,7 +87,7 @@
         <div class="atlas-onboarding-backdrop" data-component="onboarding-backdrop" data-open="false"></div>
         <section class="atlas-onboarding" data-component="onboarding" data-open="false" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="atlas-onboarding-title" tabindex="-1">
           <header class="atlas-onboarding-header">
-            <h2 id="atlas-onboarding-title" class="atlas-onboarding-title">自住找房 · 偏好设定</h2>
+            <h2 id="atlas-onboarding-title" class="atlas-onboarding-title">筛选偏好</h2>
             <button type="button" class="atlas-onboarding-close" data-role="onboarding-close" aria-label="关闭">×</button>
           </header>
           <form class="atlas-onboarding-form" data-role="onboarding-form" novalidate>
@@ -122,9 +122,6 @@
             <button type="button" class="atlas-help-close" data-role="help-close" aria-label="关闭">×</button>
           </header>
           <dl class="atlas-help-list">
-            <dt><kbd>⌘1</kbd> / <kbd>⌃1</kbd></dt><dd>切换到收益猎手模式</dd>
-            <dt><kbd>⌘2</kbd> / <kbd>⌃2</kbd></dt><dd>切换到自住找房模式</dd>
-            <dt><kbd>⌘3</kbd> / <kbd>⌃3</kbd></dt><dd>切换到全市观察模式</dd>
             <dt><kbd>F</kbd></dt><dd>把当前抽屉里的楼栋/小区加入或移出关注夹</dd>
             <dt><kbd>N</kbd></dt><dd>聚焦笔记输入框</dd>
             <dt><kbd>⌘K</kbd> / <kbd>⌃K</kbd></dt><dd>打开全局搜索</dd>
@@ -172,11 +169,11 @@
         </div>
       </section>
       <footer class="atlas-statusbar mono" data-component="statusbar">
-        <span data-role="statusbar-mode">模式：--</span>
+        <span data-role="statusbar-mode">指标：租售比观察</span>
         <span data-role="statusbar-data">数据：--</span>
         <span data-role="statusbar-build">偏好仅保存在本机</span>
       </footer>
     </div>
-    <script type="module" src="/modules/main.js?v=20260519-map-pins-key"></script>
+    <script type="module" src="/modules/main.js?v=20260519-single-yield"></script>
   </body>
 </html>

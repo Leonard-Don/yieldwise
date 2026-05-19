@@ -95,6 +95,19 @@
   gap: 6px;
 }
 
+.atlas-mode-current {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(0, 214, 143, 0.32);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 214, 143, 0.08);
+  color: var(--text-0);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
 .atlas-mode-chip {
   appearance: none;
   border: 1px solid var(--line);

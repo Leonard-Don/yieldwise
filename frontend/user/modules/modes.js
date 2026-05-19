@@ -1,8 +1,9 @@
+export const PRIMARY_MODE_ID = "yield";
+
 export const MODES = [
   {
-    id: "yield",
-    label: "收益猎手",
-    hotkey: "1",
+    id: PRIMARY_MODE_ID,
+    label: "租售比观察",
     boardColumns: [
       { key: "name", label: "名称" },
       { key: "yield", label: "租售比", format: "pct" },
@@ -13,39 +14,16 @@ export const MODES = [
     defaultSort: { key: "yield", direction: "desc" },
     defaultFilters: {},
   },
-  {
-    id: "home",
-    label: "自住找房",
-    hotkey: "2",
-    boardColumns: [
-      { key: "name", label: "名称" },
-      { key: "avgPriceWan", label: "预算匹配", format: "wan" },
-      { key: "score", label: "配套", format: "int" },
-      { key: "yield", label: "价格安全垫", format: "pct" },
-      { key: "sample", label: "样本可信度", format: "sample" },
-    ],
-    defaultSort: { key: "avgPriceWan", direction: "asc" },
-    defaultFilters: {},
-  },
-  {
-    id: "city",
-    label: "全市观察",
-    hotkey: "3",
-    boardColumns: [
-      { key: "name", label: "行政区" },
-      { key: "yield", label: "均值", format: "pct" },
-      { key: "score", label: "分位", format: "int" },
-      { key: "sample", label: "样本", format: "sample" },
-    ],
-    defaultSort: { key: "yield", direction: "desc" },
-    defaultFilters: {},
-  },
 ];
 
 const MODE_INDEX = new Map(MODES.map((m) => [m.id, m]));
 
 export function getMode(id) {
-  return MODE_INDEX.get(id) || MODES[0];
+  return MODE_INDEX.get(normalizeModeId(id)) || MODES[0];
+}
+
+export function normalizeModeId(id) {
+  return MODE_INDEX.has(id) ? id : PRIMARY_MODE_ID;
 }
 
 export function yieldColorFor(yieldPct) {
@@ -163,9 +141,8 @@ export function prunedFilters(filters) {
 }
 
 export function resolveDefaultFilters(modeId, userPrefs) {
-  if (modeId === "yield") {
-    return { ...defaultFiltersFor("yield") };
-  }
+  // Legacy "home" preferences are still useful as budget/area filters, but
+  // the product no longer exposes them as a separate mode.
   if (modeId === "home") {
     const out = {};
     if (userPrefs && typeof userPrefs === "object") {
@@ -180,5 +157,5 @@ export function resolveDefaultFilters(modeId, userPrefs) {
     }
     return out;
   }
-  return {};
+  return { ...defaultFiltersFor(PRIMARY_MODE_ID) };
 }

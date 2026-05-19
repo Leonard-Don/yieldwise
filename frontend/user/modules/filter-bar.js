@@ -1,4 +1,4 @@
-import { describeFilter, getMode, prunedFilters } from "./modes.js?v=20260519-map-pins-key";
+import { describeFilter, getMode, prunedFilters } from "./modes.js?v=20260519-single-yield";
 
 const FILTER_API_DEFAULTS = {
   minYield: 0,
@@ -27,7 +27,7 @@ export function initFilterBar({ root, store }) {
     const entries = Object.entries(activeFilters);
 
     if (entries.length === 0) {
-      chipsEl.innerHTML = `<span class="atlas-filter-empty">${mode.label} 模式 · 无筛选</span>`;
+      chipsEl.innerHTML = `<span class="atlas-filter-empty">${mode.label} · 无筛选</span>`;
     } else {
       chipsEl.innerHTML = entries
         .map(

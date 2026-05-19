@@ -1,12 +1,12 @@
 import { createStore } from "./state.js";
-import { initShell } from "./shell.js?v=20260519-map-pins-key";
-import { initMap } from "./map.js?v=20260519-map-pins-key";
-import { initBoard } from "./opportunity-board.js?v=20260519-map-pins-key";
+import { initShell } from "./shell.js?v=20260519-single-yield";
+import { initMap } from "./map.js?v=20260519-single-yield";
+import { initBoard } from "./opportunity-board.js?v=20260519-single-yield";
 import { initDrawer } from "./detail-drawer.js";
-import { initFilterBar } from "./filter-bar.js?v=20260519-map-pins-key";
+import { initFilterBar } from "./filter-bar.js?v=20260519-single-yield";
 import { createStorage } from "./storage.js";
-import { MODES, normalizeInitialFiltersFor } from "./modes.js?v=20260519-map-pins-key";
-import { initOnboarding } from "./home-onboarding.js";
+import { MODES, normalizeInitialFiltersFor } from "./modes.js?v=20260519-single-yield";
+import { initOnboarding } from "./home-onboarding.js?v=20260519-single-yield";
 import { initWatchlist } from "./watchlist.js";
 import { initAnnotations } from "./annotations.js";
 import { initAlerts } from "./alerts.js";
@@ -15,7 +15,6 @@ import { initSearch } from "./search.js";
 import { initComparison } from "./comparison.js?v=20260514-a11y";
 import { initCandidateDesk } from "./candidate-desk.js";
 import { normalizeComparisonItems } from "./comparison-helpers.js";
-import { isPrefsEmpty } from "./user-prefs-helpers.js";
 import { api } from "./api.js";
 import { bootstrapCityConfig } from "./config-bootstrap.js";
 
@@ -35,7 +34,8 @@ async function bootstrap(root) {
   const persistedComparison = normalizeComparisonItems(comparisonStorage.read());
   const initialFilters = {};
   for (const mode of MODES) {
-    initialFilters[mode.id] = normalizeInitialFiltersFor(mode.id, persistedFilters[mode.id]);
+    const persistedForMode = persistedFilters[mode.id] || persistedFilters.home || persistedFilters.city;
+    initialFilters[mode.id] = normalizeInitialFiltersFor(mode.id, persistedForMode);
   }
   if (JSON.stringify(initialFilters) !== JSON.stringify(persistedFilters)) {
     filtersStorage.write(initialFilters);
@@ -58,9 +58,8 @@ async function bootstrap(root) {
     searchOpen: false,
   });
 
-  // Fire-and-forget: prefetch the user prefs (needed by the home onboarding
-  // gate). Failures are non-fatal — the user can still click 偏好 to open
-  // the modal and try again.
+  // Fire-and-forget: preferences are optional filters for the single rent-sale
+  // ratio workspace. Failures are non-fatal.
   api.userPrefs
     .get()
     .then((prefs) => store.set({ userPrefs: prefs }))
@@ -100,28 +99,6 @@ async function bootstrap(root) {
   initShortcuts({ root, store });
   initSearch({ root, store });
   initComparison({ root, store, storage: comparisonStorage });
-
-  // Auto-open the onboarding modal when a fresh user lands on home mode AND
-  // user prefs have been hydrated (otherwise we can't tell empty-from-unloaded).
-  // Fire on either mode-change or prefs-hydration transitions.
-  let lastMode = store.get().mode;
-  let prefsHydrated = store.get().userPrefs !== null && store.get().userPrefs !== undefined;
-  store.subscribe((state) => {
-    const modeChanged = state.mode !== lastMode;
-    const prefsLoadedNow = state.userPrefs !== null && state.userPrefs !== undefined;
-    const prefsJustHydrated = !prefsHydrated && prefsLoadedNow;
-    if (modeChanged) lastMode = state.mode;
-    if (prefsJustHydrated) prefsHydrated = true;
-    if (
-      (modeChanged || prefsJustHydrated) &&
-      state.mode === "home" &&
-      prefsLoadedNow &&
-      isPrefsEmpty(state.userPrefs) &&
-      !state.onboardingOpen
-    ) {
-      store.set({ onboardingOpen: true });
-    }
-  });
 
   initDrawer({ root, store });
   initFilterBar({ root, store });

@@ -1,5 +1,3 @@
-const MODE_BY_DIGIT = { "1": "yield", "2": "home", "3": "city" };
-
 function isEditableTarget(target) {
   if (!target) return false;
   const tag = (target.tagName || "").toUpperCase();
@@ -13,13 +11,8 @@ export function parseShortcut(event) {
   const { key, metaKey, ctrlKey, shiftKey, altKey, target } = event;
   const modKey = metaKey || ctrlKey;
 
-  // Mode switch is privileged: works even when typing in a form field.
-  if (modKey && !altKey && Object.prototype.hasOwnProperty.call(MODE_BY_DIGIT, key)) {
-    return MODE_BY_DIGIT[key];
-  }
-
-  // Search is also privileged across editable targets — users want ⌘K to
-  // open search even from inside a textarea / input.
+  // Search is privileged across editable targets — users want ⌘K to open
+  // search even from inside a textarea / input.
   if (modKey && !altKey && typeof key === "string" && key.toLowerCase() === "k") {
     return "search";
   }

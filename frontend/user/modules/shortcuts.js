@@ -1,8 +1,6 @@
 import { api } from "./api.js";
 import { parseShortcut } from "./shortcuts-helpers.js";
 
-const VALID_MODES = new Set(["yield", "home", "city"]);
-
 export function initShortcuts({ root, store }) {
   const overlay = root.querySelector('[data-component="help-overlay"]');
   const backdrop = root.querySelector('[data-component="help-backdrop"]');
@@ -65,9 +63,7 @@ export function initShortcuts({ root, store }) {
     const action = parseShortcut(event);
     if (!action) return;
     event.preventDefault();
-    if (VALID_MODES.has(action)) {
-      switchMode(action);
-    } else if (action === "star") {
+    if (action === "star") {
       void toggleStar();
     } else if (action === "note") {
       focusNoteInput();
@@ -76,14 +72,6 @@ export function initShortcuts({ root, store }) {
     } else if (action === "search") {
       store.set({ searchOpen: true });
     }
-  }
-
-  function switchMode(modeId) {
-    if (store.get().mode === modeId) return;
-    store.set({ mode: modeId });
-    const params = new URLSearchParams(window.location.search);
-    params.set("mode", modeId);
-    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
   }
 
   function focusNoteInput() {

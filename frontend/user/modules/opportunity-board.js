@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { candidateFromItem, isCompared } from "./comparison-helpers.js";
-import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js?v=20260519-map-pins-key";
+import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js?v=20260519-single-yield";
 
 export async function initBoard({ container, store }) {
   const list = container.querySelector('[data-role="board-list"]');
@@ -34,19 +34,6 @@ export async function initBoard({ container, store }) {
 
   async function loadFor(modeId, state) {
     const mode = getMode(modeId);
-    if (modeId === "city") {
-      try {
-        const data = await api.mapDistricts();
-        lastItems = sortItems(data.districts || [], mode.defaultSort);
-        lastError = null;
-      } catch (err) {
-        console.error("[atlas:board] districts load failed", err);
-        lastItems = [];
-        lastError = err;
-      }
-      render(store.get());
-      return;
-    }
     const persisted = state && state.filters ? state.filters[modeId] : null;
     const filters =
       persisted && Object.keys(persisted).length > 0
@@ -102,13 +89,12 @@ export async function initBoard({ container, store }) {
         const id = row.dataset.id;
         const item = lastItems.find((it) => String(it.id) === id);
         if (!item) return;
-        const selectionType = state.mode === "city" ? "district" : "community";
         const selection = {
-          type: selectionType,
+          type: "community",
           id: item.id,
           props: item,
         };
-        if (selectionType === "community" && item.primaryBuildingId) {
+        if (item.primaryBuildingId) {
           selection.primaryBuildingId = item.primaryBuildingId;
         }
         store.set({ selection });
@@ -193,8 +179,6 @@ export function formatValue(value, format, item = {}) {
 function emptyMessageFor(modeId) {
   return {
     yield: "当前筛选下暂无结果，可放宽租售比、总价或样本量条件。",
-    home: "当前偏好下暂无匹配房源，可放宽预算、区域或面积条件。",
-    city: "当前没有可汇总的行政区样本，可先导入演示/暂存样本或降低样本量门槛。",
   }[modeId] || "当前筛选下暂无结果，可放宽条件后再试。";
 }
 

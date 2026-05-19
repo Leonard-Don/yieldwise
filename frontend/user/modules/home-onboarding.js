@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { resolveDefaultFilters } from "./modes.js";
+import { resolveDefaultFilters } from "./modes.js?v=20260519-single-yield";
 
 export function initOnboarding({ root, store }) {
   const modal = root.querySelector('[data-component="onboarding"]');
@@ -131,15 +131,13 @@ export function initOnboarding({ root, store }) {
       districts: [...selectedDistricts],
     };
     const saved = await api.userPrefs.patch(payload);
-    // Seed the home-mode filter slice so the chip bar immediately reflects
-    // the saved prefs (otherwise filter-bar shows "无筛选" while the board
-    // is silently filtered through the resolver fallback in loadFor).
+    // Keep the saved preference useful inside the single rent-sale-ratio view.
     const currentFilters = store.get().filters || {};
-    const homeFilters = resolveDefaultFilters("home", saved);
+    const yieldFilters = resolveDefaultFilters("home", saved);
     store.set({
       userPrefs: saved,
       onboardingOpen: false,
-      filters: { ...currentFilters, home: homeFilters },
+      filters: { ...currentFilters, yield: yieldFilters },
     });
   }
 }

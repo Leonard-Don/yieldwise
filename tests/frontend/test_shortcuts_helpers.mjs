@@ -15,14 +15,11 @@ function makeEvent(overrides = {}) {
   };
 }
 
-test("parseShortcut: ⌘1 → yield", () => {
-  assert.equal(parseShortcut(makeEvent({ key: "1", metaKey: true })), "yield");
-  assert.equal(parseShortcut(makeEvent({ key: "1", ctrlKey: true })), "yield");
-});
-
-test("parseShortcut: ⌘2 → home, ⌘3 → city", () => {
-  assert.equal(parseShortcut(makeEvent({ key: "2", metaKey: true })), "home");
-  assert.equal(parseShortcut(makeEvent({ key: "3", ctrlKey: true })), "city");
+test("parseShortcut: mode digits are no longer global shortcuts", () => {
+  assert.equal(parseShortcut(makeEvent({ key: "1", metaKey: true })), null);
+  assert.equal(parseShortcut(makeEvent({ key: "1", ctrlKey: true })), null);
+  assert.equal(parseShortcut(makeEvent({ key: "2", metaKey: true })), null);
+  assert.equal(parseShortcut(makeEvent({ key: "3", ctrlKey: true })), null);
 });
 
 test("parseShortcut: bare digits without modifier → null", () => {
@@ -68,11 +65,11 @@ test("parseShortcut: typing in INPUT/TEXTAREA suppresses letter shortcuts", () =
   );
 });
 
-test("parseShortcut: ⌘1 still works inside a textarea (mode switch is privileged)", () => {
+test("parseShortcut: ⌘1 is not privileged inside a textarea", () => {
   const action = parseShortcut(
     makeEvent({ key: "1", metaKey: true, target: { tagName: "TEXTAREA", isContentEditable: false } }),
   );
-  assert.equal(action, "yield");
+  assert.equal(action, null);
 });
 
 test("parseShortcut: ⌘K → search (privileged across form fields)", () => {

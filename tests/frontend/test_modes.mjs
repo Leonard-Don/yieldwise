@@ -11,18 +11,20 @@ import {
   districtColorFor,
 } from "../../frontend/user/modules/modes.js";
 
-test("MODES: yield/home/city present in declared order", () => {
-  assert.deepEqual(MODES.map((m) => m.id), ["yield", "home", "city"]);
+test("MODES: only the rent-sale-ratio workspace is exposed", () => {
+  assert.deepEqual(MODES.map((m) => m.id), ["yield"]);
 });
 
 test("getMode: returns the matching config", () => {
   const m = getMode("yield");
   assert.equal(m.id, "yield");
-  assert.equal(m.label, "收益猎手");
+  assert.equal(m.label, "租售比观察");
 });
 
-test("getMode: unknown id falls back to yield", () => {
+test("getMode: unknown and legacy ids fall back to yield", () => {
   assert.equal(getMode("nonsense").id, "yield");
+  assert.equal(getMode("home").id, "yield");
+  assert.equal(getMode("city").id, "yield");
 });
 
 test("yieldColorFor: yieldPct under 3.5 is down/red", () => {
@@ -46,7 +48,7 @@ test("defaultFiltersFor: yield mode starts without restrictive filters", () => {
   assert.deepEqual(defaultFiltersFor("yield"), {});
 });
 
-test("defaultFiltersFor: home and city modes default to empty filters", () => {
+test("defaultFiltersFor: legacy modes resolve to the yield defaults", () => {
   assert.deepEqual(defaultFiltersFor("home"), {});
   assert.deepEqual(defaultFiltersFor("city"), {});
 });
