@@ -27,14 +27,14 @@ test("parseShortcut: bare digits without modifier → null", () => {
   assert.equal(parseShortcut(makeEvent({ key: "2" })), null);
 });
 
-test("parseShortcut: f → star, n → note", () => {
+test("parseShortcut: f → star", () => {
   assert.equal(parseShortcut(makeEvent({ key: "f" })), "star");
-  assert.equal(parseShortcut(makeEvent({ key: "n" })), "note");
+  assert.equal(parseShortcut(makeEvent({ key: "n" })), null);
 });
 
-test("parseShortcut: F (uppercase) and N (uppercase) also work", () => {
+test("parseShortcut: F (uppercase) works, N is unused", () => {
   assert.equal(parseShortcut(makeEvent({ key: "F", shiftKey: true })), "star");
-  assert.equal(parseShortcut(makeEvent({ key: "N", shiftKey: true })), "note");
+  assert.equal(parseShortcut(makeEvent({ key: "N", shiftKey: true })), null);
 });
 
 test("parseShortcut: f with Cmd modifier → null (browser bookmark)", () => {

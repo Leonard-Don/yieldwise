@@ -1,4 +1,4 @@
-import { PRIMARY_MODE_ID, getMode, normalizeModeId } from "./modes.js?v=20260519-single-yield";
+import { PRIMARY_MODE_ID, getMode, normalizeModeId } from "./modes.js?v=20260519-no-notes";
 
 export function initShell({ root, store }) {
   const chipsContainer = root.querySelector('[data-component="mode-chips"]');

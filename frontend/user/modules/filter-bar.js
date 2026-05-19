@@ -1,4 +1,4 @@
-import { describeFilter, getMode, prunedFilters } from "./modes.js?v=20260519-single-yield";
+import { describeFilter, getMode, prunedFilters } from "./modes.js?v=20260519-no-notes";
 
 const FILTER_API_DEFAULTS = {
   minYield: 0,

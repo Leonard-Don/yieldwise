@@ -65,19 +65,11 @@ export function initShortcuts({ root, store }) {
     event.preventDefault();
     if (action === "star") {
       void toggleStar();
-    } else if (action === "note") {
-      focusNoteInput();
     } else if (action === "help") {
       store.set({ helpOpen: !store.get().helpOpen });
     } else if (action === "search") {
       store.set({ searchOpen: true });
     }
-  }
-
-  function focusNoteInput() {
-    const input = root.querySelector('[data-role="notes-add-input"]');
-    if (!input) return;
-    input.focus();
   }
 
   async function toggleStar() {

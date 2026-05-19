@@ -1,21 +1,20 @@
 import { createStore } from "./state.js";
-import { initShell } from "./shell.js?v=20260519-single-yield";
-import { initMap } from "./map.js?v=20260519-single-yield";
-import { initBoard } from "./opportunity-board.js?v=20260519-single-yield";
+import { initShell } from "./shell.js?v=20260519-no-notes";
+import { initMap } from "./map.js?v=20260519-no-notes";
+import { initBoard } from "./opportunity-board.js?v=20260519-no-notes";
 import { initDrawer } from "./detail-drawer.js";
-import { initFilterBar } from "./filter-bar.js?v=20260519-single-yield";
+import { initFilterBar } from "./filter-bar.js?v=20260519-no-notes";
 import { createStorage } from "./storage.js";
-import { MODES, normalizeInitialFiltersFor } from "./modes.js?v=20260519-single-yield";
-import { initOnboarding } from "./home-onboarding.js?v=20260519-single-yield";
+import { MODES, normalizeInitialFiltersFor } from "./modes.js?v=20260519-no-notes";
+import { initOnboarding } from "./home-onboarding.js?v=20260519-no-notes";
 import { initWatchlist } from "./watchlist.js";
-import { initAnnotations } from "./annotations.js";
 import { initAlerts } from "./alerts.js";
-import { initShortcuts } from "./shortcuts.js";
+import { initShortcuts } from "./shortcuts.js?v=20260519-no-notes";
 import { initSearch } from "./search.js";
 import { initComparison } from "./comparison.js?v=20260514-a11y";
 import { initCandidateDesk } from "./candidate-desk.js";
 import { normalizeComparisonItems } from "./comparison-helpers.js";
-import { api } from "./api.js";
+import { api } from "./api.js?v=20260519-no-notes";
 import { bootstrapCityConfig } from "./config-bootstrap.js";
 
 const root = document.querySelector('[data-user-shell="atlas"]');
@@ -50,7 +49,6 @@ async function bootstrap(root) {
     userPrefs: null,
     onboardingOpen: false,
     watchlist: [],
-    annotationsByTarget: {},
     alerts: { items: [], last_open_at: null },
     candidateDeskOpen: false,
     comparisonItems: persistedComparison,
@@ -93,7 +91,6 @@ async function bootstrap(root) {
   initShell({ root, store });
   initOnboarding({ root, store });
   initWatchlist({ root, store });
-  initAnnotations({ root, store });
   initAlerts({ root, store });
   initCandidateDesk({ root, store });
   initShortcuts({ root, store });

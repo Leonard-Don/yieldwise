@@ -5,7 +5,7 @@ import {
   districtColorFor,
   filtersToApiParams,
   resolveDefaultFilters,
-} from "./modes.js?v=20260519-single-yield";
+} from "./modes.js?v=20260519-no-notes";
 import { getActiveCityConfig } from "./config-bootstrap.js";
 
 export async function initMap({ container, store }) {

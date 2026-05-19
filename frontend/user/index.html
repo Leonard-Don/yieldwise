@@ -7,7 +7,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles/tokens.css" />
     <link rel="stylesheet" href="/styles/shell.css" />
-    <link rel="stylesheet" href="/styles/map.css?v=20260519-single-yield" />
+    <link rel="stylesheet" href="/styles/map.css?v=20260519-no-notes" />
     <link rel="stylesheet" href="/styles/board.css" />
     <link rel="stylesheet" href="/styles/drawer.css" />
     <link rel="stylesheet" href="/styles/onboarding.css" />
@@ -72,17 +72,6 @@
           <div class="atlas-drawer-body" data-role="drawer-body">
             <div class="atlas-drawer-empty">选择楼栋或机会榜条目以查看详情</div>
           </div>
-          <section class="atlas-drawer-notes" data-component="notes-section" hidden>
-            <header class="atlas-notes-header">
-              <h3>笔记</h3>
-              <span class="atlas-notes-status mono dim" data-role="notes-status">—</span>
-            </header>
-            <ol class="atlas-notes-list" data-role="notes-list"></ol>
-            <form class="atlas-notes-add" data-role="notes-add" novalidate>
-              <textarea data-role="notes-add-input" placeholder="添加笔记 …" rows="2"></textarea>
-              <button type="submit" data-role="notes-add-submit" disabled>添加</button>
-            </form>
-          </section>
         </aside>
         <div class="atlas-onboarding-backdrop" data-component="onboarding-backdrop" data-open="false"></div>
         <section class="atlas-onboarding" data-component="onboarding" data-open="false" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="atlas-onboarding-title" tabindex="-1">
@@ -123,7 +112,6 @@
           </header>
           <dl class="atlas-help-list">
             <dt><kbd>F</kbd></dt><dd>把当前抽屉里的楼栋/小区加入或移出关注夹</dd>
-            <dt><kbd>N</kbd></dt><dd>聚焦笔记输入框</dd>
             <dt><kbd>⌘K</kbd> / <kbd>⌃K</kbd></dt><dd>打开全局搜索</dd>
             <dt><kbd>?</kbd></dt><dd>切换本帮助面板</dd>
             <dt><kbd>Esc</kbd></dt><dd>关闭抽屉 / 模态 / 帮助面板</dd>
@@ -174,6 +162,6 @@
         <span data-role="statusbar-build">偏好仅保存在本机</span>
       </footer>
     </div>
-    <script type="module" src="/modules/main.js?v=20260519-single-yield"></script>
+    <script type="module" src="/modules/main.js?v=20260519-no-notes"></script>
   </body>
 </html>

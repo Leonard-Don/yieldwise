@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { resolveDefaultFilters } from "./modes.js?v=20260519-single-yield";
+import { resolveDefaultFilters } from "./modes.js?v=20260519-no-notes";
 
 export function initOnboarding({ root, store }) {
   const modal = root.querySelector('[data-component="onboarding"]');

@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { candidateFromItem, isCompared } from "./comparison-helpers.js";
-import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js?v=20260519-single-yield";
+import { getMode, filtersToApiParams, resolveDefaultFilters } from "./modes.js?v=20260519-no-notes";
 
 export async function initBoard({ container, store }) {
   const list = container.querySelector('[data-role="board-list"]');

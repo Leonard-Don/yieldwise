@@ -31,7 +31,6 @@ export function parseShortcut(event) {
 
   const lower = typeof key === "string" ? key.toLowerCase() : "";
   if (lower === "f") return "star";
-  if (lower === "n") return "note";
 
   return null;
 }
