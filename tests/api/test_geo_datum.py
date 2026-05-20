@@ -116,6 +116,16 @@ def test_is_inside_china_bounding_box() -> None:
     assert is_inside_china(139.69, 35.69) is False  # Tokyo
 
 
+def test_normalize_coordinate_datum_canonicalizes_common_aliases() -> None:
+    import api.geo_datum as geo_datum
+
+    assert hasattr(geo_datum, "normalize_coordinate_datum")
+    assert geo_datum.normalize_coordinate_datum(" GCJ-02 ") == "gcj02"
+    assert geo_datum.normalize_coordinate_datum("wgs_84") == "wgs84"
+    assert geo_datum.normalize_coordinate_datum("") is None
+    assert geo_datum.normalize_coordinate_datum(None) is None
+
+
 def test_conversion_accepts_string_or_int_coordinates() -> None:
     # AMap loaders carry coords as strings (e.g. "121.473700"); the transform
     # must coerce rather than throw.

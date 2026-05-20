@@ -32,6 +32,7 @@ __all__ = [
     "gcj02_to_wgs84",
     "is_inside_china",
     "datum_offset_meters",
+    "normalize_coordinate_datum",
 ]
 
 # Krasovsky 1940 ellipsoid — the ellipsoid the GCJ-02 algorithm is defined on.
@@ -46,6 +47,21 @@ _INVERSE_ITERATIONS = 4
 # Approximate metres-per-degree at Shanghai's latitude (~31°N). Used only by
 # datum_offset_meters() for human-readable diagnostics — not by the transform.
 _M_PER_DEG_LAT = 111_320.0
+
+
+def normalize_coordinate_datum(value: object) -> str | None:
+    """Return the canonical datum id used by API/import contracts."""
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    compact = raw.lower().replace("-", "").replace("_", "").replace(" ", "")
+    if compact == "gcj02":
+        return "gcj02"
+    if compact == "wgs84":
+        return "wgs84"
+    return raw
 
 
 def is_inside_china(lng: float, lat: float) -> bool:

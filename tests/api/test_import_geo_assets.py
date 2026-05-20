@@ -35,3 +35,24 @@ def test_normalized_feature_preserves_coordinate_datum() -> None:
     )
 
     assert normalized["properties"]["coordinate_datum"] == "gcj02"
+
+
+def test_normalized_feature_canonicalizes_coordinate_datum_alias() -> None:
+    feature = {
+        "type": "Feature",
+        "properties": {
+            "source_ref": "amap://aoi/footprint-1",
+            "coordinateDatum": " GCJ-02 ",
+        },
+        "geometry": {"type": "Polygon", "coordinates": [[]]},
+    }
+
+    normalized = normalized_feature(
+        feature,
+        _catalog_entry(),
+        provider_id="amap-aoi-poi",
+        captured_at="2026-05-21T01:00:00+08:00",
+        resolution_notes="命中 building_id",
+    )
+
+    assert normalized["properties"]["coordinate_datum"] == "gcj02"
