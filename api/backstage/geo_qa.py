@@ -1113,6 +1113,9 @@ def feature_identity(feature: dict[str, Any]) -> dict[str, Any]:
         "districtName": properties.get("district_name"),
         "sourceRef": properties.get("source_ref"),
         "resolutionNotes": properties.get("resolution_notes"),
+        "coordinateDatum": normalize_coordinate_datum(
+            properties.get("coordinate_datum") or properties.get("coordinateDatum")
+        ),
         "geometryType": (feature.get("geometry") or {}).get("type"),
     }
 
