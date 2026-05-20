@@ -1,3 +1,5 @@
+const demoGeoCoordinateDatum = "gcj02";
+
 function buildFallbackBuildingDetail(buildingId) {
   const community = state.selectedCommunityDetail ?? getSelectedCommunity();
   if (!community) {
@@ -158,6 +160,7 @@ function buildFallbackGeoAssetRunComparison(selectedRun, baselineRun) {
         buildingName: "7号楼",
         sourceRef: "geo-demo-003",
         resolutionNotes: "新增补采楼栋 footprint。",
+        coordinateDatum: demoGeoCoordinateDatum,
         geometryType: "Polygon",
         status: "new",
         statusLabel: "新增覆盖",
@@ -174,6 +177,7 @@ function buildFallbackGeoAssetRunComparison(selectedRun, baselineRun) {
         buildingName: "11幢",
         sourceRef: "geo-demo-006",
         resolutionNotes: "新增补采楼栋 footprint。",
+        coordinateDatum: demoGeoCoordinateDatum,
         geometryType: "Polygon",
         status: "new",
         statusLabel: "新增覆盖",
@@ -190,6 +194,7 @@ function buildFallbackGeoAssetRunComparison(selectedRun, baselineRun) {
         buildingName: "5号楼",
         sourceRef: "geo-demo-002",
         resolutionNotes: "对齐楼栋 footprint 后做了一轮几何修正。",
+        coordinateDatum: demoGeoCoordinateDatum,
         geometryType: "Polygon",
         status: "changed",
         statusLabel: "几何修正",
@@ -385,6 +390,7 @@ function buildFallbackGeoAssetRunDetail(runId, baselineRunId = null) {
         buildingName: "5号楼",
         sourceRef: "zhangjiang-park-b2",
         resolutionNotes: "命中 building_id",
+        coordinateDatum: demoGeoCoordinateDatum,
         geometryType: "Polygon"
       },
       {
@@ -394,6 +400,7 @@ function buildFallbackGeoAssetRunDetail(runId, baselineRunId = null) {
         buildingName: "9幢",
         sourceRef: "qibao-yunting-b2",
         resolutionNotes: "命中 building_id",
+        coordinateDatum: demoGeoCoordinateDatum,
         geometryType: "Polygon"
       }
     ],
