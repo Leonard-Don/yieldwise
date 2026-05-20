@@ -286,6 +286,52 @@ function geoWorkOrderFilterLabel(status) {
   }[status] ?? status ?? "全部工单";
 }
 
+function escapeBackstageHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function firstNonEmpty(...values) {
+  return values.find((value) => value !== null && value !== undefined && String(value).trim() !== "");
+}
+
+function normalizeGeoDatum(value) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]/g, "");
+  if (normalized === "gcj02") {
+    return { value: "gcj02", label: "GCJ-02" };
+  }
+  if (normalized === "wgs84") {
+    return { value: "wgs84", label: "WGS-84" };
+  }
+  return null;
+}
+
+function geoEvidenceTitleMarkup(item, fallbackCommunityName = "待识别小区", fallbackBuildingName = "待识别楼栋") {
+  const communityName = firstNonEmpty(item?.communityName, item?.community_name, fallbackCommunityName);
+  const buildingName = firstNonEmpty(item?.buildingName, item?.building_name, fallbackBuildingName);
+  const datum = normalizeGeoDatum(
+    firstNonEmpty(
+      item?.coordinateDatum,
+      item?.coordinate_datum,
+      item?.geometryDatum,
+      item?.geometry_datum,
+      item?.matchingDatum,
+      item?.matching_datum
+    )
+  );
+  const datumBadge = datum
+    ? `<span class="trace-status datum" data-geo-datum="${escapeBackstageHtml(datum.value)}">${escapeBackstageHtml(datum.label)}</span>`
+    : "";
+  return `<strong>${escapeBackstageHtml(communityName)} · ${escapeBackstageHtml(buildingName)}</strong>${datumBadge}`;
+}
+
 function resolutionStatusLabel(status) {
   return {
     done: "完成",

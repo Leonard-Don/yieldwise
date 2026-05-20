@@ -6936,7 +6936,7 @@ function renderOperations() {
                     (item) => `
                       <article class="import-run-evidence" data-community-id="${item.communityId ?? ""}" data-building-id="${item.buildingId ?? ""}">
                         <div class="breakdown-top">
-                          <strong>${item.communityName} · ${item.buildingName}</strong>
+                          ${geoEvidenceTitleMarkup(item)}
                           <span class="trace-status resolved">${item.geometryType ?? "Polygon"}</span>
                         </div>
                         <p>${item.sourceRef ?? "未提供 source_ref"}</p>
@@ -6963,7 +6963,7 @@ function renderOperations() {
                     (item) => `
                       <article class="queue-item is-imported">
                         <div class="breakdown-top">
-                          <strong>${item.community_name ?? "待识别小区"} · ${item.building_name ?? "待识别楼栋"}</strong>
+                          ${geoEvidenceTitleMarkup(item)}
                           <span class="trace-status needs_review">待归一</span>
                         </div>
                         <p>${item.source_ref ?? "未提供 source_ref"}</p>
