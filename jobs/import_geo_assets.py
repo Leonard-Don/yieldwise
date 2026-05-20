@@ -126,6 +126,9 @@ def normalized_feature(
         "building_name": entry.building_name,
         "resolution_notes": resolution_notes,
     }
+    coordinate_datum = properties.get("coordinate_datum") or properties.get("coordinateDatum")
+    if coordinate_datum is not None and str(coordinate_datum).strip():
+        normalized_properties["coordinate_datum"] = str(coordinate_datum).strip()
     return {
         "type": "Feature",
         "properties": normalized_properties,
