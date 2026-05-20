@@ -1090,6 +1090,10 @@ def build_geo_asset_run_view(detail: dict[str, Any]) -> dict[str, Any]:
                 "buildingName": (feature.get("properties") or {}).get("building_name"),
                 "sourceRef": (feature.get("properties") or {}).get("source_ref"),
                 "resolutionNotes": (feature.get("properties") or {}).get("resolution_notes"),
+                "coordinateDatum": (
+                    (feature.get("properties") or {}).get("coordinate_datum")
+                    or (feature.get("properties") or {}).get("coordinateDatum")
+                ),
                 "geometryType": (feature.get("geometry") or {}).get("type"),
             }
             for feature in detail.get("features", [])[:8]
