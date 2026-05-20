@@ -1,7 +1,7 @@
 import { createStore } from "./state.js";
 import { initShell } from "./shell.js?v=20260519-no-notes";
 import { initMap } from "./map.js?v=20260519-no-notes";
-import { initBoard } from "./opportunity-board.js?v=20260519-no-notes";
+import { initBoard } from "./opportunity-board.js?v=20260520-board-layout";
 import { initDrawer } from "./detail-drawer.js";
 import { initFilterBar } from "./filter-bar.js?v=20260519-no-notes";
 import { createStorage } from "./storage.js";

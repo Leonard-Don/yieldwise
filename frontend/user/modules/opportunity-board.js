@@ -108,17 +108,21 @@ function renderRow(item, mode, selection, comparisonItems, modeId) {
     selection && (selection.id === item.id || selection.id === item.primaryBuildingId);
   const candidate = candidateFromItem(item, modeId);
   const compared = candidate && isCompared(comparisonItems, candidate.target_id, candidate.target_type);
-  const cells = mode.boardColumns
-    .map((col) => formatCell(item, col))
+  const nameColumn = mode.boardColumns.find((col) => col.key === "name");
+  const metricColumns = mode.boardColumns.filter((col) => col.key !== "name");
+  const metrics = metricColumns
+    .map((col) => renderMetricCell(item, col))
     .join("");
-  return `<li class="atlas-board-row mono" data-id="${escapeAttr(item.id)}" aria-selected="${selected ? "true" : "false"}">${cells}${renderCompareButton(item, compared)}</li>`;
+  return `<li class="atlas-board-row mono" data-id="${escapeAttr(item.id)}" aria-selected="${selected ? "true" : "false"}"><div class="atlas-board-main">${renderNameCell(item, nameColumn)}<div class="atlas-board-metrics">${metrics}</div></div>${renderCompareButton(item, compared)}</li>`;
 }
 
-function formatCell(item, col) {
+function renderNameCell(item, col) {
+  const raw = col ? item[col.key] : item.name;
+  return `<span class="atlas-board-name-cell"><span class="name" title="${escapeAttr(raw ?? "")}">${escapeText(raw ?? "—")}</span>${renderQualityBadge(item.quality)}${renderDecisionBadge(item.decisionBrief)}</span>`;
+}
+
+function renderMetricCell(item, col) {
   const raw = item[col.key];
-  if (col.key === "name") {
-    return `<span class="atlas-board-name-cell"><span class="name" title="${escapeAttr(raw ?? "")}">${escapeText(raw ?? "—")}</span>${renderQualityBadge(item.quality)}${renderDecisionBadge(item.decisionBrief)}</span>`;
-  }
   if (col.key === "districtName") {
     return `<span class="name">${escapeText(raw ?? "—")}</span>`;
   }
