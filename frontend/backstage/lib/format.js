@@ -303,11 +303,11 @@ function normalizeGeoDatum(value) {
   const normalized = String(value ?? "")
     .trim()
     .toLowerCase()
-    .replace(/[-_\s]/g, "");
+    .replace(/[-_\s:]/g, "");
   if (normalized === "gcj02") {
     return { value: "gcj02", label: "GCJ-02" };
   }
-  if (normalized === "wgs84") {
+  if (["wgs84", "wgs1984", "epsg4326", "crs84"].includes(normalized)) {
     return { value: "wgs84", label: "WGS-84" };
   }
   return null;

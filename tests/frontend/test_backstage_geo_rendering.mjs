@@ -53,6 +53,26 @@ test("geoEvidenceTitleMarkup: canonicalizes space-separated datum aliases", () =
   assert.ok(wgsMarkup.includes(">WGS-84<"));
 });
 
+test("geoEvidenceTitleMarkup: treats EPSG and CRS84 aliases as WGS-84", () => {
+  const { geoEvidenceTitleMarkup } = loadBackstageFormatContext();
+
+  const epsgMarkup = geoEvidenceTitleMarkup({
+    communityName: "徐汇样本小区",
+    buildingName: "3号楼",
+    coordinateDatum: " EPSG:4326 ",
+  });
+  const crsMarkup = geoEvidenceTitleMarkup({
+    communityName: "长宁样本小区",
+    buildingName: "4号楼",
+    geometryDatum: "CRS84",
+  });
+
+  assert.ok(epsgMarkup.includes('data-geo-datum="wgs84"'));
+  assert.ok(epsgMarkup.includes(">WGS-84<"));
+  assert.ok(crsMarkup.includes('data-geo-datum="wgs84"'));
+  assert.ok(crsMarkup.includes(">WGS-84<"));
+});
+
 test("comparison top-building rows use the datum badge title helper", () => {
   const { geoEvidenceTitleMarkup } = loadBackstageFormatContext();
   const appSource = fs.readFileSync(path.join(repoRoot, "frontend/backstage/app.js"), "utf8");
