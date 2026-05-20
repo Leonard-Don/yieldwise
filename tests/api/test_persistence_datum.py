@@ -95,6 +95,16 @@ def test_wgs84_datum_tag_inverts_resolution() -> None:
     assert gcj == wgs84_to_gcj02(121.4954, 31.1983)
 
 
+def test_epsg4326_datum_tag_inverts_resolution() -> None:
+    gcj, wgs = _resolve_datum_pair({
+        "center_lng": "121.4954",
+        "center_lat": "31.1983",
+        "coordinate_datum": " EPSG:4326 ",
+    })
+    assert wgs == (121.4954, 31.1983)
+    assert gcj == wgs84_to_gcj02(121.4954, 31.1983)
+
+
 def test_missing_coordinates_resolve_to_none_pair() -> None:
     assert _resolve_datum_pair({}) == (None, None)
     assert _resolve_datum_pair({"center_lng": "", "center_lat": ""}) == (None, None)

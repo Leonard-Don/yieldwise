@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import urlsplit, urlunsplit
 
-from .geo_datum import gcj02_to_wgs84, wgs84_to_gcj02
+from .geo_datum import gcj02_to_wgs84, normalize_coordinate_datum, wgs84_to_gcj02
 from .mock_data import DISTRICTS
 from .provider_adapters import provider_readiness_snapshot
 
@@ -421,7 +421,7 @@ def _resolve_datum_pair(
         _coerce_coord(row.get("center_lng_wgs84")),
         _coerce_coord(row.get("center_lat_wgs84")),
     )
-    datum = str(row.get("coordinate_datum") or "gcj02").strip().lower()
+    datum = normalize_coordinate_datum(row.get("coordinate_datum")) or "gcj02"
 
     gcj: tuple[float, float] | None = None
     wgs: tuple[float, float] | None = None

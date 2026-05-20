@@ -57,10 +57,10 @@ def normalize_coordinate_datum(value: object) -> str | None:
     raw = str(value).strip()
     if not raw:
         return None
-    compact = raw.lower().replace("-", "").replace("_", "").replace(" ", "")
+    compact = raw.lower().replace("-", "").replace("_", "").replace(" ", "").replace(":", "")
     if compact == "gcj02":
         return "gcj02"
-    if compact == "wgs84":
+    if compact in {"wgs84", "wgs1984", "epsg4326", "crs84"}:
         return "wgs84"
     return raw
 

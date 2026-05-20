@@ -122,6 +122,8 @@ def test_normalize_coordinate_datum_canonicalizes_common_aliases() -> None:
     assert hasattr(geo_datum, "normalize_coordinate_datum")
     assert geo_datum.normalize_coordinate_datum(" GCJ-02 ") == "gcj02"
     assert geo_datum.normalize_coordinate_datum("wgs_84") == "wgs84"
+    assert geo_datum.normalize_coordinate_datum(" EPSG:4326 ") == "wgs84"
+    assert geo_datum.normalize_coordinate_datum("CRS84") == "wgs84"
     assert geo_datum.normalize_coordinate_datum("") is None
     assert geo_datum.normalize_coordinate_datum(None) is None
 
