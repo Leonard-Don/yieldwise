@@ -33,6 +33,26 @@ test("geoEvidenceTitleMarkup: renders escaped names with a normalized datum badg
   assert.ok(markup.includes(">WGS-84<"));
 });
 
+test("geoEvidenceTitleMarkup: canonicalizes space-separated datum aliases", () => {
+  const { geoEvidenceTitleMarkup } = loadBackstageFormatContext();
+
+  const gcjMarkup = geoEvidenceTitleMarkup({
+    communityName: "浦东样本小区",
+    buildingName: "1号楼",
+    geometryDatum: " GCJ 02 ",
+  });
+  const wgsMarkup = geoEvidenceTitleMarkup({
+    communityName: "静安样本小区",
+    buildingName: "2号楼",
+    matchingDatum: " WGS 84 ",
+  });
+
+  assert.ok(gcjMarkup.includes('data-geo-datum="gcj02"'));
+  assert.ok(gcjMarkup.includes(">GCJ-02<"));
+  assert.ok(wgsMarkup.includes('data-geo-datum="wgs84"'));
+  assert.ok(wgsMarkup.includes(">WGS-84<"));
+});
+
 test("comparison top-building rows use the datum badge title helper", () => {
   const { geoEvidenceTitleMarkup } = loadBackstageFormatContext();
   const appSource = fs.readFileSync(path.join(repoRoot, "frontend/backstage/app.js"), "utf8");
