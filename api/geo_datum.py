@@ -33,6 +33,7 @@ __all__ = [
     "is_inside_china",
     "datum_offset_meters",
     "normalize_coordinate_datum",
+    "coordinate_datum_from_properties",
 ]
 
 # Krasovsky 1940 ellipsoid — the ellipsoid the GCJ-02 algorithm is defined on.
@@ -62,6 +63,24 @@ def normalize_coordinate_datum(value: object) -> str | None:
     if compact == "wgs84":
         return "wgs84"
     return raw
+
+
+def coordinate_datum_from_properties(properties: object) -> str | None:
+    """Return a normalized datum from common GeoJSON property aliases."""
+    if not isinstance(properties, dict):
+        return None
+    for key in (
+        "coordinate_datum",
+        "coordinateDatum",
+        "geometry_datum",
+        "geometryDatum",
+        "matching_datum",
+        "matchingDatum",
+    ):
+        datum = normalize_coordinate_datum(properties.get(key))
+        if datum:
+            return datum
+    return None
 
 
 def is_inside_china(lng: float, lat: float) -> bool:

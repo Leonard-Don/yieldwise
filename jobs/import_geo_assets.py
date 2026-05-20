@@ -13,7 +13,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from api.geo_datum import normalize_coordinate_datum
+from api.geo_datum import coordinate_datum_from_properties
 from api.provider_adapters import adapter_contract, validate_provider_scope
 from api.reference_catalog import BuildingReference, load_reference_catalog
 
@@ -127,9 +127,7 @@ def normalized_feature(
         "building_name": entry.building_name,
         "resolution_notes": resolution_notes,
     }
-    coordinate_datum = normalize_coordinate_datum(
-        properties.get("coordinate_datum") or properties.get("coordinateDatum")
-    )
+    coordinate_datum = coordinate_datum_from_properties(properties)
     if coordinate_datum:
         normalized_properties["coordinate_datum"] = coordinate_datum
     return {
