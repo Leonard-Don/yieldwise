@@ -21,7 +21,16 @@ Run:
     python3 jobs/match_osm_to_communities.py \\
         --osm-run osm-footprints-20260429110730 \\
         --reference-run amap-communities-2026-04-29-20260429111213 \\
-        --max-meters 250
+        --max-meters 60
+
+DATUM NOTE
+    OSM building footprints are WGS-84; AMAP community centroids are GCJ-02.
+    The two datums differ by ~300-600 m in Shanghai. This matcher converts
+    every community centroid GCJ-02 → WGS-84 (via api.geo_datum) up front, so
+    all distance comparisons happen in a single, consistent datum. Because the
+    coordinate-system offset is gone, the match radius is a real distance.
+    The CLI default intentionally remains the legacy 200 m for unattended
+    scripts; use --max-meters 60 when you want a tighter building-scale run.
 """
 from __future__ import annotations
 
@@ -32,6 +41,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from api.geo_datum import gcj02_to_wgs84  # noqa: E402
+
 TZ = timezone(timedelta(hours=8))
 
 OSM_RUNS_ROOT = ROOT_DIR / "tmp" / "geo-assets"
@@ -53,6 +67,45 @@ def latest_run(runs_root: Path, prefix: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
+def _coerce(value) -> float | None:
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f or None
+
+
+def resolve_community_wgs84(r: dict) -> tuple[float, float] | None:
+    """Resolve a reference-catalog community row to a WGS-84 ``(lng, lat)``.
+
+    All cross-source matching runs in WGS-84 — the datum OSM footprints use.
+    Community catalogs come from AMAP, whose ``center_lng`` / ``center_lat``
+    pair is GCJ-02. Resolution order:
+
+    1. ``center_lng_wgs84`` / ``center_lat_wgs84`` — an explicit WGS-84 pair
+       (emitted by the current AMAP importer); trusted verbatim.
+    2. ``center_lng`` / ``center_lat`` interpreted via ``coordinate_datum``.
+       An untagged pair defaults to GCJ-02 and is converted to WGS-84 — this
+       is the correction the matcher previously skipped.
+
+    Returns ``None`` when no usable anchor exists.
+    """
+    wgs_lng = _coerce(r.get("center_lng_wgs84"))
+    wgs_lat = _coerce(r.get("center_lat_wgs84"))
+    if wgs_lng is not None and wgs_lat is not None:
+        return wgs_lng, wgs_lat
+
+    lng = _coerce(r.get("center_lng"))
+    lat = _coerce(r.get("center_lat"))
+    if lng is None or lat is None:
+        return None
+    datum = str(r.get("coordinate_datum") or "gcj02").strip().lower()
+    if datum == "wgs84":
+        return lng, lat
+    # Untagged / GCJ-02 → convert into the unified WGS-84 matching datum.
+    return gcj02_to_wgs84(lng, lat)
+
+
 def load_reference_communities(ref_dir: Path) -> list[dict]:
     cd_path = ref_dir / "community_dictionary.json"
     if not cd_path.exists():
@@ -60,18 +113,16 @@ def load_reference_communities(ref_dir: Path) -> list[dict]:
     rows = json.loads(cd_path.read_text(encoding="utf-8"))
     out: list[dict] = []
     for r in rows:
-        try:
-            lng = float(r.get("center_lng") or 0)
-            lat = float(r.get("center_lat") or 0)
-        except (TypeError, ValueError):
+        wgs = resolve_community_wgs84(r)
+        if wgs is None:
             continue
-        if not lng or not lat:
-            continue
+        lng, lat = wgs
         out.append({
             "community_id": r.get("community_id"),
             "community_name": r.get("community_name"),
             "district_id": r.get("district_id"),
             "district_name": r.get("district_name"),
+            # lng / lat are WGS-84 — same datum as OSM footprints below.
             "lng": lng,
             "lat": lat,
         })
@@ -219,7 +270,9 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--osm-run", help="OSM run folder name (default: latest osm-footprints-*)")
     p.add_argument("--reference-run", help="Reference run folder name (default: latest with center_lng populated)")
-    p.add_argument("--max-meters", type=float, default=200.0, help="Max distance to consider a community match")
+    p.add_argument("--max-meters", type=float, default=200.0,
+                   help="Max WGS-84 distance to consider a community match "
+                        "(default keeps legacy 200m compatibility; use 60m for tighter building-scale runs)")
     p.add_argument("--per-community-cap", type=int, default=50,
                    help="Max OSM buildings any single community can claim (default 50)")
     p.add_argument("--batch-name", default="osm-matched")
@@ -287,8 +340,13 @@ def main() -> int:
     )
 
     # Phase 3: write out features with community attribution.
+    # Buckets are post-datum-correction distances: every matched distance is
+    # real WGS-84 metres and never exceeds --max-meters, so the histogram is
+    # split inside that range. The final bucket counts
+    # features with no community inside the radius (honestly labelled, not the
+    # old misleading ">200m").
     matched = 0
-    distance_buckets: dict[str, int] = {"<50m": 0, "50-100m": 0, "100-200m": 0, ">200m": 0}
+    distance_buckets: dict[str, int] = {"<20m": 0, "20-40m": 0, "40m+": 0, "unmatched": 0}
     community_counts: dict[str, dict] = {}
     new_features: list[dict] = []
     for idx, feat in enumerate(features):
@@ -302,12 +360,12 @@ def main() -> int:
             props["community_name"] = community["community_name"]
             props["match_distance_m"] = round(distance_m, 1)
             props["resolution_notes"] = f"osm-matched: community {distance_m:.0f}m away (capped@{args.per_community_cap})"
-            if distance_m < 50:
-                distance_buckets["<50m"] += 1
-            elif distance_m < 100:
-                distance_buckets["50-100m"] += 1
+            if distance_m < 20:
+                distance_buckets["<20m"] += 1
+            elif distance_m < 40:
+                distance_buckets["20-40m"] += 1
             else:
-                distance_buckets["100-200m"] += 1
+                distance_buckets["40m+"] += 1
             cid = community["community_id"]
             entry = community_counts.setdefault(cid, {
                 "communityId": cid,
@@ -318,7 +376,7 @@ def main() -> int:
             })
             entry["buildingCount"] += 1
         else:
-            distance_buckets[">200m"] += 1
+            distance_buckets["unmatched"] += 1
         new_features.append(new_feat)
 
     ts = datetime.now(TZ).strftime("%Y%m%d%H%M%S")
@@ -366,6 +424,8 @@ def main() -> int:
         "match_rate_pct": round(matched / max(len(new_features), 1) * 100, 2),
         "distance_distribution": distance_buckets,
         "max_meters_threshold": args.max_meters,
+        "matching_datum": "wgs84",
+        "datum_note": "OSM footprints WGS-84; AMAP community centroids converted GCJ-02→WGS-84 before matching.",
         "cap_stats": cap_stats,
         "matched_community_unique_count": len(community_counts),
         "source_attribution": "© OpenStreetMap contributors (ODbL); community match via AMAP catalog",

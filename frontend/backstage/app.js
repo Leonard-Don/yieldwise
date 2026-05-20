@@ -950,7 +950,7 @@ function buildFilters() {
   const districtOptions = districtDirectory();
   districtFilter.innerHTML = [
     '<option value="all">全上海</option>',
-    ...districtOptions.map((district) => `<option value="${district.id}">${district.name}</option>`)
+    ...districtOptions.map((district) => `<option value="${escapeHtml(district.id)}">${escapeHtml(district.name)}</option>`)
   ].join("");
   districtFilter.value = state.districtFilter;
   minYieldFilter.value = String(state.minYield);
@@ -1657,9 +1657,9 @@ function renderMapWaypointBadge() {
   }
   mapWaypointBadge.className = `map-waypoint-badge is-visible tone-${waypoint.tone ?? "yield"}`;
   mapWaypointBadge.innerHTML = `
-    <span class="map-waypoint-badge__eyebrow">${waypoint.sourceLabel ?? "研究台跳转"}</span>
-    <strong>${waypoint.label}</strong>
-    ${waypoint.detail ? `<span class="map-waypoint-badge__detail">${waypoint.detail}</span>` : ""}
+    <span class="map-waypoint-badge__eyebrow">${escapeHtml(waypoint.sourceLabel ?? "研究台跳转")}</span>
+    <strong>${escapeHtml(waypoint.label)}</strong>
+    ${waypoint.detail ? `<span class="map-waypoint-badge__detail">${escapeHtml(waypoint.detail)}</span>` : ""}
   `;
 }
 
@@ -1955,15 +1955,15 @@ function renderSearchResults() {
           type="button"
           id="search-result-${result.id.replace(/[^a-zA-Z0-9_-]/g, "-")}"
           class="search-result-item ${index === state.searchSelectedIndex ? "is-active" : ""}"
-          data-search-result-id="${result.id}"
+          data-search-result-id="${escapeHtml(result.id)}"
           role="option"
           aria-selected="${index === state.searchSelectedIndex ? "true" : "false"}"
         >
           <div class="search-result-top">
-            <strong>${result.label}</strong>
+            <strong>${escapeHtml(result.label)}</strong>
             <span class="search-result-type">${searchTypeLabel(result.type)}</span>
           </div>
-          <p>${result.subtitle}</p>
+          <p>${escapeHtml(result.subtitle)}</p>
         </button>
       `
     )
@@ -2782,7 +2782,7 @@ function updateMapNote() {
   if (!getVisibleMapCommunities().length && currentDataMode() === "empty") {
     mapNote.innerHTML = `
       <strong>说明</strong>
-      <p>${amapState.modeNote ?? "当前地图用于展示上海租售比机会分布。"}</p>
+      <p>${escapeHtml(amapState.modeNote ?? "当前地图用于展示上海租售比机会分布。")}</p>
       <p>当前还没有数据库主读数据，页面先保留真地图容器与离线样本说明。</p>
       <p>${runtimeConfig.hasPostgresDsn ? "本地库已配置，下一步完成首轮本地引导。" : "下一步先配置数据库连接串，或导入离线样本批次。"}</p>
     `;
@@ -2870,9 +2870,9 @@ function updateMapNote() {
   const compactFocusText = waypointText ?? (topBrowserSamplingTask ? samplingText : topGeoTask ? taskText : previewText);
   mapNote.innerHTML = `
     <strong>说明</strong>
-    <p>${baseNote}</p>
-    <p>${compactScopeText}</p>
-    <p>${compactWindowText} ${geometryText} ${compactFocusText}</p>
+    <p>${escapeHtml(baseNote)}</p>
+    <p>${escapeHtml(compactScopeText)}</p>
+    <p>${escapeHtml(compactWindowText)} ${escapeHtml(geometryText)} ${escapeHtml(compactFocusText)}</p>
   `;
 }
 
@@ -4917,12 +4917,12 @@ function renderDetail() {
     ${
       waypoint?.label
         ? `
-          <div class="detail-origin-banner tone-${waypoint.tone ?? "yield"}">
-            <span class="detail-origin-banner__eyebrow">来自 ${waypoint.sourceLabel ?? "研究台"}</span>
-            <strong>${waypoint.label}</strong>
+          <div class="detail-origin-banner tone-${escapeHtml(waypoint.tone ?? "yield")}">
+            <span class="detail-origin-banner__eyebrow">来自 ${escapeHtml(waypoint.sourceLabel ?? "研究台")}</span>
+            <strong>${escapeHtml(waypoint.label)}</strong>
             ${
               waypoint.detail
-                ? `<p>当前正在联动 ${waypoint.detail}。</p>`
+                ? `<p>当前正在联动 ${escapeHtml(waypoint.detail)}。</p>`
                 : `<p>当前对象已经同步到地图与右侧研究列。</p>`
             }
           </div>
@@ -4933,12 +4933,12 @@ function renderDetail() {
       <div class="detail-hero-copy">
         <div class="detail-title">
           <div>
-            <strong>${community.name}</strong>
-            <p class="detail-subtitle">${district.name} · 聚焦 ${building?.name ?? community.buildingFocus ?? "小区层"} · ${granularityLabel(state.granularity)}视图</p>
+            <strong>${escapeHtml(community.name)}</strong>
+            <p class="detail-subtitle">${escapeHtml(district.name)} · 聚焦 ${escapeHtml(building?.name ?? community.buildingFocus ?? "小区层")} · ${granularityLabel(state.granularity)}视图</p>
           </div>
           <span class="yield-chip ${yieldClass(community.yield)}">${community.sampleStatus === "dictionary_only" ? "待补样本" : `${community.yield.toFixed(2)}%`}</span>
         </div>
-        <p class="detail-insight">${community.note}</p>
+        <p class="detail-insight">${escapeHtml(community.note)}</p>
       </div>
       <div class="detail-kpi-strip">
         <article class="detail-kpi">
@@ -4949,7 +4949,7 @@ function renderDetail() {
         <article class="detail-kpi">
           <span>有效样本</span>
           <strong>${community.sample} 套</strong>
-          <small>${community.sampleStatusLabel ?? "状态待补"}</small>
+          <small>${escapeHtml(community.sampleStatusLabel ?? "状态待补")}</small>
         </article>
         <article class="detail-kpi">
           <span>楼栋覆盖</span>
@@ -4960,10 +4960,10 @@ function renderDetail() {
     </div>
 
     <div class="detail-meta-strip">
-      <span class="source-pill">${district.name}</span>
+      <span class="source-pill">${escapeHtml(district.name)}</span>
       <span class="source-pill">行政区均值 ${district.yield.toFixed(2)}%</span>
-      <span class="source-pill">${community.sampleStatusLabel ?? "状态待补"}</span>
-      <span class="source-pill">最近有效批次 ${community.dataFreshness ? formatTimestamp(community.dataFreshness) : "待补样本"}</span>
+      <span class="source-pill">${escapeHtml(community.sampleStatusLabel ?? "状态待补")}</span>
+      <span class="source-pill">最近有效批次 ${community.dataFreshness ? escapeHtml(formatTimestamp(community.dataFreshness)) : "待补样本"}</span>
     </div>
 
     <div class="detail-stats detail-stats--secondary">
@@ -4977,7 +4977,7 @@ function renderDetail() {
       </div>
       <div class="detail-stat">
         <span>坐标来源</span>
-        <strong>${community.anchorSource ?? "待补"}</strong>
+        <strong>${escapeHtml(community.anchorSource ?? "待补")}</strong>
       </div>
       <div class="detail-stat">
         <span>坐标质量</span>
@@ -4989,7 +4989,7 @@ function renderDetail() {
       </div>
       <div class="detail-stat">
         <span>最近有效批次</span>
-        <strong>${community.dataFreshness ? formatTimestamp(community.dataFreshness) : "待补样本"}</strong>
+        <strong>${community.dataFreshness ? escapeHtml(formatTimestamp(community.dataFreshness)) : "待补样本"}</strong>
       </div>
       <div class="detail-stat">
         <span>重点楼栋追踪</span>
@@ -5010,10 +5010,10 @@ function renderDetail() {
                   <div class="detail-breakdown-list">
                     <article class="breakdown-item">
                       <div class="breakdown-top">
-                        <strong>${anchorPreview.anchorName ?? "候选锚点"}</strong>
-                        <span>${anchorPreview.anchorSource ?? "candidate_preview"}</span>
+                        <strong>${escapeHtml(anchorPreview.anchorName ?? "候选锚点")}</strong>
+                        <span>${escapeHtml(anchorPreview.anchorSource ?? "candidate_preview")}</span>
                       </div>
-                      <p>${anchorPreview.anchorAddress ?? "地图已投出预锚点，等待确认后写回主档。"}</p>
+                      <p>${escapeHtml(anchorPreview.anchorAddress ?? "地图已投出预锚点，等待确认后写回主档。")}</p>
                     </article>
                   </div>
                 `
@@ -5029,13 +5029,13 @@ function renderDetail() {
                         (item, index) => `
                           <article class="breakdown-item">
                             <div class="breakdown-top">
-                              <strong>${item.name ?? "候选 POI"}</strong>
+                              <strong>${escapeHtml(item.name ?? "候选 POI")}</strong>
                               <span>${item.score != null ? `${Math.round(Number(item.score) * 100)}%` : "待确认"}</span>
                             </div>
-                            <p>${item.address ?? item.query ?? "等待确认该候选锚点。"}</p>
+                            <p>${escapeHtml(item.address ?? item.query ?? "等待确认该候选锚点。")}</p>
                             ${
                               index === 0
-                                ? `<div class="queue-item-footer"><button class="action compact primary" data-anchor-confirm-community-id="${community.id}">${state.busyAnchorCommunityId === community.id ? "写回中..." : "确认当前候选"}</button></div>`
+                                ? `<div class="queue-item-footer"><button class="action compact primary" data-anchor-confirm-community-id="${escapeHtml(community.id)}">${state.busyAnchorCommunityId === community.id ? "写回中..." : "确认当前候选"}</button></div>`
                                 : ""
                             }
                           </article>
@@ -5057,9 +5057,9 @@ function renderDetail() {
                         <strong>最近一次锚点确认</strong>
                         <span>${anchorDecisionLabel(latestAnchorReview.decisionState ?? anchorDecisionState)}</span>
                       </div>
-                      <p>${latestAnchorReview.reviewOwner ?? "atlas-ui"} · ${formatTimestamp(latestAnchorReview.reviewedAt)}</p>
+                      <p>${escapeHtml(latestAnchorReview.reviewOwner ?? "atlas-ui")} · ${escapeHtml(formatTimestamp(latestAnchorReview.reviewedAt))}</p>
                       <small class="evidence-address">
-                        ${latestAnchorReview.reviewNote ?? latestAnchorReview.candidateName ?? "已写回最新 reference 主档。"}
+                        ${escapeHtml(latestAnchorReview.reviewNote ?? latestAnchorReview.candidateName ?? "已写回最新 reference 主档。")}
                       </small>
                     </article>
                   </div>
@@ -5077,8 +5077,8 @@ function renderDetail() {
         <div class="detail-section-label">楼栋研究摘要</div>
         <div class="detail-title">
           <div>
-            <strong>${building.name}</strong>
-            <p class="detail-subtitle">主推楼栋 · 最强桶 ${building.bestBucketLabel} · 相对小区 ${building.yieldSpreadVsCommunity >= 0 ? "+" : ""}${building.yieldSpreadVsCommunity.toFixed(2)}%</p>
+            <strong>${escapeHtml(building.name)}</strong>
+            <p class="detail-subtitle">主推楼栋 · 最强桶 ${escapeHtml(building.bestBucketLabel)} · 相对小区 ${building.yieldSpreadVsCommunity >= 0 ? "+" : ""}${building.yieldSpreadVsCommunity.toFixed(2)}%</p>
           </div>
           <span class="yield-chip ${yieldClass(building.yieldAvg ?? community.yield)}">${(building.yieldAvg ?? community.yield).toFixed(2)}%</span>
         </div>
@@ -5116,13 +5116,13 @@ function renderDetail() {
                 (item) => `
                   <article class="breakdown-item">
                     <div class="breakdown-top">
-                      <strong>${item.label}</strong>
+                      <strong>${escapeHtml(item.label)}</strong>
                       <span>${item.contribution.toFixed(1)} 分</span>
                     </div>
                     <div class="breakdown-track">
                       <span style="width: ${item.score}%"></span>
                     </div>
-                    <p>${item.summary}</p>
+                    <p>${escapeHtml(item.summary)}</p>
                   </article>
                 `
               )
@@ -5135,9 +5135,9 @@ function renderDetail() {
           <div class="floor-focus-card">
             <div class="detail-title">
               <div>
-                <strong>${selectedFloor.floorNo} 层 · ${selectedFloor.arbitrageTag}</strong>
+                <strong>${selectedFloor.floorNo} 层 · ${escapeHtml(selectedFloor.arbitrageTag)}</strong>
                 <p class="detail-subtitle">
-                  ${selectedFloor.bucketLabel} · 相对楼栋 ${selectedFloor.yieldSpreadVsBuilding >= 0 ? "+" : ""}${selectedFloor.yieldSpreadVsBuilding.toFixed(2)}%
+                  ${escapeHtml(selectedFloor.bucketLabel)} · 相对楼栋 ${selectedFloor.yieldSpreadVsBuilding >= 0 ? "+" : ""}${selectedFloor.yieldSpreadVsBuilding.toFixed(2)}%
                   · 溢价 ${selectedFloor.pricePremiumPct >= 0 ? "+" : ""}${selectedFloor.pricePremiumPct.toFixed(2)}%
                 </p>
               </div>
@@ -5158,7 +5158,7 @@ function renderDetail() {
               </div>
               <div class="detail-stat">
                 <span>楼层桶</span>
-                <strong>${selectedFloor.bucketLabel}</strong>
+                <strong>${escapeHtml(selectedFloor.bucketLabel)}</strong>
               </div>
             </div>
           </div>
