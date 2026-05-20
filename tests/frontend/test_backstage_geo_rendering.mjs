@@ -32,3 +32,24 @@ test("geoEvidenceTitleMarkup: renders escaped names with a normalized datum badg
   assert.ok(markup.includes('data-geo-datum="wgs84"'));
   assert.ok(markup.includes(">WGS-84<"));
 });
+
+test("comparison top-building rows use the datum badge title helper", () => {
+  const { geoEvidenceTitleMarkup } = loadBackstageFormatContext();
+  const appSource = fs.readFileSync(path.join(repoRoot, "frontend/backstage/app.js"), "utf8");
+  const blockStart = appSource.indexOf("selectedGeoRunDetail.comparison.topBuildingChanges");
+  const blockEnd = appSource.indexOf("当前批次相对基线还没有显著几何变化", blockStart);
+  const comparisonBlock = appSource.slice(blockStart, blockEnd);
+
+  assert.notEqual(blockStart, -1);
+  assert.notEqual(blockEnd, -1);
+  assert.match(comparisonBlock, /geoEvidenceTitleMarkup\(item\)/);
+  assert.doesNotMatch(comparisonBlock, /<strong>\$\{item\.communityName/);
+
+  const comparisonTitleMarkup = geoEvidenceTitleMarkup({
+    communityName: "浦东样本小区",
+    buildingName: "8号楼",
+    coordinateDatum: "gcj02",
+  });
+  assert.ok(comparisonTitleMarkup.includes('data-geo-datum="gcj02"'));
+  assert.ok(comparisonTitleMarkup.includes(">GCJ-02<"));
+});

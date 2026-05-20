@@ -6633,7 +6633,7 @@ function renderOperations() {
                             data-building-id="${item.buildingId ?? ""}"
                           >
                             <div class="breakdown-top">
-                              <strong>${item.communityName ?? "待识别小区"} · ${item.buildingName ?? "待识别楼栋"}</strong>
+                              ${geoEvidenceTitleMarkup(item)}
                               <span class="trace-status ${geoComparisonToneClass(item.status)}">${item.statusLabel}</span>
                             </div>
                             <p>${item.districtName ?? "未知行政区"} · ${item.sourceRef ?? "待补 source_ref"}</p>
