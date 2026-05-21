@@ -67,18 +67,6 @@ CREATE TABLE IF NOT EXISTS communities (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE communities
-    ADD COLUMN IF NOT EXISTS anchor_source TEXT;
-
-ALTER TABLE communities
-    ADD COLUMN IF NOT EXISTS anchor_quality NUMERIC(4, 3);
-
-ALTER TABLE communities
-    ADD COLUMN IF NOT EXISTS anchor_decision_state TEXT;
-
-ALTER TABLE communities
-    ADD COLUMN IF NOT EXISTS latest_anchor_reviewed_at TIMESTAMPTZ;
-
 CREATE INDEX IF NOT EXISTS communities_district_idx ON communities (district_id);
 CREATE INDEX IF NOT EXISTS communities_centroid_wgs84_gix ON communities USING GIST (centroid_wgs84);
 
@@ -163,9 +151,6 @@ CREATE TABLE IF NOT EXISTS geo_assets (
     captured_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-ALTER TABLE geo_assets
-    ADD COLUMN IF NOT EXISTS ingestion_run_id BIGINT REFERENCES ingestion_runs(run_id);
 
 CREATE INDEX IF NOT EXISTS geo_assets_type_idx ON geo_assets (asset_type);
 CREATE INDEX IF NOT EXISTS geo_assets_geom_wgs84_gix ON geo_assets USING GIST (geom_wgs84);
