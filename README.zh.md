@@ -5,11 +5,28 @@
 
 **开源租赁资产分析工作台 —— 把房源画在一张地图上，自动算租售比 / 回本年限 / 出租率。**
 
-[English README](README.md) · [Demo 跑起来](#快速开始) · [浏览器抓取导入说明](docs/internal/import-public-browser-capture.md)
+[English README](README.md)
 
 <p align="center">
   <img src="docs/screenshots/atlas-workbench-overview.png" alt="Yieldwise 工作台" width="100%" />
 </p>
+
+## 目录
+
+- [这是什么](#这是什么)
+- [谁会用得上](#谁会用得上)
+- [为什么做这个](#为什么做这个)
+- [快速开始](#快速开始)
+- [功能](#功能)
+- [架构](#架构)
+- [数据来源](#数据来源)
+- [已知限制](#已知限制)
+- [开发与测试](#开发与测试)
+- [文档](#文档)
+- [项目状态](#项目状态)
+- [贡献](#贡献)
+- [许可](#许可)
+- [联系](#联系)
 
 ## 这是什么
 
@@ -72,13 +89,26 @@ ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 
 ## 功能
 
-- **一张地图三种工作流**：收益猎手 · 自住找房 · 全市观察
+- **一张「收益研究台」** —— 全市挂图、重点楼栋、楼层证据、公开页补样收在同一张研究台：先判断哪里值得看，再决定下一步补什么。
 - **候选研究闭环**：把小区 / 楼栋 / 区域加入候选，按到期复核、目标触发、价格 / 样本变化、证据缺口和 shortlist 分组处理
 - **候选对比与本地备忘录**：导出含投资假设、买入理由、反对理由、证据来源、待核验项和下一步动作的 Markdown 研究备忘录
 - **OSM + 高德楼栋融合** 含 per-community 配额匹配
 - **Ops 刷新中心**：在后台 dry-run 并执行 staged reference/import/geo/metrics 刷新 job，保留执行历史、异常处理队列和几何 QA
 
-## 数据来源（公开透明）
+<p align="center">
+  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Yieldwise 刷新中心" width="100%" />
+</p>
+
+## 架构
+
+- **后端** —— FastAPI（Python 3.13）；全部 HTTP 路由在 `api/main.py`。
+- **数据库** —— PostgreSQL + PostGIS；schema 在 `db/schema.sql`，首次使用时自动建好。
+- **前端** —— 原生 JavaScript，无框架。后台研究工作台在 `frontend/backstage/`，更轻量的终端用户视图在 `frontend/user/`。
+- **数据管线** —— `jobs/` 里的独立导入 / 刷新脚本产出带时间戳、可回滚的 staged 批次，不就地覆盖。
+
+坐标同时保存 GCJ-02 和 WGS-84 两套，保证高德小区与 OSM 楼栋在同一基准下对齐。
+
+## 数据来源
 
 | 层 | 来源 | 许可 |
 |---|---|---|
@@ -89,11 +119,39 @@ ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 
 Yieldwise 只保留公开页面浏览器抓取口径，不提供人工录入数据入口，不主动获取任何需要授权的数据。
 
+## 已知限制
+
+- **仅支持上海** —— 不抽象多城市，城市常量内联在 `api/config/city.py`。
+- **样例数据不是实时源** —— 自带房源是合成 / 浏览器抽样的快照；真实分析依赖你自己跑开放数据导入或公开页采样批次。
+- **基于快照，非实时** —— 指标反映的是上一次刷新，不是当前市场。
+- **地图需要免费高德 key** 才能渲染。
+- **无鉴权** —— 按本地单用户工具设计，不要原样暴露到网络上。
+
+## 开发与测试
+
+```bash
+pip install -r api/requirements-dev.txt   # 测试 + lint 依赖
+pytest                                    # 后端测试
+node --test tests/frontend/*.mjs           # 前端单元测试
+ruff check .                               # lint
+```
+
+每次 push 和 PR，CI（[`validate.yml`](.github/workflows/validate.yml)）还会跑 Python 编译检查、JS 语法检查和路由 smoke 测试。staged 数据工作流和常用刷新命令见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 文档
+
+- [更新日志](docs/CHANGELOG.md)
+- [API 契约](docs/api-contract.md)
+- [导入地理资产](docs/import-geo-assets.md)
+- [导入参考词典](docs/import-reference-dictionary.md)
+- [浏览器抓取导入](docs/internal/import-public-browser-capture.md)
+- [依赖许可](docs/legal/dependency-licenses.md)
+
 ## 项目状态
 
-**v1.0 自用闭环版**（2026-05-05）—— 功能开发冻结。
+**v1.0 —— 维护模式。** Yieldwise 是个人本地房产投研工作台，不是商业产品。核心自用闭环已经完成；后续工作只限于修 bug 和数据质量 / 正确性改进，不规划新功能路线图。
 
-这个版本的目标已经收口为：服务个人本地房产投研，不继续扩展成商业化产品。已闭环的工作流：
+它支撑的自用闭环：
 
 - 地图发现机会 → 查看小区 / 楼栋 / 楼层证据 → 加入候选研究台
 - 设置目标价、目标租金、目标收益率和复核日
@@ -102,16 +160,11 @@ Yieldwise 只保留公开页面浏览器抓取口径，不提供人工录入数�
 - 导出本地 Markdown 决策备忘录
 - 在后台刷新中心完成数据质量、公开采样、review queue 和几何 QA 的本地维护
 
-后续原则：
-
-- 不再做新功能开发
-- 只修阻塞性 bug、数据质量问题，或真实使用中反复出现的同一痛点
-- 仅支持上海；不抽象多城市，常量内联在 `api/config/city.py`
-- 后端、前端和浏览器回归测试已作为收口验证基线
+后端、前端和浏览器回归测试是验收基线。
 
 ## 贡献
 
-项目已进入自用冻结状态，暂不主动规划新功能。阻塞性 bug 和数据质量问题仍可通过 issue 记录。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+项目处于维护模式，没有新功能路线图；阻塞性 bug 和数据质量问题仍欢迎提出。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 许可
 
