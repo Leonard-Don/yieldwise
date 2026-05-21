@@ -5212,8 +5212,8 @@ function renderFloorEvidence() {
     <div class="evidence-summary">
       <div class="detail-title">
         <div>
-          <strong>${floorDetail.buildingName} · ${floorDetail.floorNo} 层</strong>
-          <p class="detail-subtitle">${floorDetail.bucketLabel} · ${floorDetail.arbitrageTag} · 机会分 ${floorDetail.opportunityScore}</p>
+          <strong>${escapeHtml(floorDetail.buildingName)} · ${floorDetail.floorNo} 层</strong>
+          <p class="detail-subtitle">${escapeHtml(floorDetail.bucketLabel)} · ${escapeHtml(floorDetail.arbitrageTag)} · 机会分 ${floorDetail.opportunityScore}</p>
         </div>
         <span class="yield-chip ${yieldClass(floorDetail.yieldPct)}">${floorDetail.yieldPct.toFixed(2)}%</span>
       </div>
@@ -5242,7 +5242,7 @@ function renderFloorEvidence() {
           : ""
       }
       <div class="source-meta">
-        ${floorDetail.sourceMix.map((item) => `<span class="source-pill">${item.name} × ${item.count}</span>`).join("")}
+        ${floorDetail.sourceMix.map((item) => `<span class="source-pill">${escapeHtml(item.name)} × ${item.count}</span>`).join("")}
         <span class="source-pill">${
           floorDetail.evidenceSource === "imported"
             ? "真实导入证据"
@@ -5252,7 +5252,7 @@ function renderFloorEvidence() {
         }</span>
         ${
           floorDetail.importRun
-            ? `<span class="source-pill">批次 ${floorDetail.importRun.batchName}</span>`
+            ? `<span class="source-pill">批次 ${escapeHtml(floorDetail.importRun.batchName)}</span>`
             : ""
         }
       </div>
@@ -5266,8 +5266,8 @@ function renderFloorEvidence() {
               <span class="detail-subtitle">${floorDetail.historySummary?.observedRuns ?? floorDetail.historyTimeline.length} 个批次</span>
             </div>
             <div class="source-meta history-summary">
-              <span class="source-pill">起点 ${floorDetail.historySummary?.firstBatchName ?? "待补"}</span>
-              <span class="source-pill">当前 ${floorDetail.historySummary?.latestBatchName ?? "待补"}</span>
+              <span class="source-pill">起点 ${escapeHtml(floorDetail.historySummary?.firstBatchName ?? "待补")}</span>
+              <span class="source-pill">当前 ${escapeHtml(floorDetail.historySummary?.latestBatchName ?? "待补")}</span>
               <span class="source-pill">累计样本对 ${floorDetail.historySummary?.totalPairCount ?? 0}</span>
               <span class="source-pill">均值 ${floorDetail.historySummary?.avgYieldPct != null ? `${Number(floorDetail.historySummary.avgYieldPct).toFixed(2)}%` : "待补"}</span>
               <span class="source-pill">较首批 ${formatSignedDelta(floorDetail.historySummary?.yieldDeltaSinceFirst, {
@@ -5282,9 +5282,9 @@ function renderFloorEvidence() {
                   (item) => `
                     <article class="history-card ${item.isLatest ? "is-active" : ""}">
                       <div class="breakdown-top">
-                        <strong>${item.batchName}</strong>
+                        <strong>${escapeHtml(item.batchName)}</strong>
                         <span class="trace-status ${item.isLatest ? "resolved" : comparisonToneClass(item.status)}">
-                          ${item.isLatest ? "当前快照" : item.statusLabel}
+                          ${item.isLatest ? "当前快照" : escapeHtml(item.statusLabel)}
                         </span>
                       </div>
                       <p>${formatTimestamp(item.createdAt)} · 样本对 ${item.pairCount}</p>
@@ -5324,24 +5324,24 @@ function renderFloorEvidence() {
           (pair) => `
             <article class="evidence-card">
               <div class="breakdown-top">
-                <strong>${pair.unitNo}</strong>
-                <span>${pair.reviewState}</span>
+                <strong>${escapeHtml(pair.unitNo)}</strong>
+                <span>${escapeHtml(pair.reviewState)}</span>
               </div>
               <div class="evidence-meta">
-                <span>${pair.layout}</span>
+                <span>${escapeHtml(pair.layout)}</span>
                 <span>${pair.areaSqm != null ? `${pair.areaSqm} m²` : "面积待补"}</span>
-                <span>${pair.orientation}</span>
+                <span>${escapeHtml(pair.orientation)}</span>
               </div>
               <div class="evidence-pricing">
                 <div>
                   <span>出售</span>
                   <strong>${pair.salePriceWan != null ? `${Number(pair.salePriceWan).toFixed(1)} 万` : "待补"}</strong>
-                  <small>${pair.saleSourceName}</small>
+                  <small>${escapeHtml(pair.saleSourceName)}</small>
                 </div>
                 <div>
                   <span>出租</span>
                   <strong>${pair.monthlyRent != null ? `${Math.round(pair.monthlyRent).toLocaleString()} 元` : "待补"}</strong>
-                  <small>${pair.rentSourceName}</small>
+                  <small>${escapeHtml(pair.rentSourceName)}</small>
                 </div>
                 <div>
                   <span>测算回报</span>
@@ -5349,11 +5349,11 @@ function renderFloorEvidence() {
                   <small>去重 ${Math.round(pair.dedupConfidence * 100)}%</small>
                 </div>
               </div>
-              <p class="evidence-address">${pair.normalizedAddress}</p>
+              <p class="evidence-address">${escapeHtml(pair.normalizedAddress)}</p>
               <div class="source-meta">
                 <span class="source-pill">归一 ${Math.round(pair.resolutionConfidence * 100)}%</span>
                 <span class="source-pill">去重 ${Math.round(pair.dedupConfidence * 100)}%</span>
-                <span class="source-pill">${pair.updatedAt}</span>
+                <span class="source-pill">${escapeHtml(pair.updatedAt)}</span>
               </div>
             </article>
           `
@@ -5372,10 +5372,10 @@ function renderFloorEvidence() {
             (item) => `
               <article class="trace-item">
                 <div class="breakdown-top">
-                  <strong>${item.step}</strong>
+                  <strong>${escapeHtml(item.step)}</strong>
                   <span class="trace-status ${item.status}">${resolutionStatusLabel(item.status)}</span>
                 </div>
-                <p>${item.detail}</p>
+                <p>${escapeHtml(item.detail)}</p>
               </article>
             `
         )
@@ -5395,11 +5395,11 @@ function renderFloorEvidence() {
                   (item) => `
                     <article class="queue-item">
                       <div class="breakdown-top">
-                        <strong>${item.buildingNo} · ${item.floorNo} 层</strong>
+                        <strong>${escapeHtml(item.buildingNo)} · ${item.floorNo} 层</strong>
                         <span class="trace-status ${item.status}">${queueStatusLabel(item.status)}</span>
                       </div>
-                      <p>${item.normalizedPath}</p>
-                      <small>${sourceLabelById(item.sourceId)} · 置信度 ${Math.round(item.confidence * 100)}% · ${item.lastActionAt}</small>
+                      <p>${escapeHtml(item.normalizedPath)}</p>
+                      <small>${escapeHtml(sourceLabelById(item.sourceId))} · 置信度 ${Math.round(item.confidence * 100)}% · ${escapeHtml(item.lastActionAt)}</small>
                     </article>
                   `
                 )
@@ -5427,26 +5427,26 @@ function renderRanking() {
       (community, index) => `
         <article
           class="ranking-item ${community.id === state.selectedCommunityId ? "is-active" : ""} ${index < 3 ? "is-top-tier" : ""}"
-          data-community-id="${community.id}"
+          data-community-id="${escapeHtml(community.id)}"
           role="button"
           tabindex="0"
           aria-pressed="${community.id === state.selectedCommunityId ? "true" : "false"}"
         >
           <div class="ranking-title">
-            <strong>${index + 1}. ${community.name}</strong>
+            <strong>${index + 1}. ${escapeHtml(community.name)}</strong>
             <span class="yield-chip ${yieldClass(community.yield)}">${community.score}分</span>
           </div>
           <div class="ranking-meta">
-            <span>${community.districtName}</span>
+            <span>${escapeHtml(community.districtName)}</span>
             <span>总价 ${community.avgPriceWan} 万</span>
             <span>回报 ${community.yield.toFixed(2)}%</span>
           </div>
           <div class="source-meta">
             <span class="source-pill">样本 ${community.sample} 套</span>
-            <span class="source-pill">${community.sampleStatusLabel ?? "状态待补"}</span>
+            <span class="source-pill">${escapeHtml(community.sampleStatusLabel ?? "状态待补")}</span>
             <span class="source-pill">${community.dataFreshness ? formatTimestamp(community.dataFreshness) : "待补样本"}</span>
           </div>
-          <small class="ranking-note">${community.note}</small>
+          <small class="ranking-note">${escapeHtml(community.note)}</small>
         </article>
       `
     )
@@ -5484,27 +5484,27 @@ function renderRanking() {
       (item, index) => `
         <article
           class="ranking-item ${item.buildingId === state.selectedBuildingId && Number(item.floorNo) === Number(state.selectedFloorNo) ? "is-active" : ""}"
-          data-community-id="${item.communityId}"
-          data-building-id="${item.buildingId}"
-          data-floor-no="${item.floorNo}"
+          data-community-id="${escapeHtml(item.communityId)}"
+          data-building-id="${escapeHtml(item.buildingId)}"
+          data-floor-no="${escapeHtml(item.floorNo)}"
           role="button"
           tabindex="0"
           aria-pressed="${item.buildingId === state.selectedBuildingId && Number(item.floorNo) === Number(state.selectedFloorNo) ? "true" : "false"}"
         >
           <div class="ranking-title">
-            <strong>${index + 1}. ${item.communityName} · ${item.buildingName} · ${item.floorNo} 层</strong>
+            <strong>${index + 1}. ${escapeHtml(item.communityName)} · ${escapeHtml(item.buildingName)} · ${item.floorNo} 层</strong>
             <span class="yield-chip ${yieldClass(item.latestYieldPct)}">${item.persistenceScore}分</span>
           </div>
           <div class="ranking-meta">
-            <span>${item.districtName}</span>
+            <span>${escapeHtml(item.districtName)}</span>
             <span>当前 ${Number(item.latestYieldPct).toFixed(2)}%</span>
-            <span>${item.trendLabel}</span>
+            <span>${escapeHtml(item.trendLabel)}</span>
           </div>
           <div class="source-meta">
-            <span class="source-pill">批次 ${item.latestBatchName}</span>
+            <span class="source-pill">批次 ${escapeHtml(item.latestBatchName)}</span>
             ${
               item.baselineBatchName
-                ? `<span class="source-pill">基线 ${item.baselineBatchName}</span>`
+                ? `<span class="source-pill">基线 ${escapeHtml(item.baselineBatchName)}</span>`
                 : ""
             }
             <span class="source-pill">${item.observedRuns} 次观测</span>
@@ -5556,22 +5556,22 @@ function renderRanking() {
           return `
             <article
               class="ranking-item geo-task ${active ? "is-active" : ""}"
-              data-geo-task-id="${item.taskId ?? ""}"
-              data-community-id="${item.communityId ?? ""}"
-              data-building-id="${item.buildingId ?? ""}"
-              data-floor-no="${focusFloor ?? ""}"
+              data-geo-task-id="${escapeHtml(item.taskId ?? "")}"
+              data-community-id="${escapeHtml(item.communityId ?? "")}"
+              data-building-id="${escapeHtml(item.buildingId ?? "")}"
+              data-floor-no="${escapeHtml(focusFloor ?? "")}"
               role="button"
               tabindex="0"
               aria-pressed="${active ? "true" : "false"}"
             >
               <div class="ranking-title">
-                <strong>${index + 1}. ${item.communityName ?? "待识别小区"} · ${item.buildingName ?? "待识别楼栋"}</strong>
-                <span class="trace-status ${geoImpactBandClass(item.impactBand)}">${item.impactLabel}</span>
+                <strong>${index + 1}. ${escapeHtml(item.communityName ?? "待识别小区")} · ${escapeHtml(item.buildingName ?? "待识别楼栋")}</strong>
+                <span class="trace-status ${geoImpactBandClass(item.impactBand)}">${escapeHtml(item.impactLabel)}</span>
               </div>
               <div class="ranking-meta">
-                <span>${item.districtName ?? "未知行政区"}</span>
+                <span>${escapeHtml(item.districtName ?? "未知行政区")}</span>
                 <span>影响 ${item.impactScore ?? 0}</span>
-                <span>${item.taskScopeLabel ?? "几何任务"}</span>
+                <span>${escapeHtml(item.taskScopeLabel ?? "几何任务")}</span>
               </div>
               <div class="source-meta">
                 <span class="source-pill">状态 ${geoTaskStatusLabel(item.status)}</span>
@@ -5580,7 +5580,7 @@ function renderRanking() {
                 <span class="source-pill">楼栋分 ${item.buildingOpportunityScore ?? 0}</span>
                 ${
                   item.workOrderId
-                    ? `<span class="source-pill">工单 ${geoWorkOrderStatusLabel(item.workOrderStatus)} · ${item.workOrderAssignee ?? "待分配"}</span>`
+                    ? `<span class="source-pill">工单 ${geoWorkOrderStatusLabel(item.workOrderStatus)} · ${escapeHtml(item.workOrderAssignee ?? "待分配")}</span>`
                     : ""
                 }
               </div>
@@ -5592,7 +5592,7 @@ function renderRanking() {
                         .map(
                           (floor) => `
                             <span class="source-pill">
-                              ${floor.floorNo}层 · ${Number(floor.latestYieldPct ?? 0).toFixed(2)}% · ${floor.trendLabel}
+                              ${floor.floorNo}层 · ${Number(floor.latestYieldPct ?? 0).toFixed(2)}% · ${escapeHtml(floor.trendLabel)}
                             </span>
                           `
                         )
@@ -5601,15 +5601,15 @@ function renderRanking() {
                   `
                   : ""
               }
-              <small class="ranking-note">${item.recommendedAction ?? item.resolutionNotes ?? "等待处理。"}</small>
+              <small class="ranking-note">${escapeHtml(item.recommendedAction ?? item.resolutionNotes ?? "等待处理。")}</small>
               ${
                 canCreateGeoWorkOrder(item)
                   ? `
                     <div class="queue-item-footer">
                       <button
                         class="action compact"
-                        data-geo-create-work-order-run-id="${item.runId}"
-                        data-geo-create-work-order-task-id="${item.taskId}"
+                        data-geo-create-work-order-run-id="${escapeHtml(item.runId)}"
+                        data-geo-create-work-order-task-id="${escapeHtml(item.taskId)}"
                       >
                         ${state.busyGeoWorkOrderTaskId === item.taskId ? "创建中..." : "生成工单"}
                       </button>
@@ -5656,27 +5656,27 @@ function renderRanking() {
           return `
             <article
               class="ranking-item browser-task ${active ? "is-active" : ""}"
-              data-task-id="${item.taskId ?? ""}"
-              data-community-id="${item.communityId ?? ""}"
-              data-building-id="${item.buildingId ?? ""}"
-              data-floor-no="${item.floorNo ?? ""}"
+              data-task-id="${escapeHtml(item.taskId ?? "")}"
+              data-community-id="${escapeHtml(item.communityId ?? "")}"
+              data-building-id="${escapeHtml(item.buildingId ?? "")}"
+              data-floor-no="${escapeHtml(item.floorNo ?? "")}"
               role="button"
               tabindex="0"
               aria-pressed="${active ? "true" : "false"}"
             >
               <div class="ranking-title">
-                <strong>${index + 1}. ${item.communityName}${item.buildingName ? ` · ${item.buildingName}` : ""}${item.floorNo != null ? ` · ${item.floorNo}层` : ""}</strong>
-                <span class="trace-status ${geoImpactBandClass(item.priorityScore >= 88 ? "critical" : item.priorityScore >= 76 ? "high" : item.priorityScore >= 62 ? "medium" : "low")}">${item.priorityLabel}</span>
+                <strong>${index + 1}. ${escapeHtml(item.communityName)}${item.buildingName ? ` · ${escapeHtml(item.buildingName)}` : ""}${item.floorNo != null ? ` · ${item.floorNo}层` : ""}</strong>
+                <span class="trace-status ${geoImpactBandClass(item.priorityScore >= 88 ? "critical" : item.priorityScore >= 76 ? "high" : item.priorityScore >= 62 ? "medium" : "low")}">${escapeHtml(item.priorityLabel)}</span>
               </div>
               <div class="ranking-meta">
-                <span>${item.districtName}</span>
-                <span>${item.taskTypeLabel}</span>
+                <span>${escapeHtml(item.districtName)}</span>
+                <span>${escapeHtml(item.taskTypeLabel)}</span>
                 <span>${item.targetGranularity === "floor" ? `样本对 ${item.currentPairCount ?? 0}/${item.targetPairCount ?? 0}` : `样本 ${item.currentSampleSize ?? 0}/${item.targetSampleSize ?? 0}`}</span>
               </div>
               <div class="source-meta">
-                <span class="trace-status ${item.taskLifecycleStatus ?? "needs_capture"}">${item.taskLifecycleLabel ?? "待采样"}</span>
+                <span class="trace-status ${item.taskLifecycleStatus ?? "needs_capture"}">${escapeHtml(item.taskLifecycleLabel ?? "待采样")}</span>
                 <span class="source-pill">优先分 ${item.priorityScore ?? 0}</span>
-                <span class="source-pill">${item.sampleStatusLabel ?? "状态待补"}</span>
+                <span class="source-pill">${escapeHtml(item.sampleStatusLabel ?? "状态待补")}</span>
                 <span class="source-pill">${item.focusScope === "priority" ? "重点区任务" : "全市任务"}</span>
                 ${item.currentYieldPct != null ? `<span class="source-pill">回报 ${Number(item.currentYieldPct).toFixed(2)}%</span>` : ""}
                 ${item.dataFreshness ? `<span class="source-pill">样本 ${formatTimestamp(item.dataFreshness)}</span>` : ""}
@@ -5692,21 +5692,21 @@ function renderRanking() {
                           ? `<span class="source-pill">待复核 ${browserCapturePendingAttentionCount(item)}</span>`
                           : item.latestCaptureAttentionCount
                             ? `<span class="source-pill">原文待处理 ${item.latestCaptureAttentionCount}</span>`
-                          : `<span class="source-pill">已并入 ${item.latestCaptureImportRunId ?? "最新批次"}</span>`
+                          : `<span class="source-pill">已并入 ${escapeHtml(item.latestCaptureImportRunId ?? "最新批次")}</span>`
                       }
                     </div>
                   `
                   : ""
               }
               <div class="source-meta">
-                <span class="source-pill">Sale: ${item.saleQuery}</span>
-                <span class="source-pill">Rent: ${item.rentQuery}</span>
+                <span class="source-pill">Sale: ${escapeHtml(item.saleQuery)}</span>
+                <span class="source-pill">Rent: ${escapeHtml(item.rentQuery)}</span>
               </div>
-              <small class="ranking-note">${item.reason} ${item.captureGoal}</small>
+              <small class="ranking-note">${escapeHtml(item.reason)} ${escapeHtml(item.captureGoal)}</small>
               <div class="queue-item-footer anchor-action-row">
-                <button class="action compact" data-browser-copy-sale="${item.taskId}">复制 Sale</button>
-                <button class="action compact" data-browser-copy-rent="${item.taskId}">复制 Rent</button>
-                <button class="action compact primary" data-browser-open-capture="${item.taskId}">查看抓取任务</button>
+                <button class="action compact" data-browser-copy-sale="${escapeHtml(item.taskId)}">复制 Sale</button>
+                <button class="action compact" data-browser-copy-rent="${escapeHtml(item.taskId)}">复制 Rent</button>
+                <button class="action compact primary" data-browser-open-capture="${escapeHtml(item.taskId)}">查看抓取任务</button>
               </div>
             </article>
           `;
@@ -5799,12 +5799,12 @@ function renderMatrix() {
             (building) => `
               <tr
                 class="${building.id === state.selectedBuildingId ? "is-active" : ""}"
-                data-building-id="${building.id}"
+                data-building-id="${escapeHtml(building.id)}"
                 role="button"
                 tabindex="0"
                 aria-pressed="${building.id === state.selectedBuildingId ? "true" : "false"}"
               >
-                <td>${building.name}</td>
+                <td>${escapeHtml(building.name)}</td>
                 <td>${building.totalFloors}</td>
                 <td><span class="yield-chip ${yieldClass(building.low)}">${building.low.toFixed(2)}%</span></td>
                 <td><span class="yield-chip ${yieldClass(building.mid)}">${building.mid.toFixed(2)}%</span></td>
@@ -5837,9 +5837,9 @@ function renderPipeline() {
     .map(
       (step, index) => `
         <article class="pipeline-step">
-          <strong>${index + 1}. ${step.title}</strong>
-          <p>${step.description}</p>
-          <small>${step.meta}</small>
+          <strong>${index + 1}. ${escapeHtml(step.title)}</strong>
+          <p>${escapeHtml(step.description)}</p>
+          <small>${escapeHtml(step.meta)}</small>
         </article>
       `
     )
@@ -5851,9 +5851,9 @@ function renderSchemas() {
     .map(
       (schema) => `
         <article class="schema-row">
-          <strong>${schema.name}</strong>
-          <p>${schema.description}</p>
-          <small>${schema.fields}</small>
+          <strong>${escapeHtml(schema.name)}</strong>
+          <p>${escapeHtml(schema.description)}</p>
+          <small>${escapeHtml(schema.fields)}</small>
         </article>
       `
     )
@@ -5903,27 +5903,27 @@ function renderStrategy() {
   strategyPanel.innerHTML = `
     <article class="strategy-item">
       <span class="strategy-kicker">Primary</span>
-      <strong>${strategy.map_stack.primary.name}</strong>
-      <p>${strategy.map_stack.primary.role}</p>
-      <small>${strategy.map_stack.primary.why}</small>
+      <strong>${escapeHtml(strategy.map_stack.primary.name)}</strong>
+      <p>${escapeHtml(strategy.map_stack.primary.role)}</p>
+      <small>${escapeHtml(strategy.map_stack.primary.why)}</small>
     </article>
     <article class="strategy-item">
       <span class="strategy-kicker">Secondary</span>
-      <strong>${strategy.map_stack.secondary.name}</strong>
-      <p>${strategy.map_stack.secondary.role}</p>
-      <small>${strategy.map_stack.secondary.why}</small>
+      <strong>${escapeHtml(strategy.map_stack.secondary.name)}</strong>
+      <p>${escapeHtml(strategy.map_stack.secondary.role)}</p>
+      <small>${escapeHtml(strategy.map_stack.secondary.why)}</small>
     </article>
     <article class="strategy-item">
       <span class="strategy-kicker">Coordinate</span>
-      <strong>${strategy.coordinate_policy.storage}</strong>
-      <p>前端: ${strategy.coordinate_policy.china_web}</p>
-      <small>导出: ${strategy.coordinate_policy.google_earth}</small>
+      <strong>${escapeHtml(strategy.coordinate_policy.storage)}</strong>
+      <p>前端: ${escapeHtml(strategy.coordinate_policy.china_web)}</p>
+      <small>导出: ${escapeHtml(strategy.coordinate_policy.google_earth)}</small>
     </article>
     <article class="strategy-item">
       <span class="strategy-kicker">Address</span>
-      <strong>${strategy.address_model.join(" → ")}</strong>
-      <p>${strategy.data_policy.priority}</p>
-      <small>${strategy.data_policy.risk_note}</small>
+      <strong>${escapeHtml(strategy.address_model.join(" → "))}</strong>
+      <p>${escapeHtml(strategy.data_policy.priority)}</p>
+      <small>${escapeHtml(strategy.data_policy.risk_note)}</small>
     </article>
   `;
 
@@ -5931,14 +5931,14 @@ function renderStrategy() {
     .map(
       (source) => `
         <article class="source-item">
-          <strong>${source.name}</strong>
-          <p>${source.role}</p>
+          <strong>${escapeHtml(source.name)}</strong>
+          <p>${escapeHtml(source.role)}</p>
           <div class="source-meta">
-            <span class="source-pill">${source.category}</span>
-            <span class="source-pill">priority: ${source.priority}</span>
+            <span class="source-pill">${escapeHtml(source.category)}</span>
+            <span class="source-pill">priority: ${escapeHtml(source.priority)}</span>
           </div>
-          <small>${source.coverage}</small>
-          ${source.recommendedNextStep ? `<p class="source-hint">${source.recommendedNextStep}</p>` : ""}
+          <small>${escapeHtml(source.coverage)}</small>
+          ${source.recommendedNextStep ? `<p class="source-hint">${escapeHtml(source.recommendedNextStep)}</p>` : ""}
           ${renderSourceActions(source)}
         </article>
       `
@@ -6100,7 +6100,7 @@ function renderOperations() {
   opsSummary.innerHTML = `
     ${
       state.opsMessage && state.opsMessageContext === "database"
-        ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
+        ? `<div class="ops-feedback ${state.opsMessageTone}">${escapeHtml(state.opsMessage)}</div>`
         : ""
     }
     <article class="ops-overview-hero">
@@ -6124,7 +6124,7 @@ function renderOperations() {
         <article class="ops-overview-stat">
           <span>最近引导</span>
           <strong>${latestBootstrapLabel}</strong>
-          <small>${postgresLabel}</small>
+          <small>${escapeHtml(postgresLabel)}</small>
         </article>
       </div>
     </article>
@@ -6140,7 +6140,7 @@ function renderOperations() {
       <div class="comparison-strip">
         <span class="source-pill">检查 ${refreshChecks.length}</span>
         <span class="source-pill">异常候选 ${refreshAnomalyCount}</span>
-        <span class="source-pill">质量 ${refreshQualityGate?.label ?? refreshCenterStatusLabel(refreshQualityStatus)}</span>
+        <span class="source-pill">质量 ${escapeHtml(refreshQualityGate?.label ?? refreshCenterStatusLabel(refreshQualityStatus))}</span>
         <span class="source-pill">几何任务 ${Number(refreshGeometryQa.openTaskCount ?? 0)}</span>
         <span class="source-pill">最近执行 ${refreshCenterJobStatusLabel(latestRefreshJobStatus)}</span>
         <span class="source-pill">生成 ${refreshGeneratedLabel}</span>
@@ -6159,27 +6159,27 @@ function renderOperations() {
                       (item) => `
                         <div class="refresh-center-row">
                           <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
-                          <p><strong>${item.label}</strong><small>${item.batchName ?? item.reason}</small></p>
+                          <p><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.batchName ?? item.reason)}</small></p>
                         </div>
                       `
                     )
                     .join("")
                 : "<p class=\"helper-text\">刷新计划读取中。</p>"
             }
-            <div class="refresh-center-latest-job" data-refresh-center-latest-job-id="${latestRefreshJob?.jobId ?? ""}">
+            <div class="refresh-center-latest-job" data-refresh-center-latest-job-id="${escapeHtml(latestRefreshJob?.jobId ?? "")}">
               <div class="breakdown-top">
                 <strong>最近执行</strong>
                 <span class="trace-status ${refreshCenterStatusTone(latestRefreshJobStatus)}">${refreshCenterJobStatusLabel(latestRefreshJobStatus)}</span>
               </div>
-              <p>${latestRefreshJob?.jobId ?? "尚未执行刷新计划"}</p>
-              <small>${latestRefreshJobLabel}${latestRefreshJob?.error ? ` · ${latestRefreshJob.error}` : ""}</small>
+              <p>${escapeHtml(latestRefreshJob?.jobId ?? "尚未执行刷新计划")}</p>
+              <small>${latestRefreshJobLabel}${latestRefreshJob?.error ? ` · ${escapeHtml(latestRefreshJob.error)}` : ""}</small>
               ${
                 latestRefreshJobSteps.length
                   ? `<div class="refresh-center-job-steps">${latestRefreshJobSteps
                       .slice(0, 4)
                       .map(
                         (item) =>
-                          `<span class="source-pill">${item.label ?? item.step}: ${refreshCenterJobStatusLabel(item.status)}</span>`
+                          `<span class="source-pill">${escapeHtml(item.label ?? item.step)}: ${refreshCenterJobStatusLabel(item.status)}</span>`
                       )
                       .join("")}</div>`
                   : ""
@@ -6201,7 +6201,7 @@ function renderOperations() {
                       (item) => `
                         <div class="refresh-center-row">
                           <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
-                          <p><strong>${item.label}</strong><small>${item.detail}</small></p>
+                          <p><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></p>
                         </div>
                       `
                     )
@@ -6219,7 +6219,7 @@ function renderOperations() {
             <div class="refresh-center-row">
               <span class="trace-status ${refreshCenterStatusTone(refreshQualityStatus)}">${refreshCenterStatusLabel(refreshQualityStatus)}</span>
               <p>
-                <strong>${refreshQualityGate?.label ?? "读取中"}</strong>
+                <strong>${escapeHtml(refreshQualityGate?.label ?? "读取中")}</strong>
                 <small>高可信 ${Number(refreshQualityCounts.strong ?? 0)} / 可用 ${Number(refreshQualityCounts.usable ?? 0)} / 薄样本 ${Number(refreshQualityCounts.thin ?? 0)} / 待补样 ${Number(refreshQualityCounts.blocked ?? 0)}</small>
               </p>
             </div>
@@ -6235,7 +6235,7 @@ function renderOperations() {
                       (item) => `
                         <div class="refresh-center-row">
                           <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
-                          <p><strong>${item.label}</strong><small>${item.detail}</small></p>
+                          <p><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></p>
                         </div>
                       `
                     )
@@ -6257,7 +6257,7 @@ function renderOperations() {
                       (item) => `
                         <div class="refresh-center-row">
                           <span class="trace-status ${refreshCenterStatusTone(item.status)}">${Number(item.count ?? 0)}</span>
-                          <p><strong>${item.label}</strong><small>${item.threshold}</small></p>
+                          <p><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.threshold)}</small></p>
                         </div>
                       `
                     )
@@ -6277,7 +6277,7 @@ function renderOperations() {
                 (item) => `
                   <div class="refresh-center-row">
                     <span class="trace-status ${refreshCenterStatusTone(item.status)}">${refreshCenterStatusLabel(item.status)}</span>
-                    <p><strong>${item.label}</strong><small>${item.detail}</small></p>
+                    <p><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></p>
                   </div>
                 `
               )
@@ -6294,11 +6294,11 @@ function renderOperations() {
         </button>
         ${
           shouldShowRefreshRetry
-            ? `<button class="action compact" data-refresh-center-retry-job-id="${latestRefreshJob.jobId}" ${state.busyRefreshCenterExecute ? "disabled" : ""}>重试失败任务</button>`
+            ? `<button class="action compact" data-refresh-center-retry-job-id="${escapeHtml(latestRefreshJob.jobId)}" ${state.busyRefreshCenterExecute ? "disabled" : ""}>重试失败任务</button>`
             : `<button class="action compact" data-refresh-center-quality-tab="refresh">处理刷新质检</button>`
         }
         <button class="action compact" data-refresh-center-detail-tab="geo">查看几何 QA</button>
-        <span class="source-pill refresh-center-report-path">${refreshReportLabel}</span>
+        <span class="source-pill refresh-center-report-path">${escapeHtml(refreshReportLabel)}</span>
       </div>
     </article>
     <article class="ops-overview-card ops-overview-card--coverage">
@@ -6389,10 +6389,10 @@ function renderOperations() {
                 (run, index) => `
                   <article class="import-run-card ${index === 0 ? "is-active" : ""}">
                     <div class="breakdown-top">
-                      <strong>${run.batchName}</strong>
+                      <strong>${escapeHtml(run.batchName)}</strong>
                       <span class="trace-status resolved">${run.storageMode === "database+file" ? "已写库" : "可写库"}</span>
                     </div>
-                    <p>${sourceLabelById(run.providerId)} · ${formatTimestamp(run.createdAt)}</p>
+                    <p>${escapeHtml(sourceLabelById(run.providerId))} · ${formatTimestamp(run.createdAt)}</p>
                     <div class="import-run-metrics">
                       <span class="source-pill">行政区 ${run.districtCount ?? 0}</span>
                       <span class="source-pill">小区 ${run.communityCount ?? 0}</span>
@@ -6400,7 +6400,7 @@ function renderOperations() {
                       <span class="source-pill">已锚定 ${run.anchoredCommunityCount ?? 0}</span>
                     </div>
                     <div class="queue-item-footer">
-                      <button class="action compact ${postgresReady ? "primary" : ""}" data-reference-persist-run-id="${run.runId}" ${postgresReady ? "" : "disabled"}>
+                      <button class="action compact ${postgresReady ? "primary" : ""}" data-reference-persist-run-id="${escapeHtml(run.runId)}" ${postgresReady ? "" : "disabled"}>
                         ${state.busyReferencePersistRunId === run.runId ? "写入中..." : "写入本地数据库"}
                       </button>
                     </div>
@@ -6417,14 +6417,14 @@ function renderOperations() {
     ? importRuns
         .map(
           (run) => `
-            <article class="import-run-card ${run.runId === selectedRunId ? "is-active" : ""}" data-run-id="${run.runId}">
+            <article class="import-run-card ${run.runId === selectedRunId ? "is-active" : ""}" data-run-id="${escapeHtml(run.runId)}">
               <div class="breakdown-top">
-                <strong>${run.batchName}</strong>
+                <strong>${escapeHtml(run.batchName)}</strong>
                 <span class="trace-status ${run.reviewCount > 0 ? "needs_review" : "resolved"}">
                   ${Math.round((run.resolvedRate ?? 0) * 100)}%
                 </span>
               </div>
-              <p>${sourceLabelById(run.providerId)} · ${formatTimestamp(run.createdAt)}</p>
+              <p>${escapeHtml(sourceLabelById(run.providerId))} · ${formatTimestamp(run.createdAt)}</p>
               <div class="import-run-metrics">
                 <span class="source-pill">已归一 ${run.resolvedCount}</span>
                 <span class="source-pill">待复核 ${run.reviewCount}</span>
@@ -6493,10 +6493,10 @@ function renderOperations() {
                 (run, index) => `
                   <article class="import-run-card ${index === 0 ? "is-active" : ""}">
                     <div class="breakdown-top">
-                      <strong>${run.batchName}</strong>
+                      <strong>${escapeHtml(run.batchName)}</strong>
                       <span class="trace-status resolved">${index === 0 ? "当前口径" : "历史快照"}</span>
                     </div>
-                    <p>${formatTimestamp(run.createdAt)} · 快照日 ${run.snapshotDate ?? "待补"}</p>
+                    <p>${formatTimestamp(run.createdAt)} · 快照日 ${escapeHtml(run.snapshotDate ?? "待补")}</p>
                     <div class="import-run-metrics">
                       <span class="source-pill">小区指标 ${run.communityMetricCount ?? 0}</span>
                       <span class="source-pill">楼栋分桶 ${run.buildingFloorMetricCount ?? 0}</span>
@@ -6525,12 +6525,12 @@ function renderOperations() {
             ${geoAssetRuns
               .map(
                 (run, index) => `
-                  <article class="import-run-card ${run.runId === selectedGeoRunId || (!selectedGeoRunId && index === 0) ? "is-active" : ""}" data-geo-run-id="${run.runId}">
+                  <article class="import-run-card ${run.runId === selectedGeoRunId || (!selectedGeoRunId && index === 0) ? "is-active" : ""}" data-geo-run-id="${escapeHtml(run.runId)}">
                     <div class="breakdown-top">
-                      <strong>${run.batchName}</strong>
+                      <strong>${escapeHtml(run.batchName)}</strong>
                       <span class="trace-status resolved">${run.runId === selectedGeoRunId || (!selectedGeoRunId && index === 0) ? "当前地图" : "可回放"}</span>
                     </div>
-                    <p>${sourceLabelById(run.providerId)} · ${formatTimestamp(run.createdAt)}</p>
+                    <p>${escapeHtml(sourceLabelById(run.providerId))} · ${formatTimestamp(run.createdAt)}</p>
                     <div class="import-run-metrics">
                       <span class="source-pill">要素 ${run.featureCount}</span>
                       <span class="source-pill">楼栋 ${run.resolvedBuildingCount}</span>
@@ -6551,17 +6551,17 @@ function renderOperations() {
     ? `
       ${
         state.opsMessage && state.opsMessageContext === "geo"
-          ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
+          ? `<div class="ops-feedback ${state.opsMessageTone}">${escapeHtml(state.opsMessage)}</div>`
           : ""
       }
       <article class="import-run-section">
         <div class="breakdown-top">
-          <strong>几何批次详情 · ${selectedGeoRunDetail.batchName}</strong>
+          <strong>几何批次详情 · ${escapeHtml(selectedGeoRunDetail.batchName)}</strong>
           <div class="section-actions">
-            <span class="trace-status resolved">${selectedGeoRunDetail.assetType ?? "building_footprint"}</span>
+            <span class="trace-status resolved">${escapeHtml(selectedGeoRunDetail.assetType ?? "building_footprint")}</span>
             <button
               class="action compact ${postgresReady ? "primary" : ""}"
-              data-geo-persist-run-id="${selectedGeoRunDetail.runId}"
+              data-geo-persist-run-id="${escapeHtml(selectedGeoRunDetail.runId)}"
               ${postgresReady ? "" : "disabled"}
               title="${postgresReady ? "把该几何批次写入本地数据库几何表。" : "先配置数据库连接串才能写入本地数据库。"}"
             >
@@ -6569,7 +6569,7 @@ function renderOperations() {
             </button>
           </div>
         </div>
-        <p>${sourceLabelById(selectedGeoRunDetail.providerId)} · ${formatTimestamp(selectedGeoRunDetail.createdAt)}</p>
+        <p>${escapeHtml(sourceLabelById(selectedGeoRunDetail.providerId))} · ${formatTimestamp(selectedGeoRunDetail.createdAt)}</p>
         <div class="comparison-strip">
           <span class="source-pill">目录楼栋 ${selectedGeoRunDetail.coverage?.catalogBuildingCount ?? 0}</span>
           <span class="source-pill">已覆盖 ${selectedGeoRunDetail.coverage?.resolvedBuildingCount ?? 0}</span>
@@ -6587,8 +6587,8 @@ function renderOperations() {
             ${geoBaselineOptions
               .map(
                 (item) => `
-                  <option value="${item.runId}" ${item.runId === state.selectedGeoBaselineRunId ? "selected" : ""}>
-                    ${item.batchName} · ${formatTimestamp(item.createdAt)}
+                  <option value="${escapeHtml(item.runId)}" ${item.runId === state.selectedGeoBaselineRunId ? "selected" : ""}>
+                    ${escapeHtml(item.batchName)} · ${formatTimestamp(item.createdAt)}
                   </option>
                 `
               )
@@ -6602,9 +6602,9 @@ function renderOperations() {
             <article class="import-run-section" data-browser-capture-current-task-runs="true">
               <div class="breakdown-top">
                 <strong>相对基线几何批次的变化</strong>
-                <span class="badge">${selectedGeoRunDetail.comparison.baselineBatchName}</span>
+                <span class="badge">${escapeHtml(selectedGeoRunDetail.comparison.baselineBatchName)}</span>
               </div>
-              <p>对比基线 · ${selectedGeoRunDetail.comparison.baselineBatchName} · ${formatTimestamp(
+              <p>对比基线 · ${escapeHtml(selectedGeoRunDetail.comparison.baselineBatchName)} · ${formatTimestamp(
                 selectedGeoRunDetail.comparison.baselineCreatedAt
               )}</p>
               <div class="comparison-strip">
@@ -6629,14 +6629,14 @@ function renderOperations() {
                         (item) => `
                           <article
                             class="import-run-evidence"
-                            data-community-id="${item.communityId ?? ""}"
-                            data-building-id="${item.buildingId ?? ""}"
+                            data-community-id="${escapeHtml(item.communityId ?? "")}"
+                            data-building-id="${escapeHtml(item.buildingId ?? "")}"
                           >
                             <div class="breakdown-top">
                               ${geoEvidenceTitleMarkup(item)}
-                              <span class="trace-status ${geoComparisonToneClass(item.status)}">${item.statusLabel}</span>
+                              <span class="trace-status ${geoComparisonToneClass(item.status)}">${escapeHtml(item.statusLabel)}</span>
                             </div>
-                            <p>${item.districtName ?? "未知行政区"} · ${item.sourceRef ?? "待补 source_ref"}</p>
+                            <p>${escapeHtml(item.districtName ?? "未知行政区")} · ${escapeHtml(item.sourceRef ?? "待补 source_ref")}</p>
                             <small>
                               ${
                                 item.status === "changed"
@@ -6689,27 +6689,27 @@ function renderOperations() {
                     return `
                       <article
                         class="queue-item is-imported ${item.communityId === selectedCommunityId ? "is-related" : ""}"
-                        data-geo-task-id="${item.taskId ?? ""}"
-                        data-community-id="${item.communityId ?? ""}"
-                        data-building-id="${item.buildingId ?? ""}"
+                        data-geo-task-id="${escapeHtml(item.taskId ?? "")}"
+                        data-community-id="${escapeHtml(item.communityId ?? "")}"
+                        data-building-id="${escapeHtml(item.buildingId ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${item.communityName ?? "待识别小区"} · ${item.buildingName ?? "待识别楼栋"}</strong>
+                          <strong>${escapeHtml(item.communityName ?? "待识别小区")} · ${escapeHtml(item.buildingName ?? "待识别楼栋")}</strong>
                           <span class="trace-status ${item.status}">${geoTaskStatusLabel(item.status)}</span>
                         </div>
-                        <p>${item.taskScope === "unresolved_feature" ? "未命中楼栋词典" : `${item.districtName ?? "未知行政区"} · ${item.sourceRef ?? "待补 source_ref"}`}</p>
+                        <p>${item.taskScope === "unresolved_feature" ? "未命中楼栋词典" : `${escapeHtml(item.districtName ?? "未知行政区")} · ${escapeHtml(item.sourceRef ?? "待补 source_ref")}`}</p>
                         <div class="comparison-strip">
-                          <span class="trace-status ${geoImpactBandClass(item.impactBand)}">${item.impactLabel}</span>
+                          <span class="trace-status ${geoImpactBandClass(item.impactBand)}">${escapeHtml(item.impactLabel)}</span>
                           <span class="source-pill">影响 ${item.impactScore ?? 0}</span>
-                          <span class="source-pill">${item.taskScopeLabel ?? geoTaskStatusLabel(item.taskScope)}</span>
+                          <span class="source-pill">${escapeHtml(item.taskScopeLabel ?? geoTaskStatusLabel(item.taskScope))}</span>
                           <span class="source-pill">榜单 ${item.watchlistHits ?? 0}</span>
                           ${
                             item.workOrderId
-                              ? `<span class="source-pill">工单 ${geoWorkOrderStatusLabel(item.workOrderStatus)} · ${item.workOrderAssignee ?? "待分配"}</span>`
+                              ? `<span class="source-pill">工单 ${geoWorkOrderStatusLabel(item.workOrderStatus)} · ${escapeHtml(item.workOrderAssignee ?? "待分配")}</span>`
                               : ""
                           }
                         </div>
-                        <small>${item.recommendedAction ?? item.resolutionNotes ?? "等待处理。"}</small>
+                        <small>${escapeHtml(item.recommendedAction ?? item.resolutionNotes ?? "等待处理。")}</small>
                         ${
                           (item.watchlistFloors ?? []).length
                             ? `
@@ -6718,7 +6718,7 @@ function renderOperations() {
                                   .map(
                                     (floor) => `
                                       <span class="source-pill">
-                                        ${floor.floorNo}层 · ${Number(floor.latestYieldPct ?? 0).toFixed(2)}% · ${floor.trendLabel}
+                                        ${floor.floorNo}层 · ${Number(floor.latestYieldPct ?? 0).toFixed(2)}% · ${escapeHtml(floor.trendLabel)}
                                       </span>
                                     `
                                   )
@@ -6733,8 +6733,8 @@ function renderOperations() {
                               <div class="queue-item-footer">
                                 <button
                                   class="action compact"
-                                  data-geo-create-work-order-run-id="${selectedGeoRunDetail.runId}"
-                                  data-geo-create-work-order-task-id="${item.taskId}"
+                                  data-geo-create-work-order-run-id="${escapeHtml(selectedGeoRunDetail.runId)}"
+                                  data-geo-create-work-order-task-id="${escapeHtml(item.taskId)}"
                                 >
                                   ${state.busyGeoWorkOrderTaskId === item.taskId ? "创建中..." : "生成工单"}
                                 </button>
@@ -6748,8 +6748,8 @@ function renderOperations() {
                               <div class="queue-item-footer">
                                 <button
                                   class="action compact"
-                                  data-geo-review-run-id="${selectedGeoRunDetail.runId}"
-                                  data-geo-review-task-id="${item.taskId}"
+                                  data-geo-review-run-id="${escapeHtml(selectedGeoRunDetail.runId)}"
+                                  data-geo-review-task-id="${escapeHtml(item.taskId)}"
                                   data-geo-next-status="${nextStatus}"
                                 >
                                   ${state.busyGeoTaskId === item.taskId ? "回写中..." : geoTaskActionLabel(item)}
@@ -6800,15 +6800,15 @@ function renderOperations() {
           <label class="field compact">
             <div class="field-header">
               <span>责任人</span>
-              <strong>${state.geoWorkOrderAssigneeFilter === "all" ? "全部" : state.geoWorkOrderAssigneeFilter}</strong>
+              <strong>${state.geoWorkOrderAssigneeFilter === "all" ? "全部" : escapeHtml(state.geoWorkOrderAssigneeFilter)}</strong>
             </div>
             <select data-geo-work-order-assignee-filter>
               <option value="all">全部责任人</option>
               ${geoWorkOrderAssignees
                 .map(
                   (assignee) => `
-                    <option value="${assignee}" ${assignee === state.geoWorkOrderAssigneeFilter ? "selected" : ""}>
-                      ${assignee}
+                    <option value="${escapeHtml(assignee)}" ${assignee === state.geoWorkOrderAssigneeFilter ? "selected" : ""}>
+                      ${escapeHtml(assignee)}
                     </option>
                   `
                 )
@@ -6822,8 +6822,8 @@ function renderOperations() {
         </div>
         <div class="comparison-strip">
           <span class="source-pill">当前显示 ${filteredGeoWorkOrders.length}/${(selectedGeoRunDetail.workOrders ?? []).length}</span>
-          <span class="source-pill">筛选范围 ${state.districtFilter === "all" ? "全上海" : districtLabelById(state.districtFilter)}</span>
-          <span class="source-pill">责任人 ${state.geoWorkOrderAssigneeFilter === "all" ? "全部" : state.geoWorkOrderAssigneeFilter}</span>
+          <span class="source-pill">筛选范围 ${state.districtFilter === "all" ? "全上海" : escapeHtml(districtLabelById(state.districtFilter))}</span>
+          <span class="source-pill">责任人 ${state.geoWorkOrderAssigneeFilter === "all" ? "全部" : escapeHtml(state.geoWorkOrderAssigneeFilter)}</span>
         </div>
         <div class="import-run-grid">
           ${
@@ -6834,16 +6834,16 @@ function renderOperations() {
                     return `
                       <article
                         class="queue-item is-imported work-order-card ${item.communityId === selectedCommunityId ? "is-related" : ""}"
-                        data-community-id="${item.communityId ?? ""}"
-                        data-building-id="${item.buildingId ?? ""}"
-                        data-floor-no="${item.focusFloorNo ?? ""}"
-                        data-geo-work-order-id="${item.workOrderId ?? ""}"
+                        data-community-id="${escapeHtml(item.communityId ?? "")}"
+                        data-building-id="${escapeHtml(item.buildingId ?? "")}"
+                        data-floor-no="${escapeHtml(item.focusFloorNo ?? "")}"
+                        data-geo-work-order-id="${escapeHtml(item.workOrderId ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${item.title}</strong>
+                          <strong>${escapeHtml(item.title)}</strong>
                           <span class="trace-status ${item.status}">${geoWorkOrderStatusLabel(item.status)}</span>
                         </div>
-                        <p>${item.assignee ?? "待分配"} · ${item.taskCount ?? 0} 条任务${item.dueAt ? ` · 截止 ${formatTimestamp(item.dueAt)}` : ""}</p>
+                        <p>${escapeHtml(item.assignee ?? "待分配")} · ${item.taskCount ?? 0} 条任务${item.dueAt ? ` · 截止 ${formatTimestamp(item.dueAt)}` : ""}</p>
                         <div class="comparison-strip">
                           <span class="source-pill">影响 ${Number(item.impactScore ?? 0).toFixed(1)}</span>
                           <span class="source-pill">榜单 ${item.watchlistHits ?? 0}</span>
@@ -6860,7 +6860,7 @@ function renderOperations() {
                                 ${(item.linkedTasks ?? [])
                                   .map(
                                     (task) => `
-                                      <span class="source-pill">${task.buildingName ?? "待识别楼栋"} · ${task.taskScopeLabel ?? "几何任务"}</span>
+                                      <span class="source-pill">${escapeHtml(task.buildingName ?? "待识别楼栋")} · ${escapeHtml(task.taskScopeLabel ?? "几何任务")}</span>
                                     `
                                   )
                                   .join("")}
@@ -6868,15 +6868,15 @@ function renderOperations() {
                             `
                             : ""
                         }
-                        <small>${item.notes ?? "等待 GIS 跟进。"}</small>
+                        <small>${escapeHtml(item.notes ?? "等待 GIS 跟进。")}</small>
                         ${
                           nextStatus
                             ? `
                               <div class="queue-item-footer">
                                 <button
                                   class="action compact"
-                                  data-geo-update-work-order-run-id="${selectedGeoRunDetail.runId}"
-                                  data-geo-update-work-order-id="${item.workOrderId}"
+                                  data-geo-update-work-order-run-id="${escapeHtml(selectedGeoRunDetail.runId)}"
+                                  data-geo-update-work-order-id="${escapeHtml(item.workOrderId)}"
                                   data-geo-update-work-order-status="${nextStatus}"
                                 >
                                   ${state.busyGeoWorkOrderId === item.workOrderId ? "回写中..." : geoWorkOrderActionLabel(item)}
@@ -6908,13 +6908,13 @@ function renderOperations() {
                   .slice(0, 6)
                   .map(
                     (item) => `
-                      <article class="import-run-evidence" data-community-id="${item.communityId}" data-building-id="${item.missingBuildings?.[0]?.buildingId ?? ""}">
+                      <article class="import-run-evidence" data-community-id="${escapeHtml(item.communityId)}" data-building-id="${escapeHtml(item.missingBuildings?.[0]?.buildingId ?? "")}">
                         <div class="breakdown-top">
-                          <strong>${item.communityName}</strong>
+                          <strong>${escapeHtml(item.communityName)}</strong>
                           <span class="trace-status needs_review">缺 ${item.missingBuildingCount} 栋</span>
                         </div>
-                        <p>${item.districtName} · 已覆盖 ${item.resolvedBuildingCount}/${item.totalBuildingCount} 栋 · ${item.coveragePct}% </p>
-                        <small>${(item.missingBuildings ?? []).map((building) => building.buildingName).join(" / ") || "待补齐楼栋 footprint"}</small>
+                        <p>${escapeHtml(item.districtName)} · 已覆盖 ${item.resolvedBuildingCount}/${item.totalBuildingCount} 栋 · ${item.coveragePct}% </p>
+                        <small>${escapeHtml((item.missingBuildings ?? []).map((building) => building.buildingName).join(" / ")) || "待补齐楼栋 footprint"}</small>
                       </article>
                     `
                   )
@@ -6934,13 +6934,13 @@ function renderOperations() {
               ? (selectedGeoRunDetail.featurePreview ?? [])
                   .map(
                     (item) => `
-                      <article class="import-run-evidence" data-community-id="${item.communityId ?? ""}" data-building-id="${item.buildingId ?? ""}">
+                      <article class="import-run-evidence" data-community-id="${escapeHtml(item.communityId ?? "")}" data-building-id="${escapeHtml(item.buildingId ?? "")}">
                         <div class="breakdown-top">
                           ${geoEvidenceTitleMarkup(item)}
-                          <span class="trace-status resolved">${item.geometryType ?? "Polygon"}</span>
+                          <span class="trace-status resolved">${escapeHtml(item.geometryType ?? "Polygon")}</span>
                         </div>
-                        <p>${item.sourceRef ?? "未提供 source_ref"}</p>
-                        <small>${item.resolutionNotes ?? "已命中楼栋词典"}</small>
+                        <p>${escapeHtml(item.sourceRef ?? "未提供 source_ref")}</p>
+                        <small>${escapeHtml(item.resolutionNotes ?? "已命中楼栋词典")}</small>
                       </article>
                     `
                   )
@@ -6966,8 +6966,8 @@ function renderOperations() {
                           ${geoEvidenceTitleMarkup(item)}
                           <span class="trace-status needs_review">待归一</span>
                         </div>
-                        <p>${item.source_ref ?? "未提供 source_ref"}</p>
-                        <small>${item.resolution_notes ?? "未命中楼栋词典"}</small>
+                        <p>${escapeHtml(item.source_ref ?? "未提供 source_ref")}</p>
+                        <small>${escapeHtml(item.resolution_notes ?? "未命中楼栋词典")}</small>
                       </article>
                     `
                   )
@@ -6987,13 +6987,13 @@ function renderOperations() {
               ? (selectedGeoRunDetail.recentReviews ?? [])
                   .map(
                     (item) => `
-                      <article class="import-run-evidence" data-community-id="${item.communityId ?? ""}" data-building-id="${item.buildingId ?? ""}">
+                      <article class="import-run-evidence" data-community-id="${escapeHtml(item.communityId ?? "")}" data-building-id="${escapeHtml(item.buildingId ?? "")}">
                         <div class="breakdown-top">
-                          <strong>${item.communityName ?? "待识别小区"} · ${item.buildingName ?? "待识别楼栋"}</strong>
+                          <strong>${escapeHtml(item.communityName ?? "待识别小区")} · ${escapeHtml(item.buildingName ?? "待识别楼栋")}</strong>
                           <span class="trace-status ${item.newStatus}">${geoTaskStatusLabel(item.newStatus)}</span>
                         </div>
-                        <p>${item.previousStatus ? `${geoTaskStatusLabel(item.previousStatus)} → ` : ""}${geoTaskStatusLabel(item.newStatus)} · ${item.reviewOwner} · ${formatTimestamp(item.reviewedAt)}</p>
-                        <small>${item.resolutionNotes ?? "已记录更新。"}</small>
+                        <p>${item.previousStatus ? `${geoTaskStatusLabel(item.previousStatus)} → ` : ""}${geoTaskStatusLabel(item.newStatus)} · ${escapeHtml(item.reviewOwner)} · ${formatTimestamp(item.reviewedAt)}</p>
+                        <small>${escapeHtml(item.resolutionNotes ?? "已记录更新。")}</small>
                       </article>
                     `
                   )
@@ -7015,11 +7015,11 @@ function renderOperations() {
                     (item) => `
                       <article class="import-run-evidence">
                         <div class="breakdown-top">
-                          <strong>${item.workOrderId}</strong>
+                          <strong>${escapeHtml(item.workOrderId)}</strong>
                           <span class="trace-status ${item.newStatus}">${geoWorkOrderStatusLabel(item.newStatus)}</span>
                         </div>
-                        <p>${item.previousStatus ? `${geoWorkOrderStatusLabel(item.previousStatus)} → ` : ""}${geoWorkOrderStatusLabel(item.newStatus)} · ${item.changedBy} · ${formatTimestamp(item.changedAt)}</p>
-                        <small>${item.notes ?? "已记录工单变更。"}</small>
+                        <p>${item.previousStatus ? `${geoWorkOrderStatusLabel(item.previousStatus)} → ` : ""}${geoWorkOrderStatusLabel(item.newStatus)} · ${escapeHtml(item.changedBy)} · ${formatTimestamp(item.changedAt)}</p>
+                        <small>${escapeHtml(item.notes ?? "已记录工单变更。")}</small>
                       </article>
                     `
                   )
@@ -7035,26 +7035,26 @@ function renderOperations() {
     ? `
       ${
         state.opsMessage && ["import", "anchor"].includes(state.opsMessageContext)
-          ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
+          ? `<div class="ops-feedback ${state.opsMessageTone}">${escapeHtml(state.opsMessage)}</div>`
           : ""
       }
       <article class="import-run-section">
         <div class="breakdown-top">
-          <strong>当前批次 · ${selectedRunDetail.batchName}</strong>
+          <strong>当前批次 · ${escapeHtml(selectedRunDetail.batchName)}</strong>
           <div class="section-actions">
             <span class="trace-status ${selectedRunDetail.reviewCount > 0 ? "needs_review" : "resolved"}">
               ${selectedRunDetail.reviewCount > 0 ? `${selectedRunDetail.reviewCount} 条待复核` : "已归一"}
             </span>
             <button
               class="action compact ${postgresReady ? "primary" : ""}"
-              data-persist-run-id="${selectedRunDetail.runId}"
+              data-persist-run-id="${escapeHtml(selectedRunDetail.runId)}"
               ${postgresReady ? "" : "disabled"}
             >
               ${state.busyPersistRunId === selectedRunDetail.runId ? "写入中..." : "写入本地数据库"}
             </button>
           </div>
         </div>
-        <p>${sourceLabelById(selectedRunDetail.providerId)} · ${formatTimestamp(selectedRunDetail.createdAt)} · ${postgresLabel}</p>
+        <p>${escapeHtml(sourceLabelById(selectedRunDetail.providerId))} · ${formatTimestamp(selectedRunDetail.createdAt)} · ${escapeHtml(postgresLabel)}</p>
         <div class="import-run-grid">
           ${
             (selectedRunDetail.reviewQueue ?? []).length
@@ -7064,24 +7064,24 @@ function renderOperations() {
                     (item) => `
                       <article
                         class="queue-item is-imported ${item.communityId === selectedCommunityId ? "is-related" : ""}"
-                        data-community-id="${item.communityId ?? ""}"
-                        data-building-id="${item.buildingId ?? ""}"
-                        data-floor-no="${item.floorNo ?? ""}"
+                        data-community-id="${escapeHtml(item.communityId ?? "")}"
+                        data-building-id="${escapeHtml(item.buildingId ?? "")}"
+                        data-floor-no="${escapeHtml(item.floorNo ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${item.buildingNo} · ${item.floorNo ?? "待识别"} 层</strong>
+                          <strong>${escapeHtml(item.buildingNo)} · ${item.floorNo ?? "待识别"} 层</strong>
                           <span class="trace-status ${item.status}">${queueStatusLabel(item.status)}</span>
                         </div>
-                        <p>${item.normalizedPath}</p>
-                        <small>${item.reviewHint}</small>
+                        <p>${escapeHtml(item.normalizedPath)}</p>
+                        <small>${escapeHtml(item.reviewHint)}</small>
                         ${
                           item.status !== "resolved"
                             ? `
                               <div class="queue-item-footer">
                                 <button
                                   class="action compact"
-                                  data-review-run-id="${selectedRunDetail.runId}"
-                                  data-review-queue-id="${item.queueId}"
+                                  data-review-run-id="${escapeHtml(selectedRunDetail.runId)}"
+                                  data-review-queue-id="${escapeHtml(item.queueId)}"
                                 >
                                   ${state.busyReviewQueueId === item.queueId ? "回写中..." : "标记已复核"}
                                 </button>
@@ -7109,12 +7109,12 @@ function renderOperations() {
               (item) => `
                 <article
                   class="import-run-evidence"
-                  data-community-id="${item.communityId ?? ""}"
-                  data-building-id="${item.buildingId ?? ""}"
-                  data-floor-no="${item.floorNo ?? ""}"
+                  data-community-id="${escapeHtml(item.communityId ?? "")}"
+                  data-building-id="${escapeHtml(item.buildingId ?? "")}"
+                  data-floor-no="${escapeHtml(item.floorNo ?? "")}"
                 >
                   <div class="breakdown-top">
-                    <strong>${item.communityName} · ${item.buildingName} · ${item.floorNo} 层</strong>
+                    <strong>${escapeHtml(item.communityName)} · ${escapeHtml(item.buildingName)} · ${item.floorNo} 层</strong>
                     <span class="yield-chip ${yieldClass(item.yieldPct ?? 0)}">${Number(item.yieldPct ?? 0).toFixed(2)}%</span>
                   </div>
                   <p>样本对 ${item.pairCount} 组 · 最佳置信 ${Math.round((item.bestPairConfidence ?? 0) * 100)}%</p>
@@ -7130,7 +7130,7 @@ function renderOperations() {
             <article class="import-run-section" data-browser-capture-recent-runs="true">
               <div class="breakdown-top">
                 <strong>相对基线批次的变化</strong>
-                <span class="badge">${selectedRunDetail.comparison.baselineBatchName}</span>
+                <span class="badge">${escapeHtml(selectedRunDetail.comparison.baselineBatchName)}</span>
               </div>
               <div class="field compact">
                 <div class="field-header">
@@ -7142,15 +7142,15 @@ function renderOperations() {
                   ${baselineOptions
                     .map(
                       (item) => `
-                        <option value="${item.runId}" ${item.runId === state.selectedBaselineRunId ? "selected" : ""}>
-                          ${item.batchName} · ${formatTimestamp(item.createdAt)}
+                        <option value="${escapeHtml(item.runId)}" ${item.runId === state.selectedBaselineRunId ? "selected" : ""}>
+                          ${escapeHtml(item.batchName)} · ${formatTimestamp(item.createdAt)}
                         </option>
                       `
                     )
                     .join("")}
                 </select>
               </div>
-              <p>对比基线 · ${selectedRunDetail.comparison.baselineBatchName} · ${formatTimestamp(
+              <p>对比基线 · ${escapeHtml(selectedRunDetail.comparison.baselineBatchName)} · ${formatTimestamp(
                 selectedRunDetail.comparison.baselineCreatedAt
               )}</p>
               <div class="comparison-strip">
@@ -7173,13 +7173,13 @@ function renderOperations() {
                     (item) => `
                       <article
                         class="import-run-evidence"
-                        data-community-id="${item.communityId ?? ""}"
-                        data-building-id="${item.buildingId ?? ""}"
-                        data-floor-no="${item.floorNo ?? ""}"
+                        data-community-id="${escapeHtml(item.communityId ?? "")}"
+                        data-building-id="${escapeHtml(item.buildingId ?? "")}"
+                        data-floor-no="${escapeHtml(item.floorNo ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${item.communityName} · ${item.buildingName} · ${item.floorNo} 层</strong>
-                          <span class="trace-status ${comparisonToneClass(item.status)}">${item.statusLabel}</span>
+                          <strong>${escapeHtml(item.communityName)} · ${escapeHtml(item.buildingName)} · ${item.floorNo} 层</strong>
+                          <span class="trace-status ${comparisonToneClass(item.status)}">${escapeHtml(item.statusLabel)}</span>
                         </div>
                         <p>
                           当前 ${Number(item.currentYieldPct ?? 0).toFixed(2)}%
@@ -7217,16 +7217,16 @@ function renderOperations() {
                     (item) => `
                       <article
                         class="import-run-evidence"
-                        data-community-id="${item.communityId ?? ""}"
-                        data-building-id="${item.buildingId ?? ""}"
-                        data-floor-no="${item.floorNo ?? ""}"
+                        data-community-id="${escapeHtml(item.communityId ?? "")}"
+                        data-building-id="${escapeHtml(item.buildingId ?? "")}"
+                        data-floor-no="${escapeHtml(item.floorNo ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${item.communityName} · ${item.buildingName} · ${item.floorNo ?? "待识别"} 层</strong>
+                          <strong>${escapeHtml(item.communityName)} · ${escapeHtml(item.buildingName)} · ${item.floorNo ?? "待识别"} 层</strong>
                           <span class="trace-status ${item.newStatus}">${queueStatusLabel(item.newStatus)}</span>
                         </div>
-                        <p>${item.previousStatus && item.previousStatus !== "unknown" ? `${queueStatusLabel(item.previousStatus)} → ` : ""}${queueStatusLabel(item.newStatus)} · ${item.reviewOwner} · ${formatTimestamp(item.reviewedAt)}</p>
-                        <small>${item.resolutionNotes}</small>
+                        <p>${item.previousStatus && item.previousStatus !== "unknown" ? `${queueStatusLabel(item.previousStatus)} → ` : ""}${queueStatusLabel(item.newStatus)} · ${escapeHtml(item.reviewOwner)} · ${formatTimestamp(item.reviewedAt)}</p>
+                        <small>${escapeHtml(item.resolutionNotes)}</small>
                       </article>
                     `
                   )
@@ -7243,18 +7243,18 @@ function renderOperations() {
       (item) => `
         <article class="source-item">
           <div class="breakdown-top">
-            <strong>${item.name}</strong>
-            <span class="trace-status ${item.connectionState ?? item.status}">${item.readinessLabel ?? sourceStatusLabel(item.status)}</span>
+            <strong>${escapeHtml(item.name)}</strong>
+            <span class="trace-status ${item.connectionState ?? item.status}">${escapeHtml(item.readinessLabel ?? sourceStatusLabel(item.status))}</span>
           </div>
-          <p>${item.note}</p>
+          <p>${escapeHtml(item.note)}</p>
           <div class="source-meta">
-            <span class="source-pill">${item.category}</span>
-            <span class="source-pill">优先级 ${item.priority}</span>
+            <span class="source-pill">${escapeHtml(item.category)}</span>
+            <span class="source-pill">优先级 ${escapeHtml(item.priority)}</span>
             <span class="source-pill">离线批次 ${item.stagedRunCount ?? 0}</span>
             ${item.applicationMode ? `<span class="source-pill">${sourceModeLabel(item.applicationMode)}</span>` : ""}
           </div>
-          ${item.recommendedNextStep ? `<p class="source-hint">${item.recommendedNextStep}</p>` : ""}
-          ${item.contactValue ? `<small>${item.contactLabel ?? "联系"} · ${item.contactValue}</small>` : ""}
+          ${item.recommendedNextStep ? `<p class="source-hint">${escapeHtml(item.recommendedNextStep)}</p>` : ""}
+          ${item.contactValue ? `<small>${escapeHtml(item.contactLabel ?? "联系")} · ${escapeHtml(item.contactValue)}</small>` : ""}
           <small>${item.supportsLocalAutomation ? "本地辅助任务可用" : "本阶段只保留离线样本接入"}</small>
           ${renderSourceActions(item, { compact: true })}
         </article>
@@ -7289,31 +7289,31 @@ function renderOperations() {
     ? `
       ${
         state.opsMessage && state.opsMessageContext === "sampling"
-          ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
+          ? `<div class="ops-feedback ${state.opsMessageTone}">${escapeHtml(state.opsMessage)}</div>`
           : ""
       }
       <article
         class="import-run-section browser-capture-panel"
-        data-browser-capture-panel="${selectedSamplingTask.taskId}"
-        data-browser-capture-task-id="${selectedSamplingTask.taskId}"
+        data-browser-capture-panel="${escapeHtml(selectedSamplingTask.taskId)}"
+        data-browser-capture-task-id="${escapeHtml(selectedSamplingTask.taskId)}"
         data-browser-capture-community-name="${escapeHtml(selectedSamplingTask.communityName ?? "")}"
         data-browser-capture-building-name="${escapeHtml(selectedSamplingTask.buildingName ?? "")}"
-        data-browser-capture-floor-no="${selectedSamplingTask.floorNo ?? ""}"
+        data-browser-capture-floor-no="${escapeHtml(selectedSamplingTask.floorNo ?? "")}"
         data-browser-capture-district-name="${escapeHtml(selectedSamplingTask.districtName ?? "")}"
       >
         <div class="capture-workbench-hero">
           <div class="capture-workbench-copy">
             <div class="breakdown-top">
               <strong>公开页面采样执行台</strong>
-              <span class="badge">${selectedSamplingTask.taskTypeLabel}</span>
+              <span class="badge">${escapeHtml(selectedSamplingTask.taskTypeLabel)}</span>
             </div>
-            <p class="capture-task-label" data-browser-capture-task-label="true">${selectedSamplingTask.communityName}${selectedSamplingTask.buildingName ? ` · ${selectedSamplingTask.buildingName}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""} · ${selectedSamplingTask.districtName}</p>
-            <small class="capture-task-brief">${selectedSamplingTask.reason} ${selectedSamplingTask.captureGoal}</small>
+            <p class="capture-task-label" data-browser-capture-task-label="true">${escapeHtml(selectedSamplingTask.communityName)}${selectedSamplingTask.buildingName ? ` · ${escapeHtml(selectedSamplingTask.buildingName)}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""} · ${escapeHtml(selectedSamplingTask.districtName)}</p>
+            <small class="capture-task-brief">${escapeHtml(selectedSamplingTask.reason)} ${escapeHtml(selectedSamplingTask.captureGoal)}</small>
           </div>
           <div class="capture-workbench-kpis">
             <article class="capture-kpi">
               <span>优先级</span>
-              <strong>${selectedSamplingTask.priorityLabel}</strong>
+              <strong>${escapeHtml(selectedSamplingTask.priorityLabel)}</strong>
               <small>${selectedSamplingTask.focusScope === "priority" ? "重点区任务" : "全市任务"}</small>
             </article>
             <article class="capture-kpi">
@@ -7332,14 +7332,14 @@ function renderOperations() {
                   ? `${Number(selectedSamplingTask.currentYieldPct).toFixed(2)}%`
                   : "待补"
               }</strong>
-              <small>${selectedSamplingTask.sampleStatusLabel ?? "状态待补"}</small>
+              <small>${escapeHtml(selectedSamplingTask.sampleStatusLabel ?? "状态待补")}</small>
             </article>
           </div>
         </div>
         <div class="comparison-strip capture-meta-strip">
-          <span class="source-pill">${selectedSamplingTask.priorityLabel}</span>
+          <span class="source-pill">${escapeHtml(selectedSamplingTask.priorityLabel)}</span>
           <span class="source-pill">${selectedSamplingTask.focusScope === "priority" ? "重点区任务" : "全市任务"}</span>
-          <span class="source-pill">${selectedSamplingTask.sampleStatusLabel ?? "状态待补"}</span>
+          <span class="source-pill">${escapeHtml(selectedSamplingTask.sampleStatusLabel ?? "状态待补")}</span>
           ${
             selectedSamplingTask.currentYieldPct != null
               ? `<span class="source-pill">当前 ${Number(selectedSamplingTask.currentYieldPct).toFixed(2)}%</span>`
@@ -7357,30 +7357,30 @@ function renderOperations() {
               <article
                 class="ops-feedback success browser-capture-result browser-post-submit-relay"
                 data-browser-capture-result="success"
-                data-browser-capture-result-task-id="${currentCaptureSubmission.taskId}"
-                data-browser-capture-result-import-run-id="${currentCaptureSubmission.importRunId ?? ""}"
-                data-browser-capture-result-capture-run-id="${currentCaptureSubmission.captureRunId ?? ""}"
-                data-browser-capture-result-metrics-run-id="${currentCaptureSubmission.metricsRunId ?? ""}"
-                data-browser-capture-result-created-at="${currentCaptureSubmission.createdAt ?? ""}"
+                data-browser-capture-result-task-id="${escapeHtml(currentCaptureSubmission.taskId)}"
+                data-browser-capture-result-import-run-id="${escapeHtml(currentCaptureSubmission.importRunId ?? "")}"
+                data-browser-capture-result-capture-run-id="${escapeHtml(currentCaptureSubmission.captureRunId ?? "")}"
+                data-browser-capture-result-metrics-run-id="${escapeHtml(currentCaptureSubmission.metricsRunId ?? "")}"
+                data-browser-capture-result-created-at="${escapeHtml(currentCaptureSubmission.createdAt ?? "")}"
                 data-browser-capture-result-attention-count="${currentCaptureSubmission.attentionCount ?? 0}"
-                data-browser-post-submit-action="${currentCaptureSubmission.workflowAction ?? "stay_current"}"
-                data-browser-post-submit-task-id="${currentCaptureSubmission.postSubmitTaskId ?? currentCaptureSubmission.taskId ?? ""}"
-                data-browser-post-submit-workflow-task-id="${currentCaptureSubmission.workflowTaskId ?? ""}"
+                data-browser-post-submit-action="${escapeHtml(currentCaptureSubmission.workflowAction ?? "stay_current")}"
+                data-browser-post-submit-task-id="${escapeHtml(currentCaptureSubmission.postSubmitTaskId ?? currentCaptureSubmission.taskId ?? "")}"
+                data-browser-post-submit-workflow-task-id="${escapeHtml(currentCaptureSubmission.workflowTaskId ?? "")}"
                 data-browser-post-submit-workflow-task-provided="${currentCaptureSubmission.workflowTaskProvided ? "true" : "false"}"
-                data-browser-post-submit-resolution="${currentCaptureSubmission.postSubmitTaskResolution ?? ""}"
+                data-browser-post-submit-resolution="${escapeHtml(currentCaptureSubmission.postSubmitTaskResolution ?? "")}"
                 data-browser-post-submit-attention-count="${currentCaptureSubmission.attentionCount ?? 0}"
-                data-browser-post-submit-source-task-id="${currentCaptureSubmission.taskId ?? ""}"
-                data-browser-post-submit-reason="${currentCaptureSubmission.workflowReason ?? ""}"
-                data-browser-post-submit-status="${currentCaptureSubmission.taskProgress?.status ?? ""}"
+                data-browser-post-submit-source-task-id="${escapeHtml(currentCaptureSubmission.taskId ?? "")}"
+                data-browser-post-submit-reason="${escapeHtml(currentCaptureSubmission.workflowReason ?? "")}"
+                data-browser-post-submit-status="${escapeHtml(currentCaptureSubmission.taskProgress?.status ?? "")}"
               >
                 <div class="breakdown-top">
                   <strong>采样接力条</strong>
                   <span class="badge">${browserSamplingWorkflowActionLabel(currentCaptureSubmission.workflowAction)}</span>
                 </div>
                 <p>
-                  已写入 ${currentCaptureSubmission.taskLabel ?? "当前任务"} ·
-                  ${currentCaptureSubmission.importRunId ?? currentCaptureSubmission.captureRunId ?? "已提交"}
-                  ${currentCaptureSubmission.metricsRunId ? ` · 指标 ${currentCaptureSubmission.metricsRunId}` : ""}
+                  已写入 ${escapeHtml(currentCaptureSubmission.taskLabel ?? "当前任务")} ·
+                  ${escapeHtml(currentCaptureSubmission.importRunId ?? currentCaptureSubmission.captureRunId ?? "已提交")}
+                  ${currentCaptureSubmission.metricsRunId ? ` · 指标 ${escapeHtml(currentCaptureSubmission.metricsRunId)}` : ""}
                   ${currentCaptureSubmission.attentionCount ? ` · 原文待处理 ${currentCaptureSubmission.attentionCount}` : " · 原文待处理 0"}
                 </p>
                 <div class="comparison-strip">
@@ -7388,7 +7388,7 @@ function renderOperations() {
                   <span class="source-pill">${browserSamplingTaskStatusLabel(currentCaptureSubmission.taskProgress?.status)}</span>
                   <span class="source-pill">待复核 ${currentCaptureSubmission.reviewPendingCount ?? 0}</span>
                   <span class="source-pill">收件箱 ${currentCaptureSubmission.reviewInboxPendingCount ?? reviewInboxSummary.pendingQueueCount ?? 0}</span>
-                  <span class="source-pill">当前接力 ${currentCaptureSubmission.postSubmitTaskLabel ?? currentCaptureSubmission.taskLabel ?? "当前任务"}</span>
+                  <span class="source-pill">当前接力 ${escapeHtml(currentCaptureSubmission.postSubmitTaskLabel ?? currentCaptureSubmission.taskLabel ?? "当前任务")}</span>
                   <span class="source-pill">${browserSamplingPostSubmitResolutionLabel(currentCaptureSubmission.postSubmitTaskResolution)}</span>
                 </div>
                 <small>${browserSamplingWorkflowReasonLabel(currentCaptureSubmission.workflowReason)}</small>
@@ -7401,31 +7401,31 @@ function renderOperations() {
             ? `
               <article
                 class="ops-feedback success browser-capture-result browser-post-submit-relay browser-review-relay"
-                data-browser-review-action="${currentReviewAction.action ?? "stay_current"}"
-                data-browser-review-run-id="${currentReviewAction.runId ?? ""}"
-                data-browser-review-queue-id="${currentReviewAction.queueId ?? ""}"
-                data-browser-review-workflow-run-id="${currentReviewAction.workflowRunId ?? ""}"
-                data-browser-review-workflow-queue-id="${currentReviewAction.workflowQueueId ?? ""}"
-                data-browser-review-workflow-task-id="${currentReviewAction.workflowTaskId ?? ""}"
+                data-browser-review-action="${escapeHtml(currentReviewAction.action ?? "stay_current")}"
+                data-browser-review-run-id="${escapeHtml(currentReviewAction.runId ?? "")}"
+                data-browser-review-queue-id="${escapeHtml(currentReviewAction.queueId ?? "")}"
+                data-browser-review-workflow-run-id="${escapeHtml(currentReviewAction.workflowRunId ?? "")}"
+                data-browser-review-workflow-queue-id="${escapeHtml(currentReviewAction.workflowQueueId ?? "")}"
+                data-browser-review-workflow-task-id="${escapeHtml(currentReviewAction.workflowTaskId ?? "")}"
                 data-browser-review-workflow-item-provided="${currentReviewAction.workflowItemProvided ? "true" : "false"}"
-                data-browser-review-resolution="${currentReviewAction.reviewResolution ?? ""}"
-                data-browser-review-reason="${currentReviewAction.reason ?? ""}"
-                data-browser-review-target-task-id="${currentReviewAction.postReviewTaskId ?? ""}"
-                data-browser-review-target-run-id="${currentReviewAction.postReviewRunId ?? ""}"
-                data-browser-review-target-queue-id="${currentReviewAction.postReviewQueueId ?? ""}"
+                data-browser-review-resolution="${escapeHtml(currentReviewAction.reviewResolution ?? "")}"
+                data-browser-review-reason="${escapeHtml(currentReviewAction.reason ?? "")}"
+                data-browser-review-target-task-id="${escapeHtml(currentReviewAction.postReviewTaskId ?? "")}"
+                data-browser-review-target-run-id="${escapeHtml(currentReviewAction.postReviewRunId ?? "")}"
+                data-browser-review-target-queue-id="${escapeHtml(currentReviewAction.postReviewQueueId ?? "")}"
                 data-browser-review-pending-count="${currentReviewAction.pendingCount ?? 0}"
                 data-browser-review-batch-affected-count="${currentReviewAction.reviewMode === "batch" ? currentReviewAction.affectedCount ?? 0 : 0}"
                 data-browser-review-batch-skipped-count="${currentReviewAction.reviewMode === "batch" ? currentReviewAction.skippedCount ?? 0 : 0}"
-                data-browser-review-batch-status="${currentReviewAction.reviewMode === "batch" ? currentReviewAction.reviewStatus ?? "" : ""}"
+                data-browser-review-batch-status="${escapeHtml(currentReviewAction.reviewMode === "batch" ? currentReviewAction.reviewStatus ?? "" : "")}"
               >
                 <div class="breakdown-top">
                   <strong>复核接力条</strong>
                   <span class="badge">${browserCaptureReviewActionLabel(currentReviewAction.action)}</span>
                 </div>
                 <p>
-                  ${currentReviewAction.reviewMode === "batch" ? "已批量处理" : "已处理"} ${currentReviewAction.taskLabel ?? "当前任务"} ·
+                  ${currentReviewAction.reviewMode === "batch" ? "已批量处理" : "已处理"} ${escapeHtml(currentReviewAction.taskLabel ?? "当前任务")} ·
                   ${browserCaptureReviewStatusLabel(currentReviewAction.reviewStatus)} ·
-                  run ${currentReviewAction.runId}
+                  run ${escapeHtml(currentReviewAction.runId)}
                 </p>
                 <div class="comparison-strip">
                   ${
@@ -7433,11 +7433,11 @@ function renderOperations() {
                       ? `<span class="source-pill">选中 ${currentReviewAction.selectedCount ?? 0}</span>
                          <span class="source-pill">成功 ${currentReviewAction.affectedCount ?? 0}</span>
                          <span class="source-pill">跳过 ${currentReviewAction.skippedCount ?? 0}</span>`
-                      : `<span class="source-pill">队列 ${currentReviewAction.queueId ?? "待补"}</span>`
+                      : `<span class="source-pill">队列 ${escapeHtml(currentReviewAction.queueId ?? "待补")}</span>`
                   }
                   <span class="source-pill">剩余待复核 ${currentReviewAction.pendingCount ?? 0}</span>
                   <span class="source-pill">收件箱 ${currentReviewAction.reviewInboxPendingCount ?? reviewInboxSummary.pendingQueueCount ?? 0}</span>
-                  <span class="source-pill">当前接力 ${currentReviewAction.postReviewTaskLabel ?? currentReviewAction.taskLabel ?? "当前任务"}</span>
+                  <span class="source-pill">当前接力 ${escapeHtml(currentReviewAction.postReviewTaskLabel ?? currentReviewAction.taskLabel ?? "当前任务")}</span>
                   <span class="source-pill">${browserCaptureReviewResolutionLabel(currentReviewAction.reviewResolution)}</span>
                 </div>
                 <small>${browserCaptureReviewReasonLabel(currentReviewAction.reason)}</small>
@@ -7446,10 +7446,10 @@ function renderOperations() {
             : ""
         }
         <div class="comparison-strip">
-          ${(selectedSamplingTask.requiredFields ?? []).map((field) => `<span class="source-pill">${field}</span>`).join("")}
+          ${(selectedSamplingTask.requiredFields ?? []).map((field) => `<span class="source-pill">${escapeHtml(field)}</span>`).join("")}
         </div>
         <div class="comparison-strip">
-          <span class="trace-status ${selectedSamplingTask.taskLifecycleStatus ?? "needs_capture"}">${selectedSamplingTask.taskLifecycleLabel ?? "待采样"}</span>
+          <span class="trace-status ${selectedSamplingTask.taskLifecycleStatus ?? "needs_capture"}">${escapeHtml(selectedSamplingTask.taskLifecycleLabel ?? "待采样")}</span>
           <span class="source-pill">历史采样 ${selectedSamplingTask.captureHistoryCount ?? 0} 次</span>
           ${
             selectedSamplingTask.latestCaptureAt
@@ -7488,17 +7488,17 @@ function renderOperations() {
                           (item) => `
                             <article
                               class="browser-task-queue-item browser-review-inbox-item ${item.inboxItemId === currentReviewInboxItemId ? "is-active" : ""}"
-                              data-browser-review-inbox-item-id="${item.inboxItemId}"
-                              data-browser-review-inbox-run-id="${item.runId}"
-                              data-browser-review-inbox-queue-id="${item.queueId}"
-                              data-browser-review-inbox-task-id="${item.taskId ?? ""}"
+                              data-browser-review-inbox-item-id="${escapeHtml(item.inboxItemId)}"
+                              data-browser-review-inbox-run-id="${escapeHtml(item.runId)}"
+                              data-browser-review-inbox-queue-id="${escapeHtml(item.queueId)}"
+                              data-browser-review-inbox-task-id="${escapeHtml(item.taskId ?? "")}"
                             >
                               <div class="breakdown-top">
-                                <strong>${item.taskLabel ?? browserSamplingTaskLabel(item)}</strong>
-                                <span class="trace-status needs_review">${item.businessTypeLabel ?? item.businessType ?? "原文"} · ${(item.attention ?? []).length} 项</span>
+                                <strong>${escapeHtml(item.taskLabel ?? browserSamplingTaskLabel(item))}</strong>
+                                <span class="trace-status needs_review">${escapeHtml(item.businessTypeLabel ?? item.businessType ?? "原文")} · ${(item.attention ?? []).length} 项</span>
                               </div>
-                              <p>${item.districtName ?? "未知行政区"} · run ${item.runId} · ${item.sourceListingId ?? "待补"}</p>
-                              <small>${(item.attention ?? []).join(" / ") || "待复核 attention"}${item.publishedAt ? ` · ${item.publishedAt}` : ""}</small>
+                              <p>${escapeHtml(item.districtName ?? "未知行政区")} · run ${escapeHtml(item.runId)} · ${escapeHtml(item.sourceListingId ?? "待补")}</p>
+                              <small>${escapeHtml((item.attention ?? []).join(" / ")) || "待复核 attention"}${item.publishedAt ? ` · ${escapeHtml(item.publishedAt)}` : ""}</small>
                             </article>
                           `
                         )
@@ -7523,10 +7523,10 @@ function renderOperations() {
                 <span class="source-pill">待采样/补采 ${workbenchQueue.districtTasks.filter((task) => ["needs_capture", "in_progress"].includes(browserSamplingCoverageState(task))).length}</span>
               </div>
               <div class="action-row compact browser-task-actions">
-                <button class="action compact" data-browser-workbench-copy-brief="${selectedSamplingTask.taskId}">复制整包采样指令</button>
-                <button class="action compact" data-browser-workbench-next-district="${workbenchQueue.nextDistrictTask?.taskId ?? ""}" ${workbenchQueue.nextDistrictTask ? "" : "disabled"}>下一个同区任务</button>
-                <button class="action compact" data-browser-workbench-next-review="${workbenchQueue.nextReviewTask?.taskId ?? ""}" data-browser-workbench-next-review-run-id="${workbenchQueue.nextReviewItem?.runId ?? ""}" data-browser-workbench-next-review-queue-id="${workbenchQueue.nextReviewItem?.queueId ?? ""}" ${workbenchQueue.nextReviewTask ? "" : "disabled"}>下一个待复核</button>
-                <button class="action compact" data-browser-workbench-next-capture="${workbenchQueue.nextCaptureTask?.taskId ?? ""}" ${workbenchQueue.nextCaptureTask ? "" : "disabled"}>下一个待采样</button>
+                <button class="action compact" data-browser-workbench-copy-brief="${escapeHtml(selectedSamplingTask.taskId)}">复制整包采样指令</button>
+                <button class="action compact" data-browser-workbench-next-district="${escapeHtml(workbenchQueue.nextDistrictTask?.taskId ?? "")}" ${workbenchQueue.nextDistrictTask ? "" : "disabled"}>下一个同区任务</button>
+                <button class="action compact" data-browser-workbench-next-review="${escapeHtml(workbenchQueue.nextReviewTask?.taskId ?? "")}" data-browser-workbench-next-review-run-id="${escapeHtml(workbenchQueue.nextReviewItem?.runId ?? "")}" data-browser-workbench-next-review-queue-id="${escapeHtml(workbenchQueue.nextReviewItem?.queueId ?? "")}" ${workbenchQueue.nextReviewTask ? "" : "disabled"}>下一个待复核</button>
+                <button class="action compact" data-browser-workbench-next-capture="${escapeHtml(workbenchQueue.nextCaptureTask?.taskId ?? "")}" ${workbenchQueue.nextCaptureTask ? "" : "disabled"}>下一个待采样</button>
               </div>
               ${
                 workbenchQueue.previewTasks.length
@@ -7535,12 +7535,12 @@ function renderOperations() {
                       ${workbenchQueue.previewTasks
                         .map(
                           (task) => `
-                            <article class="browser-task-queue-item ${task.taskId === state.selectedBrowserSamplingTaskId ? "is-active" : ""}" data-browser-workbench-task-id="${task.taskId}">
+                            <article class="browser-task-queue-item ${task.taskId === state.selectedBrowserSamplingTaskId ? "is-active" : ""}" data-browser-workbench-task-id="${escapeHtml(task.taskId)}">
                               <div class="breakdown-top">
-                                <strong>${task.communityName ?? "待识别小区"}${task.buildingName ? ` · ${task.buildingName}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}</strong>
+                                <strong>${escapeHtml(task.communityName ?? "待识别小区")}${task.buildingName ? ` · ${escapeHtml(task.buildingName)}` : ""}${task.floorNo != null ? ` · ${task.floorNo}层` : ""}</strong>
                                 <span class="trace-status ${browserSamplingCoverageState(task)}">${browserSamplingCoverageLabel(task)}</span>
                               </div>
-                              <p>${task.districtName ?? "未知行政区"} · ${task.taskTypeLabel ?? task.taskType ?? "公开页采样"} · ${task.captureGoal ?? task.reason ?? "等待补齐公开页原文。"}</p>
+                              <p>${escapeHtml(task.districtName ?? "未知行政区")} · ${escapeHtml(task.taskTypeLabel ?? task.taskType ?? "公开页采样")} · ${escapeHtml(task.captureGoal ?? task.reason ?? "等待补齐公开页原文。")}</p>
                               <small>${browserSamplingCountSummary(task)} · 优先分 ${task.priorityScore ?? 0}</small>
                             </article>
                           `
@@ -7552,20 +7552,20 @@ function renderOperations() {
               }
             </article>
             <div class="action-row compact browser-task-actions capture-query-row">
-              <button class="action compact" data-browser-workbench-copy-sale="${selectedSamplingTask.taskId}">复制 Sale 检索词</button>
-              <button class="action compact" data-browser-workbench-copy-rent="${selectedSamplingTask.taskId}">复制 Rent 检索词</button>
-              <button class="action compact" data-browser-workbench-copy-target="${selectedSamplingTask.taskId}">复制目标检索词</button>
+              <button class="action compact" data-browser-workbench-copy-sale="${escapeHtml(selectedSamplingTask.taskId)}">复制 Sale 检索词</button>
+              <button class="action compact" data-browser-workbench-copy-rent="${escapeHtml(selectedSamplingTask.taskId)}">复制 Rent 检索词</button>
+              <button class="action compact" data-browser-workbench-copy-target="${escapeHtml(selectedSamplingTask.taskId)}">复制目标检索词</button>
             </div>
             <article class="browser-capture-card browser-scrape-target-card">
               <div class="breakdown-top">
                 <strong>浏览器抓取目标</strong>
-                <span class="trace-status ${selectedSamplingTask.taskLifecycleStatus ?? "needs_capture"}">${selectedSamplingTask.taskLifecycleLabel ?? "待抓取"}</span>
+                <span class="trace-status ${selectedSamplingTask.taskLifecycleStatus ?? "needs_capture"}">${escapeHtml(selectedSamplingTask.taskLifecycleLabel ?? "待抓取")}</span>
               </div>
-              <p>${selectedSamplingTask.communityName}${selectedSamplingTask.buildingName ? ` · ${selectedSamplingTask.buildingName}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""}</p>
+              <p>${escapeHtml(selectedSamplingTask.communityName)}${selectedSamplingTask.buildingName ? ` · ${escapeHtml(selectedSamplingTask.buildingName)}` : ""}${selectedSamplingTask.floorNo != null ? ` · ${selectedSamplingTask.floorNo}层` : ""}</p>
               <div class="comparison-strip">
-                <span class="source-pill">Sale: ${selectedSamplingTask.saleQuery ?? "待生成"}</span>
-                <span class="source-pill">Rent: ${selectedSamplingTask.rentQuery ?? "待生成"}</span>
-                ${selectedSamplingTask.targetQuery ? `<span class="source-pill">Target: ${selectedSamplingTask.targetQuery}</span>` : ""}
+                <span class="source-pill">Sale: ${escapeHtml(selectedSamplingTask.saleQuery ?? "待生成")}</span>
+                <span class="source-pill">Rent: ${escapeHtml(selectedSamplingTask.rentQuery ?? "待生成")}</span>
+                ${selectedSamplingTask.targetQuery ? `<span class="source-pill">Target: ${escapeHtml(selectedSamplingTask.targetQuery)}</span>` : ""}
               </div>
               <small>当前工作台不再提供人工录入表单；新增 listing 只通过浏览器抓取批次进入。</small>
             </article>
@@ -7582,9 +7582,9 @@ function renderOperations() {
                 ? taskCaptureRuns
                     .map(
                       (run) => `
-                        <article class="import-run-evidence ${selectedCaptureRunDetail?.runId === run.runId ? "is-related" : ""}" data-browser-capture-run-id="${run.runId}" data-browser-capture-import-run-id="${run.importRunId ?? ""}" data-browser-capture-metrics-run-id="${run.metricsRunId ?? ""}" data-community-id="${run.communityId ?? ""}" data-building-id="${run.buildingId ?? ""}" data-floor-no="${run.floorNo ?? ""}">
+                        <article class="import-run-evidence ${selectedCaptureRunDetail?.runId === run.runId ? "is-related" : ""}" data-browser-capture-run-id="${escapeHtml(run.runId)}" data-browser-capture-import-run-id="${escapeHtml(run.importRunId ?? "")}" data-browser-capture-metrics-run-id="${escapeHtml(run.metricsRunId ?? "")}" data-community-id="${escapeHtml(run.communityId ?? "")}" data-building-id="${escapeHtml(run.buildingId ?? "")}" data-floor-no="${escapeHtml(run.floorNo ?? "")}">
                           <div class="breakdown-top">
-                            <strong>${run.communityName}${run.buildingName ? ` · ${run.buildingName}` : ""}${run.floorNo != null ? ` · ${run.floorNo}层` : ""}</strong>
+                            <strong>${escapeHtml(run.communityName)}${run.buildingName ? ` · ${escapeHtml(run.buildingName)}` : ""}${run.floorNo != null ? ` · ${run.floorNo}层` : ""}</strong>
                             <span class="trace-status ${browserCapturePendingAttentionCount(run) ? "needs_review" : "captured"}">${browserCapturePendingAttentionCount(run) ? "待复核" : "已导入"}</span>
                           </div>
                           <p>${formatTimestamp(run.createdAt)} · 原文 ${run.captureCount} 条 · Sale ${run.saleCaptureCount} / Rent ${run.rentCaptureCount}</p>
@@ -7593,7 +7593,7 @@ function renderOperations() {
                               ? `待复核 ${browserCapturePendingAttentionCount(run)} 条 · 已修正 ${browserCaptureResolvedCount(run)} · 已豁免 ${browserCaptureWaivedCount(run)}`
                               : run.attentionCount
                                 ? `原文待处理 ${run.attentionCount} 条已闭环`
-                              : `已并入 ${run.importRunId ?? "最新导入批次"} · 指标 ${run.metricsRunId ?? "待刷新"}`
+                              : `已并入 ${escapeHtml(run.importRunId ?? "最新导入批次")} · 指标 ${escapeHtml(run.metricsRunId ?? "待刷新")}`
                           }</small>
                         </article>
                       `
@@ -7614,18 +7614,18 @@ function renderOperations() {
                 ? recentCaptureRuns
                     .map(
                       (run) => `
-                        <article class="import-run-evidence ${selectedCaptureRunDetail?.runId === run.runId ? "is-related" : ""}" data-browser-capture-run-id="${run.runId}" data-browser-capture-import-run-id="${run.importRunId ?? ""}" data-browser-capture-metrics-run-id="${run.metricsRunId ?? ""}" data-browser-task-id="${run.taskId ?? ""}" data-community-id="${run.communityId ?? ""}" data-building-id="${run.buildingId ?? ""}" data-floor-no="${run.floorNo ?? ""}">
+                        <article class="import-run-evidence ${selectedCaptureRunDetail?.runId === run.runId ? "is-related" : ""}" data-browser-capture-run-id="${escapeHtml(run.runId)}" data-browser-capture-import-run-id="${escapeHtml(run.importRunId ?? "")}" data-browser-capture-metrics-run-id="${escapeHtml(run.metricsRunId ?? "")}" data-browser-task-id="${escapeHtml(run.taskId ?? "")}" data-community-id="${escapeHtml(run.communityId ?? "")}" data-building-id="${escapeHtml(run.buildingId ?? "")}" data-floor-no="${escapeHtml(run.floorNo ?? "")}">
                           <div class="breakdown-top">
-                            <strong>${run.communityName}${run.buildingName ? ` · ${run.buildingName}` : ""}${run.floorNo != null ? ` · ${run.floorNo}层` : ""}</strong>
+                            <strong>${escapeHtml(run.communityName)}${run.buildingName ? ` · ${escapeHtml(run.buildingName)}` : ""}${run.floorNo != null ? ` · ${run.floorNo}层` : ""}</strong>
                             <span class="trace-status ${browserCapturePendingAttentionCount(run) ? "needs_review" : "captured"}">${browserCapturePendingAttentionCount(run) ? "待复核" : "已采完成"}</span>
                           </div>
-                          <p>${formatTimestamp(run.createdAt)} · ${run.taskTypeLabel ?? "公开页采样"} · ${run.captureCount} 条原文</p>
+                          <p>${formatTimestamp(run.createdAt)} · ${escapeHtml(run.taskTypeLabel ?? "公开页采样")} · ${run.captureCount} 条原文</p>
                           <small>${
                             browserCapturePendingAttentionCount(run)
                               ? `待复核 ${browserCapturePendingAttentionCount(run)} 条`
                               : run.attentionCount
                                 ? `原文待处理 ${run.attentionCount} 条已闭环`
-                              : `导入 ${run.importRunId ?? "最新"} · 指标 ${run.metricsRunId ?? "最新"}`
+                              : `导入 ${escapeHtml(run.importRunId ?? "最新")} · 指标 ${escapeHtml(run.metricsRunId ?? "最新")}`
                           }</small>
                         </article>
                       `
@@ -7638,9 +7638,9 @@ function renderOperations() {
             <article
               class="import-run-section"
               data-browser-capture-attention-panel="true"
-              data-browser-capture-attention-run-id="${selectedCaptureRunDetail?.runId ?? ""}"
+              data-browser-capture-attention-run-id="${escapeHtml(selectedCaptureRunDetail?.runId ?? "")}"
               data-browser-capture-attention-count="${browserCapturePendingAttentionCount(selectedCaptureRunDetail)}"
-              data-browser-review-current-run-id="${selectedCaptureRunDetail?.runId ?? ""}"
+              data-browser-review-current-run-id="${escapeHtml(selectedCaptureRunDetail?.runId ?? "")}"
               data-browser-review-current-pending-count="${browserCapturePendingAttentionCount(selectedCaptureRunDetail)}"
             >
           <div class="breakdown-top">
@@ -7658,18 +7658,18 @@ function renderOperations() {
               ? `<p class="helper-text">正在加载采样批次详情…</p>`
               : selectedCaptureRunDetail?.runId
                 ? `
-                  <p>${selectedCaptureRunDetail.communityName}${selectedCaptureRunDetail.buildingName ? ` · ${selectedCaptureRunDetail.buildingName}` : ""}${selectedCaptureRunDetail.floorNo != null ? ` · ${selectedCaptureRunDetail.floorNo}层` : ""} · ${formatTimestamp(selectedCaptureRunDetail.createdAt)}</p>
-                  <small>原文 ${selectedCaptureRunDetail.captureCount ?? 0} 条 · 原文待处理 ${selectedCaptureRunDetail.attentionCount ?? 0} 条 · 待处理 ${browserCapturePendingAttentionCount(selectedCaptureRunDetail)} 条 · 已修正 ${browserCaptureResolvedCount(selectedCaptureRunDetail)} 条 · 已豁免 ${browserCaptureWaivedCount(selectedCaptureRunDetail)} 条${browserCaptureSupersededCount(selectedCaptureRunDetail) ? ` · 已接力 ${browserCaptureSupersededCount(selectedCaptureRunDetail)} 条` : ""}${selectedCaptureRunDetail.importRunId ? ` · 导入 ${selectedCaptureRunDetail.importRunId}` : ""}${selectedCaptureRunDetail.metricsRunId ? ` · 指标 ${selectedCaptureRunDetail.metricsRunId}` : ""}</small>
+                  <p>${escapeHtml(selectedCaptureRunDetail.communityName)}${selectedCaptureRunDetail.buildingName ? ` · ${escapeHtml(selectedCaptureRunDetail.buildingName)}` : ""}${selectedCaptureRunDetail.floorNo != null ? ` · ${selectedCaptureRunDetail.floorNo}层` : ""} · ${formatTimestamp(selectedCaptureRunDetail.createdAt)}</p>
+                  <small>原文 ${selectedCaptureRunDetail.captureCount ?? 0} 条 · 原文待处理 ${selectedCaptureRunDetail.attentionCount ?? 0} 条 · 待处理 ${browserCapturePendingAttentionCount(selectedCaptureRunDetail)} 条 · 已修正 ${browserCaptureResolvedCount(selectedCaptureRunDetail)} 条 · 已豁免 ${browserCaptureWaivedCount(selectedCaptureRunDetail)} 条${browserCaptureSupersededCount(selectedCaptureRunDetail) ? ` · 已接力 ${browserCaptureSupersededCount(selectedCaptureRunDetail)} 条` : ""}${selectedCaptureRunDetail.importRunId ? ` · 导入 ${escapeHtml(selectedCaptureRunDetail.importRunId)}` : ""}${selectedCaptureRunDetail.metricsRunId ? ` · 指标 ${escapeHtml(selectedCaptureRunDetail.metricsRunId)}` : ""}</small>
                   <div
                     class="action-row compact browser-task-actions browser-review-batch-toolbar"
                     data-browser-review-batch-selected-count="${selectedReviewQueueIds.length}"
                   >
                     <span class="source-pill">已选 ${selectedReviewQueueIds.length}</span>
                     <span class="source-pill">pending ${pendingReviewItems.length}</span>
-                    <button class="action compact" data-browser-capture-review-select-all="${selectedCaptureRunDetail.runId}" ${pendingReviewItems.length && !reviewBatchBusy ? "" : "disabled"}>全选当前 pending</button>
-                    <button class="action compact" data-browser-capture-review-clear-selection="${selectedCaptureRunDetail.runId}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>清空选择</button>
-                    <button class="action compact" data-browser-capture-review-batch-resolve="${selectedCaptureRunDetail.runId}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>批量标记已修正</button>
-                    <button class="action compact" data-browser-capture-review-batch-waive="${selectedCaptureRunDetail.runId}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>批量豁免并留痕</button>
+                    <button class="action compact" data-browser-capture-review-select-all="${escapeHtml(selectedCaptureRunDetail.runId)}" ${pendingReviewItems.length && !reviewBatchBusy ? "" : "disabled"}>全选当前 pending</button>
+                    <button class="action compact" data-browser-capture-review-clear-selection="${escapeHtml(selectedCaptureRunDetail.runId)}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>清空选择</button>
+                    <button class="action compact" data-browser-capture-review-batch-resolve="${escapeHtml(selectedCaptureRunDetail.runId)}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>批量标记已修正</button>
+                    <button class="action compact" data-browser-capture-review-batch-waive="${escapeHtml(selectedCaptureRunDetail.runId)}" ${selectedReviewQueueIds.length && !reviewBatchBusy ? "" : "disabled"}>批量豁免并留痕</button>
                   </div>
                   <div class="import-run-grid">
                     ${
@@ -7677,32 +7677,32 @@ function renderOperations() {
                         ? pendingReviewItems
                             .map(
                               (item) => `
-                                <article class="import-run-evidence ${item.queueId === state.selectedBrowserCaptureReviewQueueId ? "is-related" : ""}" data-browser-capture-review-queue-item="${item.queueId}">
+                                <article class="import-run-evidence ${item.queueId === state.selectedBrowserCaptureReviewQueueId ? "is-related" : ""}" data-browser-capture-review-queue-item="${escapeHtml(item.queueId)}">
                                   <div class="breakdown-top">
                                     <div class="browser-review-item-heading">
                                       <label class="browser-review-select">
-                                        <input type="checkbox" data-browser-capture-review-select="${item.queueId}" ${selectedReviewQueueIds.includes(item.queueId) ? "checked" : ""} ${reviewBatchBusy ? "disabled" : ""} />
-                                        <span>${item.businessTypeLabel} · ${item.sourceListingId}</span>
+                                        <input type="checkbox" data-browser-capture-review-select="${escapeHtml(item.queueId)}" ${selectedReviewQueueIds.includes(item.queueId) ? "checked" : ""} ${reviewBatchBusy ? "disabled" : ""} />
+                                        <span>${escapeHtml(item.businessTypeLabel)} · ${escapeHtml(item.sourceListingId)}</span>
                                       </label>
                                     </div>
                                     <span class="trace-status needs_review">${(item.attention ?? []).length} 项缺失</span>
                                   </div>
-                                  <p>${(item.attention ?? []).join(" / ")}</p>
+                                  <p>${escapeHtml((item.attention ?? []).join(" / "))}</p>
                                   <small>
-                                    ${item.buildingText ? `楼栋 ${item.buildingText}` : "楼栋待补"} ·
-                                    ${item.floorText ? `楼层 ${item.floorText}` : "楼层待补"} ·
-                                    ${item.totalFloors ? `总层数 ${item.totalFloors}` : "总层数待补"} ·
-                                    ${item.areaSqm ? `面积 ${item.areaSqm}` : "面积可选"}
+                                    ${item.buildingText ? `楼栋 ${escapeHtml(item.buildingText)}` : "楼栋待补"} ·
+                                    ${item.floorText ? `楼层 ${escapeHtml(item.floorText)}` : "楼层待补"} ·
+                                    ${item.totalFloors ? `总层数 ${escapeHtml(item.totalFloors)}` : "总层数待补"} ·
+                                    ${item.areaSqm ? `面积 ${escapeHtml(item.areaSqm)}` : "面积可选"}
                                   </small>
                                   <div class="comparison-strip">
-                                    ${item.url ? `<span class="source-pill">${truncate(item.url, 52)}</span>` : ""}
-                                    ${item.publishedAt ? `<span class="source-pill">${item.publishedAt}</span>` : ""}
+                                    ${item.url ? `<span class="source-pill">${escapeHtml(truncate(item.url, 52))}</span>` : ""}
+                                    ${item.publishedAt ? `<span class="source-pill">${escapeHtml(item.publishedAt)}</span>` : ""}
                                     <span class="source-pill">${browserCaptureReviewStatusLabel(item.status)}</span>
                                   </div>
                                   <div class="action-row compact">
-                                    <button class="action compact" data-browser-capture-review-resolve="${item.queueId}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>${state.busyBrowserCaptureReviewQueueId === item.queueId ? "处理中..." : "标记已修正"}</button>
-                                    <button class="action compact" data-browser-capture-review-waive="${item.queueId}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>豁免并留痕</button>
-                                    ${item.rawText ? `<button class="action compact" data-browser-capture-copy-raw="${item.queueId}">复制原文</button>` : ""}
+                                    <button class="action compact" data-browser-capture-review-resolve="${escapeHtml(item.queueId)}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>${state.busyBrowserCaptureReviewQueueId === item.queueId ? "处理中..." : "标记已修正"}</button>
+                                    <button class="action compact" data-browser-capture-review-waive="${escapeHtml(item.queueId)}" ${reviewBatchBusy || state.busyBrowserCaptureReviewQueueId === item.queueId ? "disabled" : ""}>豁免并留痕</button>
+                                    ${item.rawText ? `<button class="action compact" data-browser-capture-copy-raw="${escapeHtml(item.queueId)}">复制原文</button>` : ""}
                                   </div>
                                 </article>
                               `
@@ -7722,11 +7722,11 @@ function renderOperations() {
                                 (item) => `
                                   <article class="import-run-evidence">
                                     <div class="breakdown-top">
-                                      <strong>${item.businessTypeLabel} · ${item.sourceListingId}</strong>
+                                      <strong>${escapeHtml(item.businessTypeLabel)} · ${escapeHtml(item.sourceListingId)}</strong>
                                       <span class="trace-status ${item.status === "resolved" ? "resolved" : item.status === "waived" ? "medium" : "captured"}">${browserCaptureReviewStatusLabel(item.status)}</span>
                                     </div>
-                                    <p>${(item.attention ?? []).join(" / ")}</p>
-                                    <small>${item.resolutionNotes ?? "已记录处理结果。"}${item.reviewedAt ? ` · ${formatTimestamp(item.reviewedAt)}` : ""}${item.replacementRunId ? ` · 接力到 ${item.replacementRunId}` : ""}</small>
+                                    <p>${escapeHtml((item.attention ?? []).join(" / "))}</p>
+                                    <small>${escapeHtml(item.resolutionNotes ?? "已记录处理结果。")}${item.reviewedAt ? ` · ${formatTimestamp(item.reviewedAt)}` : ""}${item.replacementRunId ? ` · 接力到 ${escapeHtml(item.replacementRunId)}` : ""}</small>
                                   </article>
                                 `
                               )
@@ -7777,14 +7777,14 @@ function renderOperations() {
                     (districtItem) => `
                       <article
                         class="import-run-evidence coverage-card ${districtItem.districtId === state.districtFilter ? "is-related" : ""}"
-                        data-browser-coverage-district="${districtItem.districtId ?? ""}"
-                        data-browser-coverage-task-id="${districtItem.outstandingTask?.taskId ?? districtItem.highestPriorityTask?.taskId ?? ""}"
-                        data-community-id="${districtItem.outstandingTask?.communityId ?? districtItem.highestPriorityTask?.communityId ?? ""}"
-                        data-building-id="${districtItem.outstandingTask?.buildingId ?? districtItem.highestPriorityTask?.buildingId ?? ""}"
-                        data-floor-no="${districtItem.outstandingTask?.floorNo ?? districtItem.highestPriorityTask?.floorNo ?? ""}"
+                        data-browser-coverage-district="${escapeHtml(districtItem.districtId ?? "")}"
+                        data-browser-coverage-task-id="${escapeHtml(districtItem.outstandingTask?.taskId ?? districtItem.highestPriorityTask?.taskId ?? "")}"
+                        data-community-id="${escapeHtml(districtItem.outstandingTask?.communityId ?? districtItem.highestPriorityTask?.communityId ?? "")}"
+                        data-building-id="${escapeHtml(districtItem.outstandingTask?.buildingId ?? districtItem.highestPriorityTask?.buildingId ?? "")}"
+                        data-floor-no="${escapeHtml(districtItem.outstandingTask?.floorNo ?? districtItem.highestPriorityTask?.floorNo ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${districtItem.districtName}</strong>
+                          <strong>${escapeHtml(districtItem.districtName)}</strong>
                           <span class="trace-status ${districtItem.reviewTaskCount ? "needs_review" : districtItem.completionPct >= 100 ? "resolved" : districtItem.inProgressTaskCount ? "in_progress" : "needs_capture"}">
                             ${districtItem.reviewTaskCount ? "待复核" : districtItem.completionPct >= 100 ? "已采够" : districtItem.inProgressTaskCount ? "补采中" : "待采样"}
                           </span>
@@ -7802,7 +7802,7 @@ function renderOperations() {
                         </div>
                         <small class="ranking-note">${
                           districtItem.outstandingTask
-                            ? `${districtItem.outstandingTask.communityName ?? "待识别小区"}${districtItem.outstandingTask.buildingName ? ` · ${districtItem.outstandingTask.buildingName}` : ""}${districtItem.outstandingTask.floorNo != null ? ` · ${districtItem.outstandingTask.floorNo}层` : ""} · ${districtItem.outstandingTask.captureGoal}`
+                            ? `${escapeHtml(districtItem.outstandingTask.communityName ?? "待识别小区")}${districtItem.outstandingTask.buildingName ? ` · ${escapeHtml(districtItem.outstandingTask.buildingName)}` : ""}${districtItem.outstandingTask.floorNo != null ? ` · ${districtItem.outstandingTask.floorNo}层` : ""} · ${escapeHtml(districtItem.outstandingTask.captureGoal)}`
                             : "当前没有可继续补采的任务。"
                         }</small>
                       </article>
@@ -7831,19 +7831,19 @@ function renderOperations() {
                     return `
                       <article
                         class="import-run-evidence coverage-card ${primaryTask?.taskId === state.selectedBrowserSamplingTaskId ? "is-related" : ""}"
-                        data-browser-coverage-community-id="${communityItem.communityId ?? ""}"
-                        data-browser-coverage-task-id="${primaryTask?.taskId ?? ""}"
-                        data-community-id="${primaryTask?.communityId ?? communityItem.communityId ?? ""}"
-                        data-building-id="${primaryTask?.buildingId ?? ""}"
-                        data-floor-no="${primaryTask?.floorNo ?? ""}"
+                        data-browser-coverage-community-id="${escapeHtml(communityItem.communityId ?? "")}"
+                        data-browser-coverage-task-id="${escapeHtml(primaryTask?.taskId ?? "")}"
+                        data-community-id="${escapeHtml(primaryTask?.communityId ?? communityItem.communityId ?? "")}"
+                        data-building-id="${escapeHtml(primaryTask?.buildingId ?? "")}"
+                        data-floor-no="${escapeHtml(primaryTask?.floorNo ?? "")}"
                       >
                         <div class="breakdown-top">
-                          <strong>${index + 1}. ${communityItem.communityName}</strong>
+                          <strong>${index + 1}. ${escapeHtml(communityItem.communityName)}</strong>
                           <span class="trace-status ${coverageState}">
                             ${communityItem.reviewTaskCount ? "待复核" : communityItem.missingCount <= 0 ? "已采够" : communityItem.inProgressTaskCount ? "补采中" : "待采样"}
                           </span>
                         </div>
-                        <p>${communityItem.districtName} · ${communityItem.taskCount} 个任务 · 已补 ${communityItem.currentCount}/${communityItem.targetCount || communityItem.currentCount || 0}</p>
+                        <p>${escapeHtml(communityItem.districtName)} · ${communityItem.taskCount} 个任务 · 已补 ${communityItem.currentCount}/${communityItem.targetCount || communityItem.currentCount || 0}</p>
                         <div class="coverage-progress"><div class="coverage-progress-fill" style="width: ${communityItem.completionPct}%;"></div></div>
                         <div class="comparison-strip">
                           <span class="source-pill">完成 ${communityItem.completionPct}%</span>
@@ -7861,7 +7861,7 @@ function renderOperations() {
                         </div>
                         <small class="ranking-note">${
                           primaryTask
-                            ? `${primaryTask.taskTypeLabel} · ${browserSamplingCoverageLabel(primaryTask)} · ${primaryTask.captureGoal}`
+                            ? `${escapeHtml(primaryTask.taskTypeLabel)} · ${browserSamplingCoverageLabel(primaryTask)} · ${escapeHtml(primaryTask.captureGoal)}`
                             : "当前没有可继续补采的任务。"
                         }</small>
                       </article>
@@ -7890,21 +7890,21 @@ function renderOperations() {
       (item) => `
         <article
           class="queue-item ${item.communityId === selectedCommunityId ? "is-related" : ""} ${item.runId ? "is-imported" : ""}"
-          data-community-id="${item.communityId ?? ""}"
-          data-building-id="${item.buildingId ?? ""}"
-          data-floor-no="${item.floorNo ?? ""}"
+          data-community-id="${escapeHtml(item.communityId ?? "")}"
+          data-building-id="${escapeHtml(item.buildingId ?? "")}"
+          data-floor-no="${escapeHtml(item.floorNo ?? "")}"
         >
           <div class="breakdown-top">
-            <strong>${item.buildingNo} · ${item.floorNo ?? "待识别"} 层</strong>
+            <strong>${escapeHtml(item.buildingNo)} · ${item.floorNo ?? "待识别"} 层</strong>
             <span class="trace-status ${item.status}">${queueStatusLabel(item.status)}</span>
           </div>
-          <p>${item.normalizedPath}</p>
-          <small>${sourceLabelById(item.sourceId)} · 置信度 ${Math.round(item.confidence * 100)}% · ${item.lastActionAt}${item.batchName ? ` · ${item.batchName}` : ""}</small>
+          <p>${escapeHtml(item.normalizedPath)}</p>
+          <small>${escapeHtml(sourceLabelById(item.sourceId))} · 置信度 ${Math.round(item.confidence * 100)}% · ${escapeHtml(item.lastActionAt)}${item.batchName ? ` · ${escapeHtml(item.batchName)}` : ""}</small>
           ${
             item.runId && item.status !== "resolved"
               ? `
                 <div class="queue-item-footer">
-                  <button class="action compact" data-review-run-id="${item.runId}" data-review-queue-id="${item.queueId}">
+                  <button class="action compact" data-review-run-id="${escapeHtml(item.runId)}" data-review-queue-id="${escapeHtml(item.queueId)}">
                     ${state.busyReviewQueueId === item.queueId ? "回写中..." : "标记已复核"}
                   </button>
                 </div>
@@ -7924,7 +7924,7 @@ function renderOperations() {
       </div>
       ${
         state.opsMessage && state.opsMessageContext === "database"
-          ? `<div class="ops-feedback ${state.opsMessageTone}">${state.opsMessage}</div>`
+          ? `<div class="ops-feedback ${state.opsMessageTone}">${escapeHtml(state.opsMessage)}</div>`
           : ""
       }
       <div class="comparison-strip">
@@ -7945,7 +7945,7 @@ function renderOperations() {
                   <article
                     class="queue-item refresh-anomaly-item ${item.status === "pending" || item.status === "needs_sample" ? "is-imported" : ""}"
                     data-refresh-anomaly-id="${escapeHtml(anomalyId)}"
-                    ${canNavigate ? `data-community-id="${item.communityId ?? ""}" data-building-id="${item.buildingId ?? ""}" data-floor-no="${item.floorNo ?? ""}"` : ""}
+                    ${canNavigate ? `data-community-id="${escapeHtml(item.communityId ?? "")}" data-building-id="${escapeHtml(item.buildingId ?? "")}" data-floor-no="${escapeHtml(item.floorNo ?? "")}"` : ""}
                   >
                     <div class="breakdown-top">
                       <strong>${escapeHtml(item.label ?? item.typeLabel ?? "刷新质检")}</strong>
@@ -7993,7 +7993,7 @@ function renderOperations() {
       <div class="comparison-strip">
         <span class="source-pill">重点区 ${anchorWatchItems.filter((item) => item.focusScope === "priority").length}</span>
         <span class="source-pill">有候选建议 ${anchorWatchItems.filter((item) => (item.candidateSuggestions ?? []).length > 0).length}</span>
-        <span class="source-pill">筛选 ${state.districtFilter === "all" ? "全上海" : districtLabelById(state.districtFilter)}</span>
+        <span class="source-pill">筛选 ${state.districtFilter === "all" ? "全上海" : escapeHtml(districtLabelById(state.districtFilter))}</span>
       </div>
       <div class="import-run-grid">
         ${
@@ -8006,25 +8006,25 @@ function renderOperations() {
                   const suggestionText = topCandidate?.address ?? topCandidate?.query ?? item.sourceRefs?.[0] ?? "暂未命中可靠候选。";
                   const suggestionSource = topCandidate?.matchSource ?? topCandidate?.match_source ?? item.previewAnchorSource ?? "candidate";
                   return `
-                    <article class="queue-item ${item.communityId === state.selectedCommunityId ? "is-related" : ""}" data-community-id="${item.communityId}">
+                    <article class="queue-item ${item.communityId === state.selectedCommunityId ? "is-related" : ""}" data-community-id="${escapeHtml(item.communityId)}">
                       <div class="breakdown-top">
-                        <strong>${item.communityName}</strong>
-                        <span class="trace-status ${item.focusScope === "priority" ? "high" : "medium"}">${item.priorityLabel}</span>
+                        <strong>${escapeHtml(item.communityName)}</strong>
+                        <span class="trace-status ${item.focusScope === "priority" ? "high" : "medium"}">${escapeHtml(item.priorityLabel)}</span>
                       </div>
-                      <p>${item.districtName} · ${item.sampleStatusLabel}</p>
+                      <p>${escapeHtml(item.districtName)} · ${escapeHtml(item.sampleStatusLabel)}</p>
                       <div class="comparison-strip">
-                        <span class="source-pill">${suggestionName}</span>
-                        <span class="source-pill">${suggestionSource}</span>
+                        <span class="source-pill">${escapeHtml(suggestionName)}</span>
+                        <span class="source-pill">${escapeHtml(suggestionSource)}</span>
                         <span class="source-pill">${scoreLabel}</span>
                       </div>
-                      <small>${suggestionText}</small>
+                      <small>${escapeHtml(suggestionText)}</small>
                       ${
                         item.latestAnchorReview?.reviewedAt
                           ? `<small>最近确认 ${formatTimestamp(item.latestAnchorReview.reviewedAt)} · ${anchorDecisionLabel(item.latestAnchorReview.decisionState ?? item.anchorDecisionState)}</small>`
                           : ""
                       }
                       <div class="queue-item-footer anchor-action-row">
-                        <button class="action compact primary" data-anchor-confirm-community-id="${item.communityId}" data-anchor-reference-run-id="${item.referenceRunId ?? ""}">
+                        <button class="action compact primary" data-anchor-confirm-community-id="${escapeHtml(item.communityId)}" data-anchor-reference-run-id="${escapeHtml(item.referenceRunId ?? "")}">
                           ${state.busyAnchorCommunityId === item.communityId ? "写回中..." : "确认当前候选"}
                         </button>
                       </div>
@@ -8762,10 +8762,10 @@ function refreshReportPathLabel(path) {
 function renderSourceActions(source, options = {}) {
   const compact = options.compact ?? false;
   const actions = [
-    source.applyUrl ? `<a class="source-link" href="${source.applyUrl}" target="_blank" rel="noreferrer">申请入口</a>` : "",
-    source.docsUrl ? `<a class="source-link" href="${source.docsUrl}" target="_blank" rel="noreferrer">文档</a>` : "",
-    source.platformUrl ? `<a class="source-link" href="${source.platformUrl}" target="_blank" rel="noreferrer">平台</a>` : "",
-    source.guideUrl ? `<a class="source-link" href="${source.guideUrl}" target="_blank" rel="noreferrer">接入说明</a>` : ""
+    source.applyUrl ? `<a class="source-link" href="${escapeHtml(source.applyUrl)}" target="_blank" rel="noreferrer">申请入口</a>` : "",
+    source.docsUrl ? `<a class="source-link" href="${escapeHtml(source.docsUrl)}" target="_blank" rel="noreferrer">文档</a>` : "",
+    source.platformUrl ? `<a class="source-link" href="${escapeHtml(source.platformUrl)}" target="_blank" rel="noreferrer">平台</a>` : "",
+    source.guideUrl ? `<a class="source-link" href="${escapeHtml(source.guideUrl)}" target="_blank" rel="noreferrer">接入说明</a>` : ""
   ].filter(Boolean);
   if (!actions.length) {
     return "";
