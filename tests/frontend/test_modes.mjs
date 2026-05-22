@@ -8,7 +8,6 @@ import {
   defaultFiltersFor,
   normalizeInitialFiltersFor,
   resolveDefaultFilters,
-  districtColorFor,
 } from "../../frontend/user/modules/modes.js";
 
 test("MODES: only the rent-sale-ratio workspace is exposed", () => {
@@ -69,52 +68,7 @@ test("resolveDefaultFilters: yield mode starts without restrictive filters", () 
   assert.deepEqual(resolveDefaultFilters("yield", null), {});
 });
 
-test("resolveDefaultFilters: home with empty prefs returns empty", () => {
-  assert.deepEqual(resolveDefaultFilters("home", null), {});
-  assert.deepEqual(resolveDefaultFilters("home", {}), {});
-  assert.deepEqual(resolveDefaultFilters("home", { budget_max_wan: null, districts: [] }), {});
-});
-
-test("resolveDefaultFilters: home with budget pulls maxBudget", () => {
-  assert.deepEqual(
-    resolveDefaultFilters("home", { budget_max_wan: 1200, districts: [] }),
-    { maxBudget: 1200 },
-  );
-});
-
-test("resolveDefaultFilters: home with districts uses first district", () => {
-  assert.deepEqual(
-    resolveDefaultFilters("home", { budget_max_wan: 1200, districts: ["pudong", "jingan"] }),
-    { maxBudget: 1200, district: "pudong" },
-  );
-});
-
-test("resolveDefaultFilters: city mode is empty regardless of prefs", () => {
+test("resolveDefaultFilters: legacy mode ids no longer pull preference filters", () => {
+  assert.deepEqual(resolveDefaultFilters("home", { budget_max_wan: 1200, districts: ["pudong"] }), {});
   assert.deepEqual(resolveDefaultFilters("city", { budget_max_wan: 1200 }), {});
-});
-
-test("districtColorFor: null/NaN returns dim", () => {
-  assert.equal(districtColorFor(null, 4), "var(--text-dim)");
-  assert.equal(districtColorFor(Number.NaN, 4), "var(--text-dim)");
-  assert.equal(districtColorFor(4, null), "var(--text-dim)");
-});
-
-test("districtColorFor: value above mean by > 0.2 → up", () => {
-  assert.equal(districtColorFor(5, 4), "var(--up)");
-});
-
-test("districtColorFor: value below mean by > 0.2 → down", () => {
-  assert.equal(districtColorFor(3, 4), "var(--down)");
-});
-
-test("districtColorFor: value within ±0.2 of mean → warn", () => {
-  assert.equal(districtColorFor(4.1, 4), "var(--warn)");
-  assert.equal(districtColorFor(3.9, 4), "var(--warn)");
-});
-
-test("districtColorFor: handles fractional yield (auto-scale 0.04 → 4)", () => {
-  // The function should accept either fraction or percent — same heuristic as
-  // yieldColorFor — to handle staged data that stores yield as 0.04 vs 4.0.
-  assert.equal(districtColorFor(0.05, 0.04), "var(--up)");
-  assert.equal(districtColorFor(0.03, 0.04), "var(--down)");
 });

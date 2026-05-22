@@ -74,7 +74,6 @@ export const api = {
   opportunities: (params) => getJSON(`/api/v2/opportunities${buildQuery(params)}`),
   decisionMemo: (payload) => postJSON("/api/v2/decision-memo", payload),
   mapBuildings: (params) => getJSON(`/api/v2/map/buildings${buildQuery(params)}`),
-  mapDistricts: (params) => getJSON(`/api/v2/map/districts${buildQuery(params)}`),
   // OSM footprints are large; bypass the in-memory cache so viewport changes
   // re-fetch with the right bbox each time.
   mapOsmFootprints: (params) => getJSONFresh(`/api/v2/map/osm-footprints${buildQuery(params)}`),

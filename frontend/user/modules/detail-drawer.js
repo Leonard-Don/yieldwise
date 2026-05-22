@@ -174,7 +174,7 @@ export function initDrawer({ root, store }) {
   }
 
   function renderDistrictBody({ detail }) {
-    const kpis = pickKpisFor("city", {
+    const kpis = pickKpisFor("district", {
       yield: detail.yield,
       paybackYears: detail.paybackYears,
       score: detail.score,

@@ -133,19 +133,7 @@ const KPI_MAP = {
     }
     return tiles;
   },
-  home: (d) => {
-    const tiles = [
-      { key: "price", label: "中位总价", value: formatWan(d.saleMedianWan) },
-      { key: "rent", label: "中位月租", value: formatYuan(d.rentMedianMonthly) },
-      { key: "payback", label: "回本年限", value: formatYears(d.paybackYears) },
-      { key: "sample", label: "样本量", value: formatInt(d.sampleSize) },
-    ];
-    if (d.osmFootprintCount > 0) {
-      tiles.splice(3, 0, { key: "footprints", label: "实拍楼栋", value: formatBuildingCount(d.osmFootprintCount) });
-    }
-    return tiles;
-  },
-  city: (d) => [
+  district: (d) => [
     { key: "yield", label: "均租售比", value: formatPct(normalizeYieldPct(d.yield ?? d.yieldAvg)) },
     { key: "payback", label: "均回本年限", value: formatYears(d.paybackYears) },
     { key: "score", label: "均机会分", value: formatInt(d.score) },

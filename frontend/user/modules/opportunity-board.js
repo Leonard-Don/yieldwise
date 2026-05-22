@@ -69,13 +69,13 @@ export async function initBoard({ container, store }) {
     countEl.textContent = String(lastItems.length);
     publishCount(lastItems.length);
     list.innerHTML = lastItems
-      .map((item) => renderRow(item, mode, state.selection, state.comparisonItems, state.mode))
+      .map((item) => renderRow(item, mode, state.selection, state.comparisonItems))
       .join("");
     list.querySelectorAll("[data-comparison-add]").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         const item = lastItems.find((it) => String(it.id) === button.dataset.id);
-        const candidate = candidateFromItem(item, state.mode);
+        const candidate = candidateFromItem(item);
         button.dispatchEvent(
           new CustomEvent("atlas:add-comparison", {
             bubbles: true,
@@ -103,10 +103,10 @@ export async function initBoard({ container, store }) {
   }
 }
 
-function renderRow(item, mode, selection, comparisonItems, modeId) {
+function renderRow(item, mode, selection, comparisonItems) {
   const selected =
     selection && (selection.id === item.id || selection.id === item.primaryBuildingId);
-  const candidate = candidateFromItem(item, modeId);
+  const candidate = candidateFromItem(item);
   const compared = candidate && isCompared(comparisonItems, candidate.target_id, candidate.target_type);
   const nameColumn = mode.boardColumns.find((col) => col.key === "name");
   const metricColumns = mode.boardColumns.filter((col) => col.key !== "name");

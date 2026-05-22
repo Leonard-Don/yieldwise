@@ -2,7 +2,6 @@ import { api } from "./api.js";
 import { loadAmap } from "./runtime.js";
 import {
   yieldColorFor,
-  districtColorFor,
   filtersToApiParams,
   resolveDefaultFilters,
 } from "./modes.js?v=20260519-no-notes";
@@ -58,23 +57,12 @@ export async function initMap({ container, store }) {
   async function renderForState(state) {
     const myToken = ++renderToken;
     clearOverlays();
-    if (state.mode === "city") {
-      opportunitySelections.clear();
-      const next = await renderDistricts({ AMap, map, store });
-      if (myToken !== renderToken) {
-        // a newer mode-change won — discard these overlays
-        map.remove(next);
-        return;
-      }
-      currentOverlays = next;
-    } else {
-      const next = await renderOpportunities({ AMap, map, store, state, opportunitySelections });
-      if (myToken !== renderToken) {
-        map.remove(next);
-        return;
-      }
-      currentOverlays = next;
+    const next = await renderOpportunities({ AMap, map, store, state, opportunitySelections });
+    if (myToken !== renderToken) {
+      map.remove(next);
+      return;
     }
+    currentOverlays = next;
   }
 
   currentMapKey = mapKeyFor(store.get());
@@ -341,85 +329,6 @@ async function renderOpportunities({ AMap, map, store, state, opportunitySelecti
     fitMarkerOverlays(map, markerOverlays);
   }
   return overlays;
-}
-
-const districtBoundaryCache = new Map();
-
-async function renderDistricts({ AMap, map, store }) {
-  const overlays = [];
-  let payload;
-  try {
-    payload = await api.mapDistricts();
-  } catch (err) {
-    console.error("[atlas:map] districts load failed", err);
-    return overlays;
-  }
-
-  const districts = payload.districts || [];
-  const summary = payload.summary || {};
-  const meanYield = summary.avgYield;
-
-  if (!AMap.DistrictSearch) {
-    console.warn("[atlas:map] AMap.DistrictSearch unavailable — falling back to label markers");
-    for (const district of districts) {
-      // No polygon plugin — skip silently. Phase 6 may add label markers fallback.
-    }
-    return overlays;
-  }
-
-  const search = new AMap.DistrictSearch({
-    level: "district",
-    extensions: "all",
-    subdistrict: 0,
-    showbiz: false,
-  });
-
-  await Promise.all(
-    districts.map(async (district) => {
-      const boundaries = await fetchBoundariesCached(search, district.name);
-      const color = districtColorFor(district.yield, meanYield);
-      for (const path of boundaries) {
-        const polygon = new AMap.Polygon({
-          path,
-          strokeColor: color,
-          strokeWeight: 1,
-          strokeOpacity: 0.85,
-          fillColor: color,
-          fillOpacity: 0.25,
-          bubble: false,
-        });
-        polygon.setExtData({ districtId: district.id, props: district });
-        polygon.on("click", () => {
-          store.set({
-            selection: { type: "district", id: district.id, props: district },
-          });
-        });
-        overlays.push(polygon);
-      }
-    }),
-  );
-
-  if (overlays.length > 0) map.add(overlays);
-  return overlays;
-}
-
-function fetchBoundariesCached(search, districtName) {
-  if (districtBoundaryCache.has(districtName)) {
-    return Promise.resolve(districtBoundaryCache.get(districtName));
-  }
-  return new Promise((resolve) => {
-    search.search(districtName, (status, result) => {
-      if (status !== "complete") {
-        districtBoundaryCache.set(districtName, []);
-        resolve([]);
-        return;
-      }
-      const first = result?.districtList?.[0];
-      const boundaries = first?.boundaries ?? [];
-      districtBoundaryCache.set(districtName, boundaries);
-      resolve(boundaries);
-    });
-  });
 }
 
 function createOverlay({ AMap, geometry, color }) {

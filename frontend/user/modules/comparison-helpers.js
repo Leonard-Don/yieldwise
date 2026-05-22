@@ -64,12 +64,11 @@ export function comparisonCount(items) {
   return normalizeComparisonItems(items).length;
 }
 
-export function candidateFromItem(item, modeId) {
+export function candidateFromItem(item) {
   if (!item || typeof item !== "object") return null;
-  const targetType = modeId === "city" ? "district" : "community";
   return normalizeComparisonItem({
     target_id: item.id,
-    target_type: targetType,
+    target_type: "community",
     target_name: item.name,
     district_name: item.districtName,
     yield_pct: item.yield,

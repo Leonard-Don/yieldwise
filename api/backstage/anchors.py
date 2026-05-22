@@ -150,11 +150,7 @@ def confirm_community_anchor(
     *,
     action: str,
     candidate_index: int | None = None,
-    center_lng: float | None = None,
-    center_lat: float | None = None,
-    anchor_source_label: str | None = None,
     review_note: str | None = None,
-    alias_hint: str | None = None,
     reference_run_id: str | None = None,
     review_owner: str = "atlas-ui",
 ) -> dict[str, Any] | None:

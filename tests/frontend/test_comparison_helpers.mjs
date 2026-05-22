@@ -34,18 +34,7 @@ test("add/remove/isCompared keep a stable comparison list", () => {
   assert.deepEqual(removeComparisonItem(added, "a", "community").map((item) => item.target_id), ["b"]);
 });
 
-test("candidateFromItem: city mode creates a district target", () => {
-  const candidate = candidateFromItem(
-    { id: "pudong", name: "浦东新区", yield: 4.2, score: 88 },
-    "city",
-  );
-
-  assert.equal(candidate.target_type, "district");
-  assert.equal(candidate.target_id, "pudong");
-  assert.equal(candidate.yield_pct, 4.2);
-});
-
-test("candidateFromItem: yield mode creates a community target with quality", () => {
+test("candidateFromItem: board rows create community targets with quality", () => {
   const candidate = candidateFromItem(
     {
       id: "x",
@@ -55,7 +44,6 @@ test("candidateFromItem: yield mode creates a community target with quality", ()
       score: 88,
       quality: { status: "usable", label: "可用", sampleLabel: "售 4 / 租 5" },
     },
-    "yield",
   );
 
   assert.equal(candidate.target_type, "community");

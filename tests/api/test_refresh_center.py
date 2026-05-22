@@ -53,7 +53,8 @@ def test_refresh_center_report_can_run_without_persisting(client) -> None:
     assert payload["reports"]["nextReportDir"] == "tmp/refresh-reports"
 
 
-def test_refresh_center_execute_records_job_without_metrics(client, isolated_refresh_center_paths: Path) -> None:
+@pytest.mark.usefixtures("isolated_refresh_center_paths")
+def test_refresh_center_execute_records_job_without_metrics(client) -> None:
     response = client.post("/api/ops/refresh-center/execute", json={"refreshMetrics": False})
 
     assert response.status_code == 200
@@ -73,7 +74,8 @@ def test_refresh_center_execute_records_job_without_metrics(client, isolated_ref
     assert any(item["jobId"] == payload["jobId"] for item in jobs)
 
 
-def test_refresh_center_anomaly_queue_can_record_review_state(client, isolated_refresh_center_paths: Path) -> None:
+@pytest.mark.usefixtures("isolated_refresh_center_paths")
+def test_refresh_center_anomaly_queue_can_record_review_state(client) -> None:
     queue_response = client.get("/api/ops/refresh-center/anomalies")
 
     assert queue_response.status_code == 200

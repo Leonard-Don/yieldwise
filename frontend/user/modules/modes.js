@@ -35,24 +35,6 @@ export function yieldColorFor(yieldPct) {
   return "var(--up)";
 }
 
-function normalizeYieldScalar(value) {
-  if (value === null || value === undefined) return null;
-  const num = Number(value);
-  if (Number.isNaN(num)) return null;
-  // Match the percent-vs-fraction heuristic in map.js: < 1 means fraction.
-  return num < 1 ? num * 100 : num;
-}
-
-export function districtColorFor(value, mean) {
-  const v = normalizeYieldScalar(value);
-  const m = normalizeYieldScalar(mean);
-  if (v === null || m === null) return "var(--text-dim)";
-  const delta = v - m;
-  if (delta > 0.2) return "var(--up)";
-  if (delta < -0.2) return "var(--down)";
-  return "var(--warn)";
-}
-
 export function defaultFiltersFor(modeId) {
   return { ...(getMode(modeId).defaultFilters || {}) };
 }
@@ -140,22 +122,6 @@ export function prunedFilters(filters) {
   return out;
 }
 
-export function resolveDefaultFilters(modeId, userPrefs) {
-  // Legacy "home" preferences are still useful as budget/area filters, but
-  // the product no longer exposes them as a separate mode.
-  if (modeId === "home") {
-    const out = {};
-    if (userPrefs && typeof userPrefs === "object") {
-      const budget = userPrefs.budget_max_wan;
-      if (budget !== null && budget !== undefined && budget !== "") {
-        out.maxBudget = Number(budget);
-      }
-      const districts = userPrefs.districts;
-      if (Array.isArray(districts) && districts.length > 0) {
-        out.district = String(districts[0]);
-      }
-    }
-    return out;
-  }
+export function resolveDefaultFilters() {
   return { ...defaultFiltersFor(PRIMARY_MODE_ID) };
 }

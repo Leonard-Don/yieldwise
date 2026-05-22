@@ -270,11 +270,7 @@ def community_anchor_confirmation(community_id: str, payload: dict = Body(...)) 
             community_id,
             action=action,
             candidate_index=payload.get("candidate_index"),
-            center_lng=payload.get("center_lng"),
-            center_lat=payload.get("center_lat"),
-            anchor_source_label=payload.get("anchor_source_label"),
             review_note=payload.get("review_note"),
-            alias_hint=payload.get("alias_hint"),
             reference_run_id=payload.get("reference_run_id"),
             review_owner=str(payload.get("review_owner") or "atlas-ui"),
         )
