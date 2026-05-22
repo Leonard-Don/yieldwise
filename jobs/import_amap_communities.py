@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
@@ -43,6 +44,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from api.env import load_local_env  # noqa: E402
+from api.geo_datum import gcj02_to_wgs84  # noqa: E402
 
 load_local_env()
 
@@ -107,7 +109,9 @@ def fetch_district_pois(key: str, district_name: str, *, pages: int, offset: int
 
 def slugify(name: str, district_id: str, used: set[str]) -> str:
     cleaned = re.sub(r"[\s（）()【】\[\]：:·\-—,，.。!！?？]+", "", name)
-    digest = format(abs(hash((district_id, cleaned))) % 10**9, "09d")
+    # Deterministic digest — builtin hash() is PYTHONHASHSEED-salted (id churn).
+    fingerprint = hashlib.sha256(f"{district_id}\x1f{cleaned}".encode("utf-8")).hexdigest()
+    digest = format(int(fingerprint, 16) % 10**9, "09d")
     base = f"{district_id}-{digest}"
     cid = base
     n = 2
@@ -143,7 +147,12 @@ def normalize_pois(pois: list[dict], district_id: str, used_ids: set[str], used_
         loc = parse_loc(p.get("location"))
         if not loc:
             continue
+        # AMap's Place Search returns coordinates in GCJ-02 ("火星坐标系").
+        # Keep the GCJ-02 pair as center_lng/center_lat (the frontend renders
+        # on AMap GCJ-02 tiles) and additionally carry the true WGS-84 pair so
+        # cross-source matching against OSM (WGS-84) is datum-consistent.
         lng, lat = loc
+        wgs_lng, wgs_lat = gcj02_to_wgs84(lng, lat)
         key = f"{district_id}::{name}"
         if key in used_names:
             continue
@@ -159,6 +168,9 @@ def normalize_pois(pois: list[dict], district_id: str, used_ids: set[str], used_
             "source_confidence": 0.93,
             "center_lng": f"{lng:.6f}",
             "center_lat": f"{lat:.6f}",
+            "coordinate_datum": "gcj02",
+            "center_lng_wgs84": f"{wgs_lng:.6f}",
+            "center_lat_wgs84": f"{wgs_lat:.6f}",
             "anchor_source": "amap_place",
             "anchor_quality": "0.92",
             "source_refs": [f"amap-place://{p.get('id') or name}"],
@@ -228,7 +240,9 @@ def main() -> int:
 
     csv_fields = [
         "district_id", "community_id", "community_name", "aliases",
-        "center_lng", "center_lat", "anchor_source", "anchor_quality",
+        "center_lng", "center_lat", "coordinate_datum",
+        "center_lng_wgs84", "center_lat_wgs84",
+        "anchor_source", "anchor_quality",
         "source_confidence", "alias_source", "alias_confidence",
     ]
     write_csv(REF_DIR / "community_dictionary_enriched.csv", all_communities, csv_fields)

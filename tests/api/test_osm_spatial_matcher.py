@@ -1,11 +1,14 @@
 """Unit tests for OSM-to-community spatial matcher."""
 from __future__ import annotations
 
+from api.geo_datum import gcj02_to_wgs84
 from jobs.match_osm_to_communities import (
     dist_meters,
     index_communities_by_district,
     match_feature,
+    parse_args,
     polygon_centroid,
+    resolve_community_wgs84,
 )
 
 
@@ -90,3 +93,72 @@ def test_match_feature_skips_non_polygon() -> None:
     community, distance = match_feature(feat, {"any": []}, max_meters=200.0)
     assert community == {}
     assert distance is None
+
+
+# ── Datum resolution ──────────────────────────────────────────────────────
+# OSM footprints are WGS-84; AMAP community centroids are GCJ-02. The matcher
+# resolves every community to WGS-84 before any distance comparison.
+
+
+def test_resolve_community_untagged_pair_is_converted_from_gcj02() -> None:
+    # An untagged center_lng/center_lat pair is treated as GCJ-02 (the AMAP
+    # default) and converted to WGS-84.
+    row = {"center_lng": "121.500000", "center_lat": "31.200000"}
+    resolved = resolve_community_wgs84(row)
+    expected = gcj02_to_wgs84(121.5, 31.2)
+    assert resolved is not None
+    assert abs(resolved[0] - expected[0]) < 1e-9
+    assert abs(resolved[1] - expected[1]) < 1e-9
+    # And it actually moved — not the raw GCJ-02 numbers.
+    assert resolved != (121.5, 31.2)
+
+
+def test_resolve_community_prefers_explicit_wgs84_pair() -> None:
+    # When an explicit WGS-84 pair is present it is trusted verbatim.
+    row = {
+        "center_lng": "121.500000",
+        "center_lat": "31.200000",
+        "center_lng_wgs84": "121.495400",
+        "center_lat_wgs84": "31.198300",
+    }
+    resolved = resolve_community_wgs84(row)
+    assert resolved == (121.4954, 31.1983)
+
+
+def test_resolve_community_wgs84_datum_tag_passes_through() -> None:
+    # coordinate_datum=wgs84 means the primary pair is already WGS-84.
+    row = {"center_lng": "121.4954", "center_lat": "31.1983", "coordinate_datum": "wgs84"}
+    assert resolve_community_wgs84(row) == (121.4954, 31.1983)
+
+
+def test_resolve_community_missing_coords_returns_none() -> None:
+    assert resolve_community_wgs84({}) is None
+    assert resolve_community_wgs84({"center_lng": "", "center_lat": ""}) is None
+    assert resolve_community_wgs84({"center_lng": 0, "center_lat": 0}) is None
+
+
+def test_datum_correction_changes_match_outcome() -> None:
+    # The crux of the bug: a building footprint in true WGS-84 sits ~480 m from
+    # the *raw* GCJ-02 community centroid but right on top of the *converted*
+    # WGS-84 centroid. With the correction the match flips from miss to hit at
+    # a real building-scale threshold.
+    gcj_centroid = (121.500000, 31.200000)  # what AMAP stores
+    wgs_centroid = gcj02_to_wgs84(*gcj_centroid)  # the true location
+    # OSM footprint centroid sits ~15 m from the true WGS-84 centroid.
+    osm_cx = wgs_centroid[0] + 0.00015
+    osm_cy = wgs_centroid[1]
+
+    raw_gap = dist_meters(osm_cx, osm_cy, *gcj_centroid)
+    corrected_gap = dist_meters(osm_cx, osm_cy, *wgs_centroid)
+
+    assert raw_gap > 300  # uncorrected: way beyond any building-scale radius
+    assert corrected_gap < 60  # corrected: a real, tight match
+
+
+def test_parse_args_preserves_legacy_default_match_radius(monkeypatch) -> None:
+    # Existing no-argument matcher runs used a 200 m radius. Datum correction
+    # changes *what* is measured, but the CLI default stays compatible so
+    # unattended scripts do not silently shrink their output set.
+    monkeypatch.setattr("sys.argv", ["match_osm_to_communities.py"])
+    args = parse_args()
+    assert args.max_meters == 200.0

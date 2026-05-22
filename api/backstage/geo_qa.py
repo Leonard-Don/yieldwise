@@ -21,6 +21,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from ..geo_datum import coordinate_datum_from_properties
 from ..persistence import postgres_data_snapshot, query_row, query_rows
 
 
@@ -1090,6 +1091,7 @@ def build_geo_asset_run_view(detail: dict[str, Any]) -> dict[str, Any]:
                 "buildingName": (feature.get("properties") or {}).get("building_name"),
                 "sourceRef": (feature.get("properties") or {}).get("source_ref"),
                 "resolutionNotes": (feature.get("properties") or {}).get("resolution_notes"),
+                "coordinateDatum": coordinate_datum_from_properties(feature.get("properties") or {}),
                 "geometryType": (feature.get("geometry") or {}).get("type"),
             }
             for feature in detail.get("features", [])[:8]
@@ -1108,6 +1110,7 @@ def feature_identity(feature: dict[str, Any]) -> dict[str, Any]:
         "districtName": properties.get("district_name"),
         "sourceRef": properties.get("source_ref"),
         "resolutionNotes": properties.get("resolution_notes"),
+        "coordinateDatum": coordinate_datum_from_properties(properties),
         "geometryType": (feature.get("geometry") or {}).get("type"),
     }
 

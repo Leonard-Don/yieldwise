@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import urlsplit, urlunsplit
 
+from .geo_datum import gcj02_to_wgs84, normalize_coordinate_datum, wgs84_to_gcj02
 from .mock_data import DISTRICTS
 from .provider_adapters import provider_readiness_snapshot
 
@@ -385,8 +386,69 @@ def _district_rows_from_catalog(communities: list[dict[str, Any]]) -> list[dict[
     ]
 
 
+def _coerce_coord(value: Any) -> float | None:
+    """Parse a coordinate that may arrive as float, int, or string."""
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_datum_pair(
+    row: dict[str, Any],
+) -> tuple[tuple[float, float] | None, tuple[float, float] | None]:
+    """Resolve a reference row's anchor into BOTH datums: (gcj02, wgs84).
+
+    Reference rows historically carry a single ``center_lng`` / ``center_lat``
+    pair with no datum tag. The dominant source is AMAP Place Search, whose
+    coordinates are GCJ-02 — so an untagged pair is treated as GCJ-02. Callers
+    may now also supply:
+
+    - ``coordinate_datum``: ``"gcj02"`` (default) or ``"wgs84"`` — the datum of
+      the primary ``center_lng`` / ``center_lat`` pair.
+    - ``center_lng_wgs84`` / ``center_lat_wgs84``: an explicit WGS-84 pair
+      (e.g. precomputed by the AMAP importer). When present it is trusted
+      verbatim rather than re-derived.
+
+    Whichever datum is missing is filled by converting the one that is present,
+    so ``centroid_gcj02`` and ``centroid_wgs84`` are always a true datum pair —
+    never the same numbers copied into both columns.
+    """
+    primary = (_coerce_coord(row.get("center_lng")), _coerce_coord(row.get("center_lat")))
+    explicit_wgs = (
+        _coerce_coord(row.get("center_lng_wgs84")),
+        _coerce_coord(row.get("center_lat_wgs84")),
+    )
+    datum = normalize_coordinate_datum(row.get("coordinate_datum")) or "gcj02"
+
+    gcj: tuple[float, float] | None = None
+    wgs: tuple[float, float] | None = None
+
+    if primary[0] is not None and primary[1] is not None:
+        if datum == "wgs84":
+            wgs = (primary[0], primary[1])
+            gcj = wgs84_to_gcj02(*wgs)
+        else:
+            gcj = (primary[0], primary[1])
+            wgs = gcj02_to_wgs84(*gcj)
+
+    # An explicit WGS-84 pair overrides a derived one (and back-fills GCJ-02).
+    if explicit_wgs[0] is not None and explicit_wgs[1] is not None:
+        wgs = (explicit_wgs[0], explicit_wgs[1])
+        if gcj is None:
+            gcj = wgs84_to_gcj02(*wgs)
+
+    return gcj, wgs
+
+
 def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], buildings: list[dict[str, Any]]) -> None:
     for community in communities:
+        gcj, wgs = _resolve_datum_pair(community)
+        gcj_lng, gcj_lat = (gcj if gcj else (None, None))
+        wgs_lng, wgs_lat = (wgs if wgs else (None, None))
+        has_anchor = gcj is not None or wgs is not None
         cur.execute(
             """
             INSERT INTO communities (
@@ -395,6 +457,7 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
                 name,
                 aliases_json,
                 centroid_gcj02,
+                centroid_wgs84,
                 source_confidence,
                 anchor_source,
                 anchor_quality,
@@ -410,6 +473,10 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
                     WHEN %s IS NOT NULL AND %s IS NOT NULL THEN ST_SetSRID(ST_MakePoint(%s, %s), 4326)
                     ELSE NULL
                 END,
+                CASE
+                    WHEN %s IS NOT NULL AND %s IS NOT NULL THEN ST_SetSRID(ST_MakePoint(%s, %s), 4326)
+                    ELSE NULL
+                END,
                 %s,
                 %s,
                 %s,
@@ -421,6 +488,7 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
                 name = EXCLUDED.name,
                 aliases_json = EXCLUDED.aliases_json,
                 centroid_gcj02 = COALESCE(EXCLUDED.centroid_gcj02, communities.centroid_gcj02),
+                centroid_wgs84 = COALESCE(EXCLUDED.centroid_wgs84, communities.centroid_wgs84),
                 source_confidence = EXCLUDED.source_confidence,
                 anchor_source = COALESCE(EXCLUDED.anchor_source, communities.anchor_source),
                 anchor_quality = COALESCE(EXCLUDED.anchor_quality, communities.anchor_quality),
@@ -433,14 +501,18 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
                 community["district_id"],
                 community["community_name"],
                 Jsonb(sorted({alias for alias in community.get("aliases", []) if alias})),
-                community.get("center_lng"),
-                community.get("center_lat"),
-                community.get("center_lng"),
-                community.get("center_lat"),
+                gcj_lng,
+                gcj_lat,
+                gcj_lng,
+                gcj_lat,
+                wgs_lng,
+                wgs_lat,
+                wgs_lng,
+                wgs_lat,
                 float(community.get("source_confidence") or 0.82),
                 community.get("anchor_source"),
                 community.get("anchor_quality"),
-                community.get("anchor_decision_state") or ("confirmed" if community.get("center_lng") not in (None, "") and community.get("center_lat") not in (None, "") else "pending"),
+                community.get("anchor_decision_state") or ("confirmed" if has_anchor else "pending"),
                 community.get("latest_anchor_reviewed_at"),
             ),
         )
@@ -462,15 +534,25 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
             )
 
     for building in buildings:
+        b_gcj, b_wgs = _resolve_datum_pair(building)
+        b_gcj_lng, b_gcj_lat = (b_gcj if b_gcj else (None, None))
+        b_wgs_lng, b_wgs_lat = (b_wgs if b_wgs else (None, None))
         cur.execute(
             """
-            INSERT INTO buildings (building_id, community_id, building_no, total_floors, unit_count, geom_gcj02)
+            INSERT INTO buildings (
+                building_id, community_id, building_no, total_floors, unit_count,
+                geom_gcj02, geom_wgs84
+            )
             VALUES (
                 %s,
                 %s,
                 %s,
                 %s,
                 %s,
+                CASE
+                    WHEN %s IS NOT NULL AND %s IS NOT NULL THEN ST_SetSRID(ST_MakePoint(%s, %s), 4326)
+                    ELSE NULL
+                END,
                 CASE
                     WHEN %s IS NOT NULL AND %s IS NOT NULL THEN ST_SetSRID(ST_MakePoint(%s, %s), 4326)
                     ELSE NULL
@@ -482,6 +564,7 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
                 total_floors = COALESCE(EXCLUDED.total_floors, buildings.total_floors),
                 unit_count = COALESCE(EXCLUDED.unit_count, buildings.unit_count),
                 geom_gcj02 = COALESCE(EXCLUDED.geom_gcj02, buildings.geom_gcj02),
+                geom_wgs84 = COALESCE(EXCLUDED.geom_wgs84, buildings.geom_wgs84),
                 updated_at = NOW()
             """,
             (
@@ -490,10 +573,14 @@ def _upsert_reference_catalog(cur, Jsonb, communities: list[dict[str, Any]], bui
                 building["building_name"],
                 building.get("total_floors"),
                 building.get("unit_count"),
-                building.get("center_lng"),
-                building.get("center_lat"),
-                building.get("center_lng"),
-                building.get("center_lat"),
+                b_gcj_lng,
+                b_gcj_lat,
+                b_gcj_lng,
+                b_gcj_lat,
+                b_wgs_lng,
+                b_wgs_lat,
+                b_wgs_lng,
+                b_wgs_lat,
             ),
         )
         alias_candidates = {building["building_name"], *(building.get("aliases") or [])}
@@ -1403,8 +1490,11 @@ def sync_anchor_confirmation_to_postgres(
                 ],
             )
             aliases = sorted({alias for alias in (payload.get("communityAliases") or community_row.get("aliases") or []) if alias})
-            center_lng = community_row.get("center_lng")
-            center_lat = community_row.get("center_lat")
+            # Anchor candidates originate from AMAP POI search (GCJ-02); resolve
+            # both datums so centroid_gcj02 and centroid_wgs84 stay a true pair.
+            anchor_gcj, anchor_wgs = _resolve_datum_pair(community_row)
+            anchor_gcj_lng, anchor_gcj_lat = (anchor_gcj if anchor_gcj else (None, None))
+            anchor_wgs_lng, anchor_wgs_lat = (anchor_wgs if anchor_wgs else (None, None))
             cur.execute(
                 """
                 INSERT INTO communities (
@@ -1413,6 +1503,7 @@ def sync_anchor_confirmation_to_postgres(
                     name,
                     aliases_json,
                     centroid_gcj02,
+                    centroid_wgs84,
                     source_confidence,
                     anchor_source,
                     anchor_quality,
@@ -1428,6 +1519,10 @@ def sync_anchor_confirmation_to_postgres(
                         WHEN %s IS NOT NULL AND %s IS NOT NULL THEN ST_SetSRID(ST_MakePoint(%s, %s), 4326)
                         ELSE NULL
                     END,
+                    CASE
+                        WHEN %s IS NOT NULL AND %s IS NOT NULL THEN ST_SetSRID(ST_MakePoint(%s, %s), 4326)
+                        ELSE NULL
+                    END,
                     %s,
                     %s,
                     %s,
@@ -1439,6 +1534,7 @@ def sync_anchor_confirmation_to_postgres(
                     name = EXCLUDED.name,
                     aliases_json = EXCLUDED.aliases_json,
                     centroid_gcj02 = COALESCE(EXCLUDED.centroid_gcj02, communities.centroid_gcj02),
+                    centroid_wgs84 = COALESCE(EXCLUDED.centroid_wgs84, communities.centroid_wgs84),
                     source_confidence = COALESCE(EXCLUDED.source_confidence, communities.source_confidence),
                     anchor_source = COALESCE(EXCLUDED.anchor_source, communities.anchor_source),
                     anchor_quality = COALESCE(EXCLUDED.anchor_quality, communities.anchor_quality),
@@ -1451,10 +1547,14 @@ def sync_anchor_confirmation_to_postgres(
                     district_id,
                     community_row.get("community_name") or payload.get("communityName") or community_id,
                     Jsonb(aliases),
-                    center_lng,
-                    center_lat,
-                    center_lng,
-                    center_lat,
+                    anchor_gcj_lng,
+                    anchor_gcj_lat,
+                    anchor_gcj_lng,
+                    anchor_gcj_lat,
+                    anchor_wgs_lng,
+                    anchor_wgs_lat,
+                    anchor_wgs_lng,
+                    anchor_wgs_lat,
                     float(community_row.get("source_confidence") or payload.get("anchorQuality") or 0.95),
                     community_row.get("anchor_source") or payload.get("anchorSource"),
                     community_row.get("anchor_quality") or payload.get("anchorQuality"),

@@ -3,13 +3,30 @@
 [![Validate](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml/badge.svg)](https://github.com/Leonard-Don/yieldwise/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Open-source workbench for analyzing rental-yield data across Chinese cities — visualize properties on a map, compute yield / payback / occupancy KPIs.**
+**Open-source workbench for analyzing rental-yield data — visualize properties on a map, compute yield / payback / occupancy KPIs.**
 
-[中文 README](README.zh.md) · [Live demo](#quick-start) · [Browser capture import](docs/internal/import-public-browser-capture.md)
+[中文 README](README.zh.md)
 
 <p align="center">
   <img src="docs/screenshots/atlas-workbench-overview.png" alt="Yieldwise workbench overview" width="100%" />
 </p>
+
+## Contents
+
+- [What is this](#what-is-this)
+- [Who is this for](#who-is-this-for)
+- [Why it exists](#why-it-exists)
+- [Quick start](#quick-start)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Data sources](#data-sources)
+- [Limitations](#limitations)
+- [Development and testing](#development-and-testing)
+- [Documentation](#documentation)
+- [Project status](#project-status)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
 
 ## What is this
 
@@ -72,13 +89,26 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 
 ## Features
 
-- **Three workflows on one map**: 收益猎手 (yield hunter) · 自住找房 (homebuyer) · 全市观察 (city overview)
+- **One research desk** — citywide map, key buildings, floor-level evidence, and public-page sampling on a single workbench: judge where to look first, then decide what to capture next.
 - **Candidate research loop** for communities / buildings / districts, grouped by due review, target triggers, price/sample changes, evidence gaps, and shortlist state
 - **Candidate comparison + local memo export**, including investment thesis, buy reasons, objections, evidence sources, pending checks, and next actions
 - **OSM + AMAP merged building footprints** with quota-based community matching
 - **Ops refresh center** for dry-running and executing staged reference/import/geo/metrics refresh jobs, with job history, anomaly triage, and geometry QA
 
-## Data sources (transparency)
+<p align="center">
+  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Yieldwise ops refresh center" width="100%" />
+</p>
+
+## Architecture
+
+- **Backend** — FastAPI (Python 3.13); all HTTP routes live in `api/main.py`.
+- **Database** — PostgreSQL + PostGIS; schema in `db/schema.sql`, applied automatically on first use.
+- **Frontend** — vanilla JavaScript, no framework. A backstage research workbench in `frontend/backstage/` and a lighter end-user view in `frontend/user/`.
+- **Data pipeline** — standalone import/refresh scripts in `jobs/` produce timestamped, reversible staged runs; nothing is overwritten in place.
+
+Coordinates are stored in both GCJ-02 and WGS-84 so AMAP communities and OSM footprints stay datum-consistent.
+
+## Data sources
 
 | Layer | Source | License |
 |---|---|---|
@@ -89,11 +119,39 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 
 Yieldwise keeps the listing path to public-page browser scraping only: no manual data-entry UI and no auto-fetching of anything that requires authorization.
 
+## Limitations
+
+- **Shanghai only** — no multi-city abstraction; city constants are inlined in `api/config/city.py`.
+- **Sample data is not a live feed** — bundled listings are synthetic / browser-sampled snapshots; real analysis depends on running open-data imports or public-page sampling batches yourself.
+- **Snapshot-based, not real-time** — metrics reflect the last refresh, not the live market.
+- **Needs a free AMAP key** for the map to render.
+- **No authentication** — built to run locally as a single-user tool; don't expose it to a network as-is.
+
+## Development and testing
+
+```bash
+pip install -r api/requirements-dev.txt   # test + lint dependencies
+pytest                                    # backend tests
+node --test tests/frontend/*.mjs           # frontend unit tests
+ruff check .                               # lint
+```
+
+On every push and pull request, CI ([`validate.yml`](.github/workflows/validate.yml)) also runs a Python compile check, JavaScript syntax checks, and a route smoke test. See [CONTRIBUTING.md](CONTRIBUTING.md) for the staged-data workflow and common refresh commands.
+
+## Documentation
+
+- [Changelog](docs/CHANGELOG.md)
+- [API contract](docs/api-contract.md)
+- [Importing geo assets](docs/import-geo-assets.md)
+- [Importing the reference dictionary](docs/import-reference-dictionary.md)
+- [Browser-capture import](docs/internal/import-public-browser-capture.md)
+- [Dependency licenses](docs/legal/dependency-licenses.md)
+
 ## Project status
 
-**v1.0 self-use final** (2026-05-05) — feature development frozen.
+**v1.0 — maintenance mode.** Yieldwise is a personal local real-estate research workbench, not a commercial product. The core self-use loop is complete; ongoing work is limited to bug fixes and data-quality / correctness improvements rather than a roadmap of new features.
 
-This version is intentionally closed as a personal local real-estate research workbench, not a commercial product. The complete self-use loop is:
+The self-use loop it supports:
 
 - Discover opportunities on the map → inspect community / building / floor evidence → add to the candidate desk
 - Set target price, target rent, target yield, and review due dates
@@ -102,16 +160,11 @@ This version is intentionally closed as a personal local real-estate research wo
 - Export local Markdown decision memos
 - Maintain data quality, public sampling, review queues, and geometry QA from the backstage refresh center
 
-Future work policy:
-
-- No new feature development is planned
-- Only blocking bugs, data-quality issues, or repeated real-use pain points should reopen development
-- Shanghai-only; no multi-city abstraction. City constants live in `api/config/city.py`
-- Backend, frontend, and full-browser regression tests are the closure validation baseline
+Backend, frontend, and full-browser regression tests are the validation baseline.
 
 ## Contributing
 
-The project is now frozen for self-use. Blocking bugs and data-quality issues can still be filed. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Yieldwise is in maintenance mode with no new-feature roadmap, but blocking bugs and data-quality issues are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
