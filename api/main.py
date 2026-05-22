@@ -973,10 +973,10 @@ def favicon_svg() -> FileResponse:
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon_ico() -> FileResponse:
-    path = ROOT_DIR / "favicon.ico"
+    path = ROOT_DIR / "favicon.svg"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/x-icon")
+    return FileResponse(path, media_type="image/svg+xml")
 
 
 app.mount(
