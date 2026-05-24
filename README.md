@@ -95,10 +95,6 @@ This is only for local exploration. Real analysis should use Postgres/PostGIS pl
 - **OSM + AMAP merged building footprints** with quota-based community matching
 - **Ops refresh center** for dry-running and executing staged reference/import/geo/metrics refresh jobs, with job history, anomaly triage, and geometry QA
 
-<p align="center">
-  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Yieldwise ops refresh center" width="100%" />
-</p>
-
 ## Architecture
 
 - **Backend** — FastAPI (Python 3.13); all HTTP routes live in `api/main.py`.

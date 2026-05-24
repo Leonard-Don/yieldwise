@@ -95,10 +95,6 @@ ATLAS_ENABLE_DEMO_MOCK=1 uvicorn api.main:app --reload --port 8000
 - **OSM + 高德楼栋融合** 含 per-community 配额匹配
 - **Ops 刷新中心**：在后台 dry-run 并执行 staged reference/import/geo/metrics 刷新 job，保留执行历史、异常处理队列和几何 QA
 
-<p align="center">
-  <img src="docs/screenshots/atlas-ops-workbench.png" alt="Yieldwise 刷新中心" width="100%" />
-</p>
-
 ## 架构
 
 - **后端** —— FastAPI（Python 3.13）；全部 HTTP 路由在 `api/main.py`。
