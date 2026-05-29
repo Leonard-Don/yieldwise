@@ -12,9 +12,9 @@
 
 当前脚手架需要 3 份 `CSV`：
 
-- [data/templates/district_dictionary_template.csv](/Users/leonardodon/project house/data/templates/district_dictionary_template.csv)
-- [data/templates/community_dictionary_template.csv](/Users/leonardodon/project house/data/templates/community_dictionary_template.csv)
-- [data/templates/building_dictionary_template.csv](/Users/leonardodon/project house/data/templates/building_dictionary_template.csv)
+- [data/templates/district_dictionary_template.csv](../data/templates/district_dictionary_template.csv)
+- [data/templates/community_dictionary_template.csv](../data/templates/community_dictionary_template.csv)
+- [data/templates/building_dictionary_template.csv](../data/templates/building_dictionary_template.csv)
 
 ## 字段要求
 
