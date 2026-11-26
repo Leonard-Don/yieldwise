@@ -6,6 +6,13 @@
 
 ---
 
+## 2026-11-26 — Phase 7h: 导出与几何 helpers 迁出 service.py
+
+- GeoJSON / KML / CSV 导出（`build_geojson`、`build_kml`、`build_geo_work_order_*`、`build_geo_task_watchlist_*`、`build_floor_watchlist_*` 等）和 SVG↔经纬度几何 helpers 共 31 个函数迁到 `api/geo_export.py`
+- service.py 6182 → 5195 行；service.py 继续 re-export 这些名字，`api.main` 等调用方不变
+- `geo_export` 对 `flatten_communities` / `floor_watchlist` / `get_community` / `get_building` 走 lazy `service()` 引用，避免循环 import，测试对 `api.service.*` 的 monkeypatch 仍然生效
+- 零行为变化：demo mock 模式下 9 个导出函数输出与迁移前逐字节一致
+
 ## 2026-05-05 — v1.0 自用闭环版：功能开发冻结
 
 - 将项目状态收口为 **v1.0 self-use final / 自用闭环版**，版本号升至 `1.0.0`
